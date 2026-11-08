@@ -1,0 +1,162 @@
+'use strict';
+/**
+ * FrotaGest — quem é o usuário e o que ele pode ver/fazer.
+ *
+ * Perfis:
+ *  - master       (Reis Tecnologia) vê todas as empresas; cadastra empresas, aparelhos e portas/protocolos.
+ *  - admin        administra a própria empresa: usuários, grupos e veículos; vê toda a frota dela.
+ *  - operador     mapa, vídeo ao vivo, gravações do DVR e tratamento de alertas (nos grupos liberados).
+ *  - visualizador mapa, vídeo ao vivo, histórico e alertas, sem gravações nem tratamento.
+ * Reis Tecnologia
+ */
+const { HttpErro, agora } = require('../util/comum');
+
+const PERFIS = {
+  master: { nome: 'Master (Reis Tecnologia)', video: true, gravacoes: true, tratarAlertas: true, cadastros: true, auditoria: true, sistema: true },
+  admin: { nome: 'Administrador da empresa', video: true, gravacoes: true, tratarAlertas: true, cadastros: true, auditoria: true, sistema: false },
+  operador: { nome: 'Operador', video: true, gravacoes: true, tratarAlertas: true, cadastros: false, auditoria: false, sistema: false },
+  visualizador: { nome: 'Visualizador', video: true, gravacoes: false, tratarAlertas: false, cadastros: false, auditoria: false, sistema: false },
+};
+
+const CACHE_MS = 30000;
+
+class Acesso {
+  constructor({ banco, firebase, frota, proprietarios = [], log = () => {} }) {
+    this.banco = banco;
+    this.firebase = firebase;
+    this.frota = frota;
+    this.proprietarios = new Set(proprietarios.map((e) => String(e).trim().toLowerCase()).filter(Boolean));
+    this.log = log;
+    this.cache = new Map(); // uid → { u, ate }
+    this.acessos = new Map(); // usuario_id → última gravação de ultimo_acesso
+    frota.on('recarregada', () => this.invalidar());
+  }
+
+  invalidar() {
+    this.cache.clear();
+  }
+
+  /** Token do Firebase → usuário do FrotaGest. Erros: 401 (token) ou 403 (sem cadastro/bloqueado). */
+  async doToken(token) {
+    let claims;
+    try {
+      claims = await this.firebase.verificar(token);
+    } catch (e) {
+      throw new HttpErro(401, 'Sessão inválida ou expirada. Entre novamente.', 'token_invalido');
+    }
+    const c = this.cache.get(claims.uid);
+    if (c && c.ate > Date.now()) return c.u;
+    const u = await this.resolver(claims);
+    this.cache.set(claims.uid, { u, ate: Date.now() + CACHE_MS });
+    if (this.cache.size > 2000) this.cache.delete(this.cache.keys().next().value);
+    return u;
+  }
+
+  async resolver(claims) {
+    let row = await this.banco.um('SELECT * FROM usuarios WHERE firebase_uid = ?', [claims.uid]);
+    if (!row && claims.email) {
+      const porEmail = await this.banco.um('SELECT * FROM usuarios WHERE email = ?', [claims.email]);
+      if (porEmail) {
+        if (porEmail.firebase_uid && porEmail.firebase_uid !== claims.uid) {
+          throw new HttpErro(403, 'Este e-mail está ligado a outra conta de login. Peça ao administrador para reenviar o convite.', 'conta_divergente');
+        }
+        // primeiro acesso de quem foi convidado com e-mail que já tinha conta no Firebase: exige e-mail confirmado
+        if (!claims.emailVerificado) throw new HttpErro(403, 'Confirme o seu e-mail para concluir o primeiro acesso.', 'email_nao_verificado');
+        await this.banco.query('UPDATE usuarios SET firebase_uid = ? WHERE id = ? AND firebase_uid IS NULL', [claims.uid, porEmail.id]);
+        row = { ...porEmail, firebase_uid: claims.uid };
+      } else if (this.proprietarios.has(claims.email)) {
+        if (!claims.emailVerificado) throw new HttpErro(403, 'Confirme o seu e-mail para entrar como proprietário do sistema.', 'email_nao_verificado');
+        const nome = claims.nome || claims.email.split('@')[0];
+        const r = await this.banco.query(
+          "INSERT INTO usuarios (email, nome, perfil, firebase_uid, todos_grupos, ativo) VALUES (?, ?, 'master', ?, 1, 1)",
+          [claims.email, nome.slice(0, 120), claims.uid],
+        );
+        row = await this.banco.um('SELECT * FROM usuarios WHERE id = ?', [r.insertId]);
+        this.log('ok', `Proprietário do sistema ${claims.email} entrou pela primeira vez (perfil master criado)`);
+      }
+    }
+    if (!row) throw new HttpErro(403, 'Seu login não tem cadastro no FrotaGest. Peça acesso ao administrador da sua empresa.', 'sem_cadastro');
+    if (!row.ativo) throw new HttpErro(403, 'Seu acesso ao FrotaGest está desativado.', 'inativo');
+    let empresaNome = null;
+    if (row.perfil !== 'master') {
+      const emp = this.frota.empresas.get(row.empresa_id);
+      if (!emp || !emp.ativo) throw new HttpErro(403, 'O acesso da sua empresa ao FrotaGest está desativado.', 'empresa_inativa');
+      empresaNome = emp.nome;
+    }
+    const todos = Boolean(row.todos_grupos) || row.perfil === 'master' || row.perfil === 'admin';
+    const grupos = new Set();
+    if (!todos) {
+      const gs = await this.banco.query('SELECT grupo_id FROM usuario_grupos WHERE usuario_id = ?', [row.id]);
+      for (const g of gs) this.frota.descendentes(g.grupo_id, grupos);
+    }
+    return {
+      id: row.id,
+      uid: row.firebase_uid,
+      nome: row.nome,
+      email: row.email,
+      perfil: row.perfil,
+      perfilNome: PERFIS[row.perfil].nome,
+      empresaId: row.perfil === 'master' ? null : row.empresa_id,
+      empresaNome,
+      todosGrupos: todos,
+      grupos,
+      pode: PERFIS[row.perfil],
+    };
+  }
+
+  /** Grava o último acesso (no máximo uma vez a cada 5 minutos por usuário). */
+  async marcarAcesso(u) {
+    const ultimo = this.acessos.get(u.id) || 0;
+    if (Date.now() - ultimo < 300000) return false;
+    this.acessos.set(u.id, Date.now());
+    await this.banco.query('UPDATE usuarios SET ultimo_acesso = ? WHERE id = ?', [agora(), u.id]).catch(() => {});
+    return true;
+  }
+
+  /* ---------- regras de visibilidade ---------- */
+
+  veVeiculo(u, v) {
+    if (!v) return false;
+    if (u.perfil === 'master') return true;
+    if (v.empresa_id !== u.empresaId) return false;
+    if (u.todosGrupos) return true;
+    return v.grupo_id !== null && v.grupo_id !== undefined && u.grupos.has(v.grupo_id);
+  }
+
+  veAparelho(u, ap) {
+    if (!ap) return false;
+    if (u.perfil === 'master') return true;
+    if (ap.empresa_id !== u.empresaId) return false;
+    const v = this.frota.veiculoDoAparelho.get(ap.id);
+    if (v) return this.veVeiculo(u, v);
+    return u.perfil === 'admin'; // aparelho ainda sem veículo: só o administrador vê
+  }
+
+  /** Aparelho conectado pelo número (identificador): existe e o usuário pode ver? */
+  aparelhoVisivel(u, ident) {
+    const ap = this.frota.porIdent.get(ident);
+    if (!ap) return u.perfil === 'master'; // pendente de cadastro: só o master
+    return this.veAparelho(u, ap);
+  }
+
+  veItem(u, item) {
+    if (!item) return false;
+    if (u.perfil === 'master') return true;
+    if (item.pendente) return false;
+    if (item.empresaId !== u.empresaId) return false;
+    if (item.veiculoId) return this.veVeiculo(u, this.frota.veiculos.get(item.veiculoId));
+    return u.perfil === 'admin';
+  }
+}
+
+function exigir(u, capacidade) {
+  if (!u || !u.pode[capacidade]) throw new HttpErro(403, 'Seu perfil não tem acesso a esta função.', 'perfil');
+}
+
+/** Empresa em que a operação acontece: o master escolhe (ou todas = null); os demais, sempre a própria. */
+function empresaAlvo(u, pedida) {
+  if (u.perfil === 'master') return pedida || null;
+  return u.empresaId;
+}
+
+module.exports = { Acesso, PERFIS, exigir, empresaAlvo };

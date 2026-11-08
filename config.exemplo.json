@@ -1,0 +1,10 @@
+{
+  "banco": { "host": "127.0.0.1", "porta": 3306, "usuario": "frotagest", "senha": "", "nome": "frotagest", "conexoes": 10, "fusoMinutos": -180 },
+  "firebase": { "projectId": "", "apiKey": "", "authDomain": "" },
+  "proprietarios": [],
+  "gateway": { "host": "0.0.0.0", "idleTimeoutSec": 300, "maxConnections": 1000, "requireAuth": false, "acceptUnknownAuthCode": true },
+  "media": { "host": "0.0.0.0", "publicHost": "", "maxConnections": 300, "autoStopSec": 20, "converterH265": true, "maxConversoes": 6, "maxKbpsConversao": 1000 },
+  "web": { "host": "127.0.0.1", "port": 8080, "allowedHosts": [], "publicUrl": "" },
+  "gravacoes": { "maxGB": 5, "retencaoDias": 7, "ffmpeg": "ffmpeg", "tipoMidia": 2, "tipoFluxo": 0, "armazenamento": 0, "esperaVideoSeg": 90 },
+  "logs": { "diasArquivo": 14 }
+}

@@ -1,0 +1,22 @@
+{
+  "name": "frotagest",
+  "version": "1.0.0",
+  "private": true,
+  "description": "FrotaGest — monitoramento de frota em tempo real para DVRs 4G (JT/T 808 + JT/T 1078). Reis Tecnologia",
+  "main": "server.js",
+  "author": "Reis Tecnologia",
+  "scripts": {
+    "start": "node server.js",
+    "simulador": "node tools/simulador-dvr.js",
+    "simulador:h265": "node tools/simulador-dvr.js --h265"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "jmuxer": "2.1.0",
+    "leaflet": "1.9.4",
+    "mysql2": "^3.11.5"
+  },
+  "license": "UNLICENSED"
+}
