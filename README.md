@@ -95,7 +95,11 @@ git clone git@github-frotagest:reisconsultoriatec-collab/frotagest.git ~/frotage
 
 ### 4.3 Servidor (instância “cameras”)
 
+A instância usa o Ubuntu “minimizado”, que vem sem o git. Instale-o antes de clonar:
+
 ```bash
+sudo apt update && sudo apt install -y git
+git clone https://github.com/reisconsultoriatec-collab/frotagest.git ~/frotagest
 bash ~/frotagest/deploy/instalar-frotagest.sh
 ```
 
