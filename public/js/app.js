@@ -1,5 +1,5 @@
 'use strict';
-/* FrotaGest — início do painel: login (Firebase), cabeçalho e navegação. Reis Tecnologia */
+/* FrotaGest — início do painel: entrar / criar conta (Firebase), cabeçalho e navegação. Reis Tecnologia */
 
 const ERROS_LOGIN = {
   'auth/invalid-credential': 'E-mail ou senha incorretos.',
@@ -11,41 +11,141 @@ const ERROS_LOGIN = {
   'auth/too-many-requests': 'Muitas tentativas seguidas. Aguarde alguns minutos ou use "Esqueci minha senha".',
   'auth/network-request-failed': 'Sem conexão com o serviço de login. Verifique a internet.',
   'auth/missing-password': 'Digite a senha.',
+  'auth/email-already-in-use': 'Este e-mail já tem login. Use a aba "Entrar" (ou "Esqueci minha senha").',
+  'auth/weak-password': 'Senha fraca: use pelo menos 8 caracteres, com uma letra maiúscula e um número.',
+  'auth/operation-not-allowed': 'O login por e-mail e senha está desativado no Firebase.',
+  'auth/admin-restricted-operation': 'A criação de contas está desligada no Firebase (Authentication › Configurações › Ações do usuário).',
 };
+const ERROS_SENHA = ['auth/invalid-credential', 'auth/invalid-login-credentials', 'auth/wrong-password', 'auth/user-not-found'];
 
 let primeiroAcesso = true;
+let cadastrando = false; // durante o "Criar conta" o painel não reage à troca de login
 
-function mostrarGate(estado, texto = '') {
+function validarSenha(s) {
+  if (!s || s.length < 8 || !/[A-Z]/.test(s) || !/\d/.test(s)) {
+    throw new Error('A senha precisa ter pelo menos 8 caracteres, com uma letra maiúscula e um número.');
+  }
+}
+
+const campoSenha = (id, auto) => `<span class="pw"><input type="password" id="${id}" autocomplete="${auto}" required><button type="button" data-ver="${id}" aria-label="Mostrar senha">${ico('eye', 'i-sm')}</button></span>`;
+
+function mostrarGate(estado, extra = {}) {
+  if (typeof extra === 'string') extra = { texto: extra };
   $('#carregando').hidden = true;
   $('#shell').hidden = true;
   $('#gate').hidden = false;
   const box = $('#gate-box');
-  const topo = `<div class="gate-ico">${ico(estado === 'login' ? 'lock' : 'info-circle')}</div>`;
+  const rodape = `<div class="gate-foot">Reis Tecnologia · FrotaGest ${H(S.config ? S.config.versao : '')}</div>`;
+  const icone = (n, cls = '') => `<div class="gate-ico ${cls}">${ico(n)}</div>`;
+
+  if (estado === 'login' || estado === 'cadastro') {
+    const abas = `<div class="seg gate-abas" role="tablist">
+      <button class="seg-btn${estado === 'login' ? ' active' : ''}" type="button" data-aba="login">Entrar</button>
+      <button class="seg-btn${estado === 'cadastro' ? ' active' : ''}" type="button" data-aba="cadastro">Criar conta</button></div>`;
+    if (estado === 'login') {
+      box.innerHTML = `${icone('lock')}<h2>Entrar no FrotaGest</h2><p>Use o seu e-mail e a sua senha.</p>${abas}
+        <form class="login-form" id="login-form" novalidate>
+          <label class="fld">E-mail<input type="email" id="login-email" autocomplete="username" required></label>
+          <label class="fld">Senha${campoSenha('login-senha', 'current-password')}</label>
+          <p class="gate-msg err" id="gate-msg" hidden></p>
+          <button class="btn btn-primary" type="submit" id="gate-ok">Entrar</button>
+          <div class="gate-links"><button class="link" type="button" id="login-esqueci">Esqueci minha senha</button></div>
+        </form>${rodape}`;
+    } else {
+      box.innerHTML = `${icone('user-plus')}<h2>Criar conta</h2><p>Crie o seu login com o código que o administrador da sua empresa passou.</p>${abas}
+        <form class="login-form" id="cad-form" novalidate>
+          <label class="fld">Seu nome completo<input id="cad-nome" maxlength="120" autocomplete="name" required></label>
+          <label class="fld">E-mail<input type="email" id="cad-email" maxlength="160" autocomplete="username" required></label>
+          <label class="fld">Senha${campoSenha('cad-senha', 'new-password')}<small>Mínimo de 8 caracteres, com uma letra maiúscula e um número.</small></label>
+          <label class="fld">Código da empresa<input id="cad-codigo" maxlength="12" autocomplete="off" class="codigo-input" placeholder="Ex.: K7M2Q9XA">
+            <small>Peça ao administrador da sua empresa. O proprietário do sistema deixa em branco.</small></label>
+          <p class="gate-msg err" id="gate-msg" hidden></p>
+          <button class="btn btn-primary" type="submit" id="gate-ok">Criar conta</button>
+        </form>${rodape}`;
+    }
+  } else if (estado === 'completar') {
+    const u = firebase.auth().currentUser;
+    box.innerHTML = `${icone('user-check')}<h2>Concluir cadastro</h2>
+      <p>O login <b>${H(u ? u.email : '')}</b> existe, mas falta concluir o cadastro no FrotaGest.</p>
+      <form class="login-form" id="comp-form" novalidate>
+        <label class="fld">Seu nome completo<input id="cad-nome" maxlength="120" autocomplete="name" required></label>
+        <label class="fld">Código da empresa<input id="cad-codigo" maxlength="12" autocomplete="off" class="codigo-input" placeholder="Ex.: K7M2Q9XA">
+          <small>Peça ao administrador da sua empresa. O proprietário do sistema deixa em branco.</small></label>
+        <p class="gate-msg err" id="gate-msg" hidden></p>
+        <button class="btn btn-primary" type="submit" id="gate-ok">Concluir cadastro</button>
+        <div class="gate-links"><button class="link" type="button" data-sair>Sair e usar outro login</button></div>
+      </form>${rodape}`;
+    $('#cad-nome').value = extra.nome || (u && u.displayName) || '';
+    $('#cad-codigo').value = extra.codigo || '';
+  } else if (estado === 'pendente') {
+    box.innerHTML = `${icone('clock-pause', 'aviso')}<h2>Aguardando aprovação</h2>
+      <p>Seu cadastro${extra.empresa ? ` em <b>${H(extra.empresa)}</b>` : ''} foi recebido. O administrador da empresa precisa aprovar o seu acesso e escolher o que você pode ver.</p>
+      <p class="gate-msg info" id="gate-msg" hidden></p>
+      <div class="gate-acoes"><button class="btn btn-primary" type="button" data-verificar>${ico('refresh', 'i-sm')} Verificar novamente</button>
+        <button class="btn btn-ghost" type="button" data-sair>Sair</button></div>${rodape}`;
+  } else if (estado === 'verificar') {
+    box.innerHTML = `${icone('mail')}<h2>Confirme o seu e-mail</h2>
+      <p>${H(extra.texto || 'Enviamos um link de confirmação para o seu e-mail.')} Abra o e-mail (veja também o spam), clique no link e depois em "Já confirmei".</p>
+      <p class="gate-msg info" id="gate-msg" hidden></p>
+      <div class="gate-acoes"><button class="btn btn-primary" type="button" data-ja>Já confirmei</button>
+        <button class="btn" type="button" data-reenviar>Enviar o link de novo</button>
+        <button class="btn btn-ghost" type="button" data-sair>Sair</button></div>${rodape}`;
+  } else {
+    const titulos = { bloqueado: 'Acesso não liberado', config: 'Login ainda não configurado', sdk: 'Não foi possível carregar o login', erro: 'Não foi possível abrir o FrotaGest' };
+    box.innerHTML = `${icone('info-circle')}<h2>${H(titulos[estado] || 'Aviso')}</h2><p>${H(extra.texto || '')}</p>
+      <div class="gate-acoes">${estado === 'bloqueado' || estado === 'erro' ? '<button class="btn btn-primary" type="button" data-sair>Entrar com outro login</button>' : '<button class="btn btn-primary" type="button" data-recarregar>Tentar de novo</button>'}</div>${rodape}`;
+  }
+
+  const msg = $('#gate-msg');
+  const mostrar = (t, tipo = 'err') => { if (!msg) return; msg.textContent = t; msg.className = `gate-msg ${tipo}`; msg.hidden = !t; };
+  if (extra.erro) mostrar(extra.erro);
+  else if (extra.texto && (estado === 'login' || estado === 'cadastro')) mostrar(extra.texto);
+
+  // eventos
+  box.querySelectorAll('[data-aba]').forEach((b) => b.addEventListener('click', () => mostrarGate(b.dataset.aba)));
+  box.querySelectorAll('[data-ver]').forEach((b) => b.addEventListener('click', () => {
+    const s = $(`#${b.dataset.ver}`);
+    s.type = s.type === 'password' ? 'text' : 'password';
+  }));
+  box.querySelectorAll('[data-sair]').forEach((b) => b.addEventListener('click', sair));
+  const rec = box.querySelector('[data-recarregar]');
+  if (rec) rec.addEventListener('click', () => location.reload());
+  const verif = box.querySelector('[data-verificar]');
+  if (verif) verif.addEventListener('click', async () => { verif.disabled = true; await entrar(); });
+  const ja = box.querySelector('[data-ja]');
+  if (ja) {
+    ja.addEventListener('click', async () => {
+      ja.disabled = true;
+      const u = firebase.auth().currentUser;
+      try { await u.reload(); await u.getIdToken(true); } catch { /* segue */ }
+      if (!firebase.auth().currentUser.emailVerified) {
+        mostrar('O e-mail ainda não aparece como confirmado. Abra o link do e-mail e tente de novo.', 'info');
+        ja.disabled = false;
+        return;
+      }
+      // proprietário: depois de confirmar, o cadastro de master é concluído no primeiro acesso
+      await entrar();
+    });
+  }
+  const reenv = box.querySelector('[data-reenviar]');
+  if (reenv) {
+    reenv.addEventListener('click', async () => {
+      try {
+        await firebase.auth().currentUser.sendEmailVerification();
+        mostrar(`Link enviado para ${firebase.auth().currentUser.email}. Veja também a caixa de spam.`, 'info');
+      } catch (err) { mostrar(ERROS_LOGIN[err.code] || err.message); }
+    });
+  }
+
   if (estado === 'login') {
-    box.innerHTML = `${topo}<h2>Entrar no FrotaGest</h2><p>Use o e-mail e a senha cadastrados pela sua empresa.</p>
-      <form class="login-form" id="login-form" novalidate>
-        <label class="fld">E-mail<input type="email" id="login-email" autocomplete="username" required></label>
-        <label class="fld">Senha<span class="pw"><input type="password" id="login-senha" autocomplete="current-password" required><button type="button" id="login-ver" aria-label="Mostrar senha">${ico('eye', 'i-sm')}</button></span></label>
-        <p class="gate-msg err" id="login-msg" hidden></p>
-        <button class="btn btn-primary" type="submit" id="login-ok">Entrar</button>
-        <div class="gate-links"><button class="link" type="button" id="login-esqueci">Esqueci minha senha</button></div>
-      </form>
-      <div class="gate-foot">Reis Tecnologia · FrotaGest ${H(S.config ? S.config.versao : '')}</div>`;
-    const msg = $('#login-msg');
-    const mostrar = (t, tipo = 'err') => { msg.textContent = t; msg.className = `gate-msg ${tipo}`; msg.hidden = !t; };
-    if (texto) mostrar(texto);
     $('#login-email').value = pref('ultimoEmail', '');
     setTimeout(() => ($('#login-email').value ? $('#login-senha') : $('#login-email')).focus(), 50);
-    $('#login-ver').addEventListener('click', () => {
-      const s = $('#login-senha');
-      s.type = s.type === 'password' ? 'text' : 'password';
-    });
     $('#login-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       const email = $('#login-email').value.trim();
       const senha = $('#login-senha').value;
       if (!email || !senha) { mostrar('Preencha o e-mail e a senha.'); return; }
-      const b = $('#login-ok');
+      const b = $('#gate-ok');
       b.disabled = true;
       b.textContent = 'Entrando…';
       mostrar('');
@@ -53,6 +153,9 @@ function mostrarGate(estado, texto = '') {
         salvarPref('ultimoEmail', email);
         await firebase.auth().signInWithEmailAndPassword(email, senha);
       } catch (err) {
+        if (ERROS_SENHA.includes(err.code)) {
+          fetch('/api/conta/falha-login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) }).catch(() => {});
+        }
         mostrar(ERROS_LOGIN[err.code] || `Não foi possível entrar (${err.code || err.message}).`);
         b.disabled = false;
         b.textContent = 'Entrar';
@@ -66,64 +169,94 @@ function mostrarGate(estado, texto = '') {
           if (/continue|domain|unauthorized/i.test(err.code || '')) return firebase.auth().sendPasswordResetEmail(email);
           throw err;
         });
-        mostrar(`Se ${email} tiver acesso, chegará um e-mail com o link para criar uma nova senha. Veja também a caixa de spam.`, 'ok');
+      } catch { /* mesma resposta para não revelar quais e-mails têm login */ }
+      mostrar(`Se ${email} tiver login, chegará um e-mail com o link para criar uma nova senha. Veja também a caixa de spam.`, 'ok');
+    });
+  }
+
+  if (estado === 'cadastro') {
+    setTimeout(() => $('#cad-nome').focus(), 50);
+    $('#cad-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const d = { nome: $('#cad-nome').value.trim(), email: $('#cad-email').value.trim(), senha: $('#cad-senha').value, codigo: $('#cad-codigo').value.trim().toUpperCase() };
+      try {
+        if (d.nome.length < 3) throw new Error('Informe o seu nome completo.');
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(d.email)) throw new Error('Informe um e-mail válido.');
+        validarSenha(d.senha);
+      } catch (err) { mostrar(err.message); return; }
+      const b = $('#gate-ok');
+      b.disabled = true;
+      b.textContent = 'Criando conta…';
+      mostrar('');
+      cadastrando = true;
+      try {
+        const cred = await firebase.auth().createUserWithEmailAndPassword(d.email, d.senha);
+        salvarPref('ultimoEmail', d.email);
+        cred.user.updateProfile({ displayName: d.nome }).catch(() => {});
+        cred.user.sendEmailVerification().catch(() => {});
+        await concluirCadastro(d.nome, d.codigo);
       } catch (err) {
-        mostrar(ERROS_LOGIN[err.code] || `Não foi possível enviar (${err.code || err.message}).`);
+        if (firebase.auth().currentUser) {
+          // o login foi criado, mas o código não foi aceito: corrige sem criar outra conta
+          mostrarGate('completar', { erro: err.message, nome: d.nome, codigo: d.codigo });
+        } else {
+          mostrar(ERROS_LOGIN[err.code] || err.message);
+          b.disabled = false;
+          b.textContent = 'Criar conta';
+        }
+      } finally {
+        cadastrando = false;
       }
     });
-    return;
   }
-  if (estado === 'verificar') {
-    box.innerHTML = `${topo}<h2>Confirme o seu e-mail</h2><p>${H(texto || 'Para o primeiro acesso, confirme o seu e-mail pelo link que enviamos.')}</p>
-      <p class="gate-msg info" id="gv-msg" hidden></p>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
-        <button class="btn btn-primary" type="button" id="gv-ja">Já confirmei</button>
-        <button class="btn" type="button" id="gv-enviar">Enviar o link de novo</button>
-        <button class="btn btn-ghost" type="button" id="gv-sair">Sair</button>
-      </div>`;
-    const msg = $('#gv-msg');
-    $('#gv-enviar').addEventListener('click', async () => {
+
+  if (estado === 'completar') {
+    $('#comp-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const nome = $('#cad-nome').value.trim();
+      const codigo = $('#cad-codigo').value.trim().toUpperCase();
+      if (nome.length < 3) { mostrar('Informe o seu nome completo.'); return; }
+      const b = $('#gate-ok');
+      b.disabled = true;
       try {
-        await firebase.auth().currentUser.sendEmailVerification();
-        msg.textContent = `Link enviado para ${firebase.auth().currentUser.email}. Veja também a caixa de spam.`;
-      } catch (err) { msg.textContent = ERROS_LOGIN[err.code] || err.message; }
-      msg.hidden = false;
+        await concluirCadastro(nome, codigo);
+      } catch (err) {
+        mostrar(err.message);
+        b.disabled = false;
+      }
     });
-    $('#gv-ja').addEventListener('click', async () => {
-      await firebase.auth().currentUser.reload();
-      await firebase.auth().currentUser.getIdToken(true);
-      entrar(firebase.auth().currentUser);
-    });
-    $('#gv-sair').addEventListener('click', sair);
-    return;
   }
-  const titulos = {
-    bloqueado: 'Acesso não liberado',
-    config: 'Login ainda não configurado',
-    sdk: 'Não foi possível carregar o login',
-    erro: 'Não foi possível abrir o FrotaGest',
-  };
-  box.innerHTML = `${topo}<h2>${H(titulos[estado] || 'Aviso')}</h2><p>${H(texto)}</p>
-    <div style="display:flex;gap:8px;margin-top:8px">${estado === 'bloqueado' || estado === 'erro' ? '<button class="btn btn-primary" type="button" id="gb-sair">Entrar com outro login</button>' : '<button class="btn btn-primary" type="button" id="gb-recarregar">Tentar de novo</button>'}</div>`;
-  const s = $('#gb-sair');
-  if (s) s.addEventListener('click', sair);
-  const r = $('#gb-recarregar');
-  if (r) r.addEventListener('click', () => location.reload());
 }
 
-async function entrar(user) {
+/** Depois de criar o login no Firebase: grava o cadastro no FrotaGest (pendente ou master). */
+async function concluirCadastro(nome, codigo) {
+  let r;
+  try {
+    r = await api('/api/conta/registrar', { corpo: { nome, codigo } });
+  } catch (e) {
+    if (e.codigo === 'email_nao_verificado') { mostrarGate('verificar', 'Enviamos um link de confirmação para o seu e-mail: o acesso de proprietário só é liberado depois de confirmar.'); return; }
+    if (e.codigo === 'ja_cadastrado') { await entrar(); return; }
+    throw e;
+  }
+  if (r.status === 'pendente') { mostrarGate('pendente', { empresa: r.empresa }); return; }
+  await entrar();
+}
+
+async function entrar() {
   try {
     S.eu = await api('/api/eu', { headers: primeiroAcesso ? { 'X-Novo-Acesso': '1' } : {} });
     primeiroAcesso = false;
   } catch (e) {
     S.eu = null;
     if (e.codigo === 'email_nao_verificado') { mostrarGate('verificar', e.message); return; }
+    if (e.codigo === 'pendente') { mostrarGate('pendente', { empresa: e.dados && e.dados.empresa }); return; }
+    if (e.codigo === 'sem_cadastro') { mostrarGate('completar'); return; }
     if (e.status === 403) { mostrarGate('bloqueado', e.message); return; }
     if (e.status === 401) { await firebase.auth().signOut(); mostrarGate('login', 'Sua sessão expirou. Entre novamente.'); return; }
     mostrarGate('erro', e.message);
     return;
   }
-  abrirApp(user);
+  abrirApp();
 }
 
 async function abrirApp() {
@@ -142,6 +275,7 @@ async function abrirApp() {
   }
   atualizarSeletorEmpresa();
   atualizarResumoAlertas();
+  atualizarPendentes();
   conectarEventos();
   abrirRota();
 }
@@ -166,7 +300,6 @@ async function sair() {
 }
 
 async function iniciar() {
-  $$('.versao').forEach((x) => { x.textContent = ''; });
   try {
     S.config = await fetch('/api/publica/config').then((r) => r.json());
   } catch {
@@ -179,13 +312,14 @@ async function iniciar() {
   firebase.initializeApp(S.config.firebase);
   firebase.auth().languageCode = 'pt-BR';
   firebase.auth().onAuthStateChanged((user) => {
+    if (cadastrando) return;
     if (!user) {
       S.eu = null;
       pararEventos();
       mostrarGate('login');
       return;
     }
-    entrar(user);
+    entrar();
   });
 
   // cabeçalho
@@ -197,6 +331,7 @@ async function iniciar() {
     S.empresa = e.target.value;
     salvarPref('empresa', S.empresa);
     atualizarStatusFrota();
+    atualizarPendentes();
     emit('empresa');
     abrirRota();
   });

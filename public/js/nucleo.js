@@ -7,7 +7,8 @@ const H = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<'
 const ico = (n, cls = '') => `<svg class="i ${cls}" aria-hidden="true"><use href="#i-${n}"/></svg>`;
 const WS_PROTO = location.protocol === 'https:' ? 'wss' : 'ws';
 /* Ícones usados por nome calculado (para o gerador do sprite): ico('lock') ico('info-circle') ico('user') ico('steering-wheel')
-   ico('clock') ico('gauge') ico('route') ico('map-pin') ico('wifi') ico('bus') ico('plug-connected-x') ico('alert-triangle') */
+   ico('clock') ico('gauge') ico('route') ico('map-pin') ico('wifi') ico('bus') ico('plug-connected-x') ico('alert-triangle')
+   ico('user-plus') ico('user-check') ico('clock-pause') ico('mail') ico('refresh') ico('key') ico('copy') */
 
 /** Estado do painel. */
 const S = {
@@ -20,6 +21,7 @@ const S = {
   streams: new Map(),
   downloads: new Map(),
   alertas: { pendentes: 0, novos: 0, altas: 0 },
+  pendentes: 0, // cadastros aguardando aprovação (administrador e master)
   conectado: false,
   paginaAtual: null,
 };
@@ -143,7 +145,7 @@ async function api(caminho, { metodo, corpo, headers } = {}) {
   if (r.status === 401) r = await enviar(true); // token venceu entre uma chamada e outra
   let j = {};
   try { j = await r.json(); } catch { /* sem corpo */ }
-  if (!r.ok) throw Object.assign(new Error(j.erro || `Erro ${r.status}`), { status: r.status, codigo: j.codigo });
+  if (!r.ok) throw Object.assign(new Error(j.erro || `Erro ${r.status}`), { status: r.status, codigo: j.codigo, dados: j });
   return j;
 }
 
@@ -198,6 +200,22 @@ function atualizarResumoAlertas() {
       emit('resumo-alertas');
     } catch { /* tenta de novo no próximo evento */ }
   }, 400);
+}
+
+/** Cadastros novos aguardando aprovação: selo no menu Usuários e aviso no Início. */
+let pendentesTimer = null;
+function atualizarPendentes() {
+  if (!S.eu || !S.eu.pode.cadastros) return;
+  clearTimeout(pendentesTimer);
+  pendentesTimer = setTimeout(async () => {
+    try {
+      const r = await api(`/api/usuarios/pendentes${S.empresa ? `?${qs({ empresa: S.empresa })}` : ''}`);
+      S.pendentes = r.total;
+      const nb = $('#nav-pendentes');
+      if (nb) { nb.hidden = !r.total; nb.textContent = String(r.total); }
+      emit('pendentes');
+    } catch { /* tenta de novo no próximo aviso */ }
+  }, 300);
 }
 
 let eventosWs = null;
@@ -276,6 +294,9 @@ function tratarEvento(m) {
     case 'recarregar':
       carregarFrota().catch(() => {});
       break;
+    case 'pendentes':
+      atualizarPendentes();
+      break;
     default:
   }
 }
@@ -299,7 +320,7 @@ const NAV = [
     itens: [
       { id: 'veiculos', nome: 'Veículos', ico: 'bus' },
       { id: 'grupos', nome: 'Grupos', ico: 'folders' },
-      { id: 'usuarios', nome: 'Usuários', ico: 'users' },
+      { id: 'usuarios', nome: 'Usuários', ico: 'users', badge: 'nav-pendentes', badgeCls: 'warn' },
       { id: 'aparelhos', nome: 'Aparelhos (DVR)', ico: 'device-cctv' },
       { id: 'empresas', nome: 'Empresas', ico: 'building', master: true },
     ],
@@ -329,7 +350,7 @@ function montarNav() {
     if (!itens.length) continue;
     html += `<div class="sb-group">${H(g.grupo)}</div>`;
     for (const it of itens) {
-      html += `<a class="sb-item" href="#/${it.id}" data-nav="${it.id}">${ico(it.ico)}<span>${H(it.nome)}</span>${it.badge ? `<span class="sb-badge err" id="${it.badge}" hidden></span>` : ''}</a>`;
+      html += `<a class="sb-item" href="#/${it.id}" data-nav="${it.id}">${ico(it.ico)}<span>${H(it.nome)}</span>${it.badge ? `<span class="sb-badge ${it.badgeCls || 'err'}" id="${it.badge}" hidden></span>` : ''}</a>`;
     }
   }
   $('#nav').innerHTML = html;

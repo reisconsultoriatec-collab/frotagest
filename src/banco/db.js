@@ -115,6 +115,8 @@ class Banco {
         try {
           await this.query(sql);
         } catch (e) {
+          // coluna/índice já existe (migração interrompida no meio e rodada de novo): segue
+          if (e.code === 'ER_DUP_FIELDNAME' || e.code === 'ER_DUP_KEYNAME' || /duplicate (column|index|key) name|already exists/i.test(e.message)) continue;
           throw new Error(`migração ${f} falhou: ${e.message}\n${sql.slice(0, 300)}`);
         }
       }

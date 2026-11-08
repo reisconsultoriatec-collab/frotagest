@@ -46,11 +46,22 @@ function horaDoAparelho(texto, fusoAparelhoMin, recebidoMs = Date.now()) {
 /* ---------- erros ---------- */
 
 class HttpErro extends Error {
-  constructor(status, mensagem, codigo) {
+  /** extra: dados a mais para a tela (ex.: { empresa } no cadastro pendente) */
+  constructor(status, mensagem, codigo, extra) {
     super(mensagem);
     this.status = status;
     this.codigo = codigo || null;
+    this.extra = extra || null;
   }
+}
+
+/** Código de acesso da empresa: 8 letras/números sem os que se confundem (0/O, 1/I/L). */
+function gerarCodigo(tamanho = 8) {
+  const alfabeto = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+  const crypto = require('crypto');
+  let s = '';
+  for (let i = 0; i < tamanho; i++) s += alfabeto[crypto.randomInt(alfabeto.length)];
+  return s;
 }
 
 /* ---------- validação ---------- */
@@ -143,5 +154,6 @@ function cap(s) {
 module.exports = {
   definirFuso, formatar, agora, paraMs, horaDoAparelho,
   HttpErro,
+  gerarCodigo,
   validar: { vazio, texto, email, inteiro, id, booleano, opcao, placa, identificador, dataHora, documento },
 };

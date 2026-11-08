@@ -66,9 +66,10 @@ Os prazos mudam em **Sistema › Configurações**; a limpeza roda sozinha toda 
 3. **Authentication › Settings › Authorized domains**: adicione `frotagest.reisconsultoriatec.com`.
 4. **Authentication › Templates**: troque o idioma para **Português (Brasil)** (e-mails de criar/redefinir senha).
 5. **Configurações do projeto › Geral › Seus apps › Web (</>)**: registre o app “FrotaGest” e anote `apiKey` e `projectId`.
-6. **Authentication › Users › Add user**: crie o seu login (o e-mail que será o master).
 
-> Mantenha ligada a opção de criar contas (Authentication › Settings › User actions): é por ela que o FrotaGest cria o login de quem você cadastrar e envia o e-mail para a pessoa criar a senha. Conta criada fora do FrotaGest não entra: sem cadastro no sistema, o acesso é recusado.
+> Mantenha ligada a opção de criar contas (Authentication › Settings › User actions): é por ela que cada pessoa cria o próprio login na tela **Criar conta**. Login sem cadastro aprovado no FrotaGest não entra.
+
+Não é preciso criar usuários no console do Firebase: todos (inclusive o master) criam o login pela tela de entrada do FrotaGest.
 
 ### 4.2 GitHub
 
@@ -115,13 +116,22 @@ O script (rode **sem sudo**; ele pede a senha quando precisa):
 
 O Nginx e o certificado da Cloudflare que já publicam o laboratório continuam valendo (mesma porta 8080). Numa instância nova: `sudo bash tools/nginx/instalar-dominio.sh frotagest.reisconsultoriatec.com`.
 
-### 4.4 Primeiro acesso
+### 4.4 Primeiro acesso (master)
 
-1. Abra <https://frotagest.reisconsultoriatec.com> e entre com o login criado no Firebase.
-2. O FrotaGest pede para **confirmar o e-mail** (clique em “Enviar o link de novo”, abra o e-mail e depois “Já confirmei”). Você entra como **master**.
-3. Cadastre na ordem: **Empresas › Aparelhos (DVR) › Grupos › Veículos › Usuários**.
+1. Abra <https://frotagest.reisconsultoriatec.com> e clique na aba **Criar conta**.
+2. Preencha nome, o **e-mail de proprietário** (o informado no instalador) e uma senha (mínimo de 8 caracteres, com maiúscula e número). **Deixe o código da empresa em branco.**
+3. Abra o e-mail de confirmação (veja o spam), clique no link e volte em **Já confirmei**. Você entra como **master**.
+4. Cadastre na ordem: **Empresas › Aparelhos (DVR) › Grupos › Veículos**.
    - DVRs que já se conectaram aparecem em **Sistema › Aparelhos pendentes** (e no mapa, em âmbar): clique em **Cadastrar** e o número vem preenchido.
-   - Ao cadastrar um usuário, ele recebe um e-mail para criar a senha.
+
+### 4.5 Usuários das empresas (mesmo modelo do EduGest)
+
+1. Cada empresa tem um **código de cadastro** (Usuários, no topo da tela; ou a coluna Código em Empresas). Passe o código para a equipe.
+2. A pessoa abre o FrotaGest › **Criar conta** › nome, e-mail, senha e o código. O cadastro fica **aguardando aprovação**.
+3. O administrador da empresa (ou o master) vê o aviso no Início e o selo no menu **Usuários**, clica em **Aprovar** e escolhe o perfil e os grupos (ou **Recusar**).
+4. A pessoa clica em “Verificar novamente” e entra. Senha esquecida: “Esqueci minha senha” na tela de entrada.
+
+“Gerar outro” troca o código (o antigo para de valer; quem já tem login não é afetado). Também dá para **convidar por e-mail** em Usuários: a pessoa recebe o link para criar a senha, sem precisar de aprovação.
 
 ## 5. Atualização
 
@@ -164,7 +174,8 @@ Cada perfil também diz o **horário configurado no aparelho** (Brasília, ou UT
 - 30 tentativas inválidas em 10 min bloqueiam o IP por 15 min (IP real vindo da Cloudflare).
 - Banco só em 127.0.0.1; senhas aleatórias; entradas validadas e SQL sempre parametrizado.
 - Cabeçalhos de segurança (CSP, HSTS pelo Nginx, sem iframe); só os arquivos do painel são servidos.
-- Auditoria de acessos, cadastros, vídeos de gravação, downloads e tratamento de alertas.
+- Auditoria de acessos, senhas erradas, cadastros e aprovações, vídeos de gravação, downloads e tratamento de alertas.
+- Criar conta exige o código da empresa e a aprovação do administrador; o código pode ser trocado a qualquer momento.
 - 2FA: previsto para uma próxima etapa.
 
 ## 9. Testar sem o DVR
@@ -179,8 +190,10 @@ node tools/simulador-dvr.js --id 20250703 --h265     # vídeo H.265
 | Sintoma | O que fazer |
 | --- | --- |
 | “Login ainda não configurado” | Preencha `firebase` no `config.json` e `pm2 restart frotagest` |
-| “Seu login não tem cadastro no FrotaGest” | Cadastre a pessoa em Usuários (ou confira o e-mail em `proprietarios`) |
+| “Falta concluir o seu cadastro” | O login existe no Firebase mas não no FrotaGest: informe o código da empresa (o proprietário deixa em branco) |
+| “Aguardando aprovação” | O administrador da empresa aprova em Usuários |
 | “Confirme o seu e-mail” | Primeiro acesso do master (ou de quem já tinha conta no Firebase): confirme pelo link |
+| “E-mail ou senha incorretos” | Confira a senha ou use “Esqueci minha senha”; quem nunca criou o login usa “Criar conta” |
 | E-mail de criar senha não chega | Veja o spam; Authentication › Templates; em Usuários › abrir › “Reenviar e-mail” |
 | “Banco de dados indisponível” | `sudo docker ps` / `sudo docker start frotagest-mysql`; as posições ficam na fila e são gravadas quando o banco volta |
 | DVR não aparece | Sistema › Log ao vivo; Sistema › Aparelhos pendentes; portas na Oracle e no iptables |

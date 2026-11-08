@@ -4,7 +4,7 @@
  * aparelhos pendentes e configurações. Toda alteração fica na auditoria.
  * Reis Tecnologia
  */
-const { HttpErro, validar: V } = require('../util/comum');
+const { HttpErro, validar: V, gerarCodigo } = require('../util/comum');
 const { empresaAlvo } = require('../auth/acesso');
 
 const PERFIS_USUARIO = ['master', 'admin', 'operador', 'visualizador'];
@@ -51,7 +51,7 @@ function registrar(srv) {
 
   r('GET', '/api/empresas', async ({ u }) => {
     if (u.perfil !== 'master') {
-      const e = await banco.um('SELECT id, nome, documento, contato, telefone, email, cidade, uf, ativo FROM empresas WHERE id = ?', [u.empresaId]);
+      const e = await banco.um('SELECT id, nome, documento, contato, telefone, email, cidade, uf, ativo, codigo_convite FROM empresas WHERE id = ?', [u.empresaId]);
       return { empresas: e ? [e] : [] };
     }
     const empresas = await banco.query(`
@@ -66,8 +66,17 @@ function registrar(srv) {
   r('POST', '/api/empresas', async ({ u, body, ip }) => {
     if (u.perfil !== 'master') throw new HttpErro(403, 'Só o master cadastra empresas.');
     const d = dadosEmpresa(body);
-    const x = await banco.query('INSERT INTO empresas (nome, documento, contato, telefone, email, cidade, uf, observacao) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [d.nome, d.documento, d.contato, d.telefone, d.email, d.cidade, d.uf, d.observacao]);
+    let x;
+    for (let t = 0; ; t++) {
+      try {
+        x = await banco.query('INSERT INTO empresas (nome, documento, contato, telefone, email, cidade, uf, observacao, codigo_convite) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          [d.nome, d.documento, d.contato, d.telefone, d.email, d.cidade, d.uf, d.observacao, gerarCodigo()]);
+        break;
+      } catch (e) {
+        if (t < 4 && e.code === 'ER_DUP_ENTRY' && /codigo/.test(e.message)) continue;
+        throw e;
+      }
+    }
     await frotaMudou();
     await auditoria.registrar(u, 'criar', { entidade: 'empresa', entidadeId: x.insertId, descricao: d.nome, ip, empresaId: x.insertId });
     return { id: x.insertId };
@@ -87,6 +96,20 @@ function registrar(srv) {
     await auditoria.registrar(u, acao, { entidade: 'empresa', entidadeId: id, descricao: d.nome, ip, empresaId: id });
     return { ok: true };
   }, { pode: 'sistema' });
+
+  /** Gera um código novo para a empresa (o antigo para de valer). Master: qualquer empresa; admin: a própria. */
+  r('POST', '/api/empresas/:id/codigo', async ({ u, params, ip }) => {
+    const id = V.id(params.id);
+    podeMexer(u, id);
+    if (!frota.empresas.has(id)) throw new HttpErro(404, 'Empresa não encontrada.');
+    let codigo;
+    for (let t = 0; t < 5; t++) {
+      codigo = gerarCodigo();
+      try { await banco.query('UPDATE empresas SET codigo_convite = ? WHERE id = ?', [codigo, id]); break; } catch (e) { if (e.code !== 'ER_DUP_ENTRY' || t === 4) throw e; }
+    }
+    await auditoria.registrar(u, 'novo_codigo', { entidade: 'empresa', entidadeId: id, descricao: 'gerou um código novo para cadastro da equipe', ip, empresaId: id });
+    return { codigo };
+  }, { pode: 'cadastros' });
 
   /* ---------------- grupos ---------------- */
 
@@ -155,7 +178,7 @@ function registrar(srv) {
     const emp = empresaAlvo(u, query.empresa ? V.id(query.empresa, 'a empresa') : null);
     const where = emp ? 'WHERE s.empresa_id = ?' : (u.perfil === 'master' ? '' : 'WHERE 1 = 0');
     const usuarios = await banco.query(`
-      SELECT s.id, s.empresa_id, e.nome AS empresa, s.email, s.nome, s.perfil, s.todos_grupos, s.ativo, s.ultimo_acesso, s.criado_em,
+      SELECT s.id, s.empresa_id, e.nome AS empresa, s.email, s.nome, s.perfil, s.todos_grupos, s.ativo, s.pendente, s.ultimo_acesso, s.criado_em,
              (s.firebase_uid IS NOT NULL) AS conta_ligada
         FROM usuarios s LEFT JOIN empresas e ON e.id = s.empresa_id ${where}
        ORDER BY s.ativo DESC, s.nome`, emp ? [emp] : []);
@@ -163,6 +186,38 @@ function registrar(srv) {
     const vinc = ids.length ? await banco.query('SELECT usuario_id, grupo_id FROM usuario_grupos WHERE usuario_id IN (?)', [ids]) : [];
     for (const x of usuarios) x.grupos = vinc.filter((g) => g.usuario_id === x.id).map((g) => g.grupo_id);
     return { usuarios };
+  }, { pode: 'cadastros' });
+
+  r('GET', '/api/usuarios/pendentes', async ({ u, query }) => {
+    const emp = empresaAlvo(u, query.empresa ? V.id(query.empresa, 'a empresa') : null);
+    const x = await banco.um(`SELECT COUNT(*) AS n FROM usuarios WHERE pendente = 1${emp ? ' AND empresa_id = ?' : ''}`, emp ? [emp] : []);
+    return { total: Number(x.n) || 0 };
+  }, { pode: 'cadastros' });
+
+  r('POST', '/api/usuarios/:id/aprovar', async ({ u, params, body, ip }) => {
+    const id = V.id(params.id);
+    const atual = await usuarioEditavel(u, id);
+    if (!atual.pendente) throw new HttpErro(409, 'Este cadastro já foi analisado.');
+    const perfil = V.opcao(body.perfil, ['admin', 'operador', 'visualizador'], 'o perfil');
+    const d = dadosUsuario(u, { ...body, perfil }, { ...atual, grupos: [] });
+    await banco.query('UPDATE usuarios SET perfil = ?, todos_grupos = ?, pendente = 0, ativo = 1 WHERE id = ?', [d.perfil, d.todosGrupos ? 1 : 0, id]);
+    await gravarGrupos(id, d.grupos);
+    acesso.invalidar();
+    await auditoria.registrar(u, 'aprovar', { entidade: 'usuario', entidadeId: id, descricao: `${atual.nome} <${atual.email}> (${d.perfil})`, ip, empresaId: atual.empresa_id });
+    srv.avisarPendentes(atual.empresa_id);
+    return { ok: true };
+  }, { pode: 'cadastros' });
+
+  /** Recusar apaga o cadastro pendente: a pessoa pode tentar de novo com o código certo. */
+  r('POST', '/api/usuarios/:id/recusar', async ({ u, params, ip }) => {
+    const id = V.id(params.id);
+    const atual = await usuarioEditavel(u, id);
+    if (!atual.pendente) throw new HttpErro(409, 'Este cadastro já foi analisado.');
+    await banco.query('DELETE FROM usuarios WHERE id = ? AND pendente = 1', [id]);
+    acesso.invalidar();
+    await auditoria.registrar(u, 'recusar', { entidade: 'usuario', entidadeId: id, descricao: `${atual.nome} <${atual.email}>`, ip, empresaId: atual.empresa_id });
+    srv.avisarPendentes(atual.empresa_id);
+    return { ok: true };
   }, { pode: 'cadastros' });
 
   function dadosUsuario(u, b, atual = null) {
@@ -223,6 +278,7 @@ function registrar(srv) {
   r('PUT', '/api/usuarios/:id', async ({ u, params, body, ip }) => {
     const id = V.id(params.id);
     const atual = await usuarioEditavel(u, id);
+    if (atual.pendente) throw new HttpErro(409, 'Este cadastro aguarda aprovação: use Aprovar ou Recusar.');
     if (body.email !== undefined && String(body.email).trim().toLowerCase() !== atual.email) {
       throw new HttpErro(400, 'O e-mail não pode ser trocado. Desative este usuário e cadastre outro com o e-mail novo.');
     }

@@ -9,6 +9,8 @@ const NOMES_ACAO = {
   acesso: 'Entrou no painel', saida: 'Saiu', criar: 'Cadastrou', editar: 'Alterou', desativar: 'Desativou', reativar: 'Reativou',
   excluir: 'Excluiu', convite: 'Enviou convite', tratar_alerta: 'Tratou alerta', ver_gravacao: 'Assistiu gravação',
   baixar_gravacao: 'Baixou gravação', salvar_gravacao: 'Salvou gravação', limpeza: 'Limpeza do histórico',
+  cadastro: 'Criou a conta', cadastro_recusado: 'Código de empresa inválido', aprovar: 'Aprovou cadastro', recusar: 'Recusou cadastro',
+  novo_codigo: 'Gerou código de cadastro', falha_login: 'Senha errada',
 };
 const NOMES_ENTIDADE = {
   empresa: 'Empresa', usuario: 'Usuário', grupo: 'Grupo', veiculo: 'Veículo', aparelho: 'Aparelho', aparelho_pendente: 'Aparelho pendente',

@@ -37,13 +37,31 @@ class Acesso {
   }
 
   /** Token do Firebase → usuário do FrotaGest. Erros: 401 (token) ou 403 (sem cadastro/bloqueado). */
-  async doToken(token) {
-    let claims;
+  /** Só confere o token (para o cadastro de quem ainda não tem usuário no FrotaGest). */
+  async claims(token) {
     try {
-      claims = await this.firebase.verificar(token);
+      return await this.firebase.verificar(token);
     } catch (e) {
       throw new HttpErro(401, 'Sessão inválida ou expirada. Entre novamente.', 'token_invalido');
     }
+  }
+
+  ehProprietario(email) {
+    return this.proprietarios.has(String(email || '').toLowerCase());
+  }
+
+  /** Cria o usuário master do proprietário do sistema (e-mail em "proprietarios", já confirmado). */
+  async criarMaster(claims, nome) {
+    const r = await this.banco.query(
+      "INSERT INTO usuarios (email, nome, perfil, firebase_uid, todos_grupos, ativo) VALUES (?, ?, 'master', ?, 1, 1)",
+      [claims.email, String(nome || claims.nome || claims.email.split('@')[0]).slice(0, 120), claims.uid],
+    );
+    this.log('ok', `Proprietário do sistema ${claims.email} entrou pela primeira vez (perfil master criado)`);
+    return this.banco.um('SELECT * FROM usuarios WHERE id = ?', [r.insertId]);
+  }
+
+  async doToken(token) {
+    const claims = await this.claims(token);
     const c = this.cache.get(claims.uid);
     if (c && c.ate > Date.now()) return c.u;
     const u = await this.resolver(claims);
@@ -64,18 +82,16 @@ class Acesso {
         if (!claims.emailVerificado) throw new HttpErro(403, 'Confirme o seu e-mail para concluir o primeiro acesso.', 'email_nao_verificado');
         await this.banco.query('UPDATE usuarios SET firebase_uid = ? WHERE id = ? AND firebase_uid IS NULL', [claims.uid, porEmail.id]);
         row = { ...porEmail, firebase_uid: claims.uid };
-      } else if (this.proprietarios.has(claims.email)) {
+      } else if (this.ehProprietario(claims.email)) {
         if (!claims.emailVerificado) throw new HttpErro(403, 'Confirme o seu e-mail para entrar como proprietário do sistema.', 'email_nao_verificado');
-        const nome = claims.nome || claims.email.split('@')[0];
-        const r = await this.banco.query(
-          "INSERT INTO usuarios (email, nome, perfil, firebase_uid, todos_grupos, ativo) VALUES (?, ?, 'master', ?, 1, 1)",
-          [claims.email, nome.slice(0, 120), claims.uid],
-        );
-        row = await this.banco.um('SELECT * FROM usuarios WHERE id = ?', [r.insertId]);
-        this.log('ok', `Proprietário do sistema ${claims.email} entrou pela primeira vez (perfil master criado)`);
+        row = await this.criarMaster(claims);
       }
     }
-    if (!row) throw new HttpErro(403, 'Seu login não tem cadastro no FrotaGest. Peça acesso ao administrador da sua empresa.', 'sem_cadastro');
+    if (!row) throw new HttpErro(403, 'Falta concluir o seu cadastro no FrotaGest: informe o código da sua empresa.', 'sem_cadastro');
+    if (row.pendente) {
+      const emp = this.frota.empresas.get(row.empresa_id);
+      throw new HttpErro(403, 'Seu cadastro foi recebido e aguarda a aprovação do administrador da empresa.', 'pendente', { empresa: emp ? emp.nome : '' });
+    }
     if (!row.ativo) throw new HttpErro(403, 'Seu acesso ao FrotaGest está desativado.', 'inativo');
     let empresaNome = null;
     if (row.perfil !== 'master') {

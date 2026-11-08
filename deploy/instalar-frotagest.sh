@@ -215,8 +215,8 @@ main() {
   echo "  Logs:         pm2 logs frotagest"
   echo "  Senhas do banco: $CRED"
   echo
-  echo "Primeiro acesso: no Firebase, crie o seu login (Authentication › Users › Add user) com o e-mail"
-  echo "informado como proprietário. Ao entrar, o FrotaGest pede para confirmar o e-mail e você vira o master."
+  echo "Primeiro acesso: abra o painel, clique em \"Criar conta\", use o e-mail informado como proprietário"
+  echo "e deixe o código da empresa em branco. Confirme o e-mail pelo link e você entra como master."
 }
 
 main "$@"

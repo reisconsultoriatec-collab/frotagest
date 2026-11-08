@@ -27,7 +27,8 @@ const { Acesso } = require('./src/auth/acesso');
 const { Servidor } = require('./src/web/servidor');
 const apiCadastros = require('./src/web/api-cadastros');
 const apiOperacao = require('./src/web/api-operacao');
-const { definirFuso } = require('./src/util/comum');
+const apiConta = require('./src/web/api-conta');
+const { definirFuso, gerarCodigo } = require('./src/util/comum');
 const { version } = require('./package.json');
 
 const ROOT = __dirname;
@@ -141,6 +142,13 @@ async function main() {
   const aplicadas = await banco.migrar();
   if (aplicadas.length) log('ok', `Banco atualizado: ${aplicadas.join(', ')}`);
 
+  // toda empresa precisa de um código para a equipe criar a conta
+  for (const e of await banco.query('SELECT id FROM empresas WHERE codigo_convite IS NULL')) {
+    for (let t = 0; t < 5; t++) {
+      try { await banco.query('UPDATE empresas SET codigo_convite = ? WHERE id = ?', [gerarCodigo(), e.id]); break; } catch (err) { if (err.code !== 'ER_DUP_ENTRY') throw err; }
+    }
+  }
+
   const config = new Configuracoes(banco);
   await config.carregar();
   const frota = new Frota(banco, config, { publicHost: cfg.media.publicHost });
@@ -170,6 +178,7 @@ async function main() {
     firebase, banco, config, auditoria, retencao, logs: ring, mensagens, iniciadoEm: Date.now(),
   });
   apiOperacao.registrar(srv);
+  apiConta.registrar(srv);
   apiCadastros.registrar(srv);
   srv.onLog = (e) => log(e.level, e.text, { source: 'painel' });
 

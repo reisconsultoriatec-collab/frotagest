@@ -161,6 +161,19 @@ class Servidor {
     if (this.fails.size > 5000) for (const [k, v] of this.fails) if (v.until < now && now - v.first > FAIL_WINDOW_MS) this.fails.delete(k);
   }
 
+  /** Limite simples por IP para rotas sensíveis: limite = { chave, max, minutos } */
+  limitar(ip, { chave, max, minutos }) {
+    if (!this.limites) this.limites = new Map();
+    const k = `${chave}:${ip}`;
+    const agora = Date.now();
+    let l = this.limites.get(k);
+    if (!l || agora - l.desde > minutos * 60000) l = { desde: agora, n: 0 };
+    l.n++;
+    this.limites.set(k, l);
+    if (this.limites.size > 10000) for (const [x, v] of this.limites) if (agora - v.desde > 3600000) this.limites.delete(x);
+    if (l.n > max) throw new HttpErro(429, `Muitas tentativas. Aguarde ${minutos} minutos.`, 'limite');
+  }
+
   hostOk(req) {
     return this.allowedHosts.has(String(req.headers.host || '').toLowerCase());
   }
@@ -285,8 +298,21 @@ class Servidor {
     if (!rota) return this.send(res, 404, { erro: 'rota não encontrada' });
 
     let u = null;
+    let claims = null;
     try {
-      if (!rota.publica) {
+      if (rota.limite) this.limitar(ip, rota.limite);
+      if (rota.conta) {
+        // cadastro: basta o login do Firebase (o usuário ainda não existe no FrotaGest)
+        if (this.blocked(ip)) throw new HttpErro(429, 'Muitas tentativas inválidas; aguarde 15 minutos.');
+        const m = /^Bearer\s+(.+)$/i.exec(String(req.headers.authorization || ''));
+        if (!m) throw new HttpErro(401, 'Entre com seu login para continuar.', 'sem_token');
+        try {
+          claims = await this.acesso.claims(m[1].trim());
+        } catch (e) {
+          this.fail(ip);
+          throw e;
+        }
+      } else if (!rota.publica) {
         if (this.blocked(ip)) throw new HttpErro(429, 'Muitas tentativas inválidas; aguarde 15 minutos.');
         const m = /^Bearer\s+(.+)$/i.exec(String(req.headers.authorization || ''));
         if (!m) throw new HttpErro(401, 'Entre com seu login para continuar.', 'sem_token');
@@ -300,11 +326,11 @@ class Servidor {
       }
       const body = await this.readJson(req);
       const query = Object.fromEntries(url.searchParams.entries());
-      const r = await rota.handler({ req, res, u, params, body, query, ip });
+      const r = await rota.handler({ req, res, u, claims, params, body, query, ip });
       if (!res.headersSent) this.send(res, 200, r === undefined ? { ok: true } : r);
     } catch (e) {
       if (res.headersSent) return;
-      if (e instanceof HttpErro) return this.send(res, e.status, { erro: e.message, codigo: e.codigo || undefined });
+      if (e instanceof HttpErro) return this.send(res, e.status, { erro: e.message, codigo: e.codigo || undefined, ...(e.extra || {}) });
       if (e.code === 'ER_DUP_ENTRY') return this.send(res, 409, { erro: duplicado(e.message) });
       if (e.code === 'ER_ROW_IS_REFERENCED_2' || e.code === 'ER_ROW_IS_REFERENCED') return this.send(res, 409, { erro: 'Não é possível excluir: há registros ligados a este. Desative em vez de excluir.' });
       if (!this.banco.ok) return this.send(res, 503, { erro: 'Banco de dados indisponível no momento. Tente de novo em instantes.' });
@@ -568,6 +594,11 @@ class Servidor {
 
   enviarDownload(job) {
     this.paraTodos({ type: 'download', download: job }, (u) => this.downloadVisivel(u, job));
+  }
+
+  /** Avisa administradores (e o master) que chegou cadastro para aprovar. */
+  avisarPendentes(empresaId) {
+    this.paraTodos({ type: 'pendentes' }, (u) => u.perfil === 'master' || (u.perfil === 'admin' && u.empresaId === empresaId));
   }
 
   recarregarFrota() {

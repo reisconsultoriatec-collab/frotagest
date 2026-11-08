@@ -20,6 +20,7 @@ PAGINAS.inicio = (() => {
             <div class="list" id="ini-offline"></div>
           </section>
         </div>
+        ${S.eu.pode.cadastros ? '<section class="card" id="ini-cad" hidden></section>' : ''}
         ${S.eu.perfil === 'master' ? '<section class="card" id="ini-pend" hidden></section>' : ''}
       </div>`;
     c.querySelector('.page').addEventListener('click', (e) => {
@@ -34,6 +35,8 @@ PAGINAS.inicio = (() => {
     offs.push(on('item', () => { clearTimeout(timer); timer = setTimeout(desenhar, 1000); }));
     offs.push(on('alerta', () => { clearTimeout(timer); timer = setTimeout(() => { desenhar(); carregarAlertas(); }, 800); }));
     offs.push(on('resumo-alertas', desenharKpis));
+    offs.push(on('pendentes', desenharCadastros));
+    desenharCadastros();
   }
 
   function sair() {
@@ -117,6 +120,16 @@ PAGINAS.inicio = (() => {
     box.querySelectorAll('[data-cad]').forEach((b) => {
       b.onclick = (e) => { e.stopPropagation(); const it = S.itens.get(`p${b.dataset.cad}`); abrirCadastroAparelho({ identificador: b.dataset.cad, modelo: it ? it.modelo : '' }); };
     });
+  }
+
+  function desenharCadastros() {
+    const box = $('#ini-cad');
+    if (!box) return;
+    box.hidden = !S.pendentes;
+    if (!S.pendentes) return;
+    box.innerHTML = `<div class="card-head"><h2>${ico('clock-pause')} ${S.pendentes === 1 ? '1 cadastro aguardando' : `${S.pendentes} cadastros aguardando`} a sua aprovação</h2>
+      <button class="btn btn-primary btn-sm" type="button" data-ir="usuarios">${ico('user-check', 'i-sm')} Ver e aprovar</button></div>
+      <p class="hint">Pessoas que criaram a conta na tela de entrada com o código da empresa. Elas só entram depois da aprovação.</p>`;
   }
 
   function desenhar() {

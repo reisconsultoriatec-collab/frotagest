@@ -542,3 +542,16 @@ tr.hexrow pre { margin: 0; font-family: var(--mono); font-size: 11.5px; white-sp
   .toolbar .field, .toolbar .field select, .toolbar .field input { width: 100%; }
   .cams .tiles { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* 1.1 — criar conta pela tela de entrada e aprovação */
+.gate-abas { width: 100%; margin: 16px 0 2px; }
+.gate-abas .seg-btn { flex: 1; padding: 8px 6px; font-size: 13.5px; }
+.gate-box .fld small { font-weight: 400; color: var(--ink-3); font-size: 11.5px; line-height: 1.4; }
+.gate-acoes { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.gate-ico.aviso { background: var(--amber-100); color: var(--amber-700); }
+.codigo-input { text-transform: uppercase; letter-spacing: 2px; font-family: var(--mono) !important; }
+.codigo-box { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 16px 18px; }
+.codigo-box .grow { flex: 1; min-width: 220px; }
+.codigo-box code { font-family: var(--mono); font-size: 20px; font-weight: 700; letter-spacing: 3px; color: var(--navy); background: var(--amber-50); border: 1px dashed var(--amber); border-radius: 10px; padding: 6px 14px; }
+.sb-item .sb-badge.warn { background: var(--amber); color: var(--navy); }
+.list-item .avatar { width: 34px; height: 34px; font-size: 13px; }

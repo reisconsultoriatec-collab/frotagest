@@ -2,7 +2,7 @@
 /* FrotaGest — Cadastros: veículos, grupos, usuários, aparelhos (DVR) e empresas. Reis Tecnologia */
 
 /** Página de lista com busca, "mostrar inativos" e botão de novo. */
-function paginaLista({ id, titulo, sub, novoTexto, podeCriar, carregar, colunas, busca, ativo, editar, vazio, dica }) {
+function paginaLista({ id, titulo, sub, novoTexto, podeCriar, carregar, colunas, busca, ativo, editar, vazio, dica, topo }) {
   let linhas = [];
   let offs = [];
   const st = { q: '', inativos: false };
@@ -17,6 +17,7 @@ function paginaLista({ id, titulo, sub, novoTexto, podeCriar, carregar, colunas,
       return;
     }
     desenhar();
+    if (topo && $(`#${id}-topo`)) topo($(`#${id}-topo`), atualizar).catch((e) => toast(e.message, 'err'));
   }
 
   function desenhar() {
@@ -36,6 +37,7 @@ function paginaLista({ id, titulo, sub, novoTexto, podeCriar, carregar, colunas,
   function render(c) {
     c.innerHTML = `
       <div class="page">
+        ${topo ? `<div id="${id}-topo" class="page" style="gap:18px"></div>` : ''}
         <section class="card">
           <div class="toolbar">
             <label class="search">${ico('search', 'i-sm')}<input id="${id}-q" placeholder="Buscar" autocomplete="off"></label>
@@ -225,11 +227,16 @@ PAGINAS.usuarios = paginaLista({
   id: 'usuarios',
   titulo: 'Usuários',
   sub: 'Quem acessa o FrotaGest e o que cada um pode ver',
-  novoTexto: 'Novo usuário',
   podeCriar: () => S.eu.pode.cadastros,
   vazio: 'Nenhum usuário cadastrado.',
-  dica: 'Ao cadastrar, a pessoa recebe um e-mail para criar a própria senha. Perfis: <b>Administrador</b> (cadastros da empresa), <b>Operador</b> (mapa, câmeras, gravações e alertas) e <b>Visualizador</b> (mapa, câmeras ao vivo e histórico).',
-  carregar: async () => (await api(`/api/usuarios${qEmpresa()}`)).usuarios,
+  novoTexto: 'Convidar por e-mail',
+  dica: 'Cada pessoa cria o próprio login em <b>Criar conta</b>, na tela de entrada, com o código da empresa; depois você aprova e escolhe o perfil. Também dá para convidar por e-mail. Perfis: <b>Administrador</b> (cadastros da empresa), <b>Operador</b> (mapa, câmeras, gravações e alertas) e <b>Visualizador</b> (mapa, câmeras ao vivo e histórico).',
+  carregar: async () => {
+    const todos = (await api(`/api/usuarios${qEmpresa()}`)).usuarios;
+    usuariosPendentes = todos.filter((u) => u.pendente);
+    return todos.filter((u) => !u.pendente);
+  },
+  topo: topoUsuarios,
   busca: (u) => [u.nome, u.email, u.empresa, NOMES_PERFIL[u.perfil]].join(' '),
   ativo: (u) => !!u.ativo,
   colunas: [
@@ -241,6 +248,96 @@ PAGINAS.usuarios = paginaLista({
   ],
   editar: editarUsuario,
 });
+
+let usuariosPendentes = [];
+
+/** Topo da tela Usuários: código da empresa para a equipe criar a conta e cadastros aguardando aprovação. */
+async function topoUsuarios(el, recarregar) {
+  const empId = S.eu.perfil === 'master' ? (S.empresa ? Number(S.empresa) : null) : S.eu.empresaId;
+  let codigo = '';
+  if (empId) {
+    const emp = (await api('/api/empresas')).empresas.find((e) => e.id === empId);
+    if (emp) {
+      codigo = `<section class="card"><div class="codigo-box">
+        <div class="kpi-ico">${ico('key')}</div>
+        <div class="grow"><div class="eyebrow">Código para a equipe ${S.eu.perfil === 'master' ? `de ${H(emp.nome)} ` : ''}criar a conta</div>
+          <div class="small muted">Na tela de entrada: <b>Criar conta</b> › nome, e-mail, senha e este código. Depois o cadastro aparece aqui para aprovar.</div></div>
+        <code id="cod-empresa">${H(emp.codigo_convite || '—')}</code>
+        <button class="btn btn-sm" type="button" data-copiar>${ico('copy', 'i-sm')} Copiar</button>
+        <button class="btn btn-sm" type="button" data-novo-codigo="${emp.id}">${ico('refresh', 'i-sm')} Gerar outro</button>
+      </div></section>`;
+    }
+  } else if (S.eu.perfil === 'master') {
+    codigo = `<section class="card"><div class="codigo-box"><div class="kpi-ico">${ico('key')}</div>
+      <div class="grow small muted">Para ver o código de cadastro de uma empresa, escolha a empresa no seletor do topo (ou veja a coluna Código em Empresas).</div></div></section>`;
+  }
+  const pend = usuariosPendentes;
+  const cardPend = pend.length ? `<section class="card">
+    <div class="card-head"><h2>${ico('clock-pause')} Cadastros aguardando aprovação <span class="pill">${pend.length}</span></h2></div>
+    <div class="list">${pend.map((u) => `<div class="list-item" data-pend="${u.id}">
+      <div class="avatar">${H(iniciais(u.nome))}</div>
+      <div class="list-main"><div class="list-title">${H(u.nome)}</div>
+        <div class="list-sub">${H(u.email)}${S.eu.perfil === 'master' ? ` · ${H(u.empresa || '')}` : ''} · desde ${H(fmtDataHora(u.criado_em).slice(0, 16))}</div></div>
+      <button class="btn btn-primary btn-sm" type="button" data-aprovar="${u.id}">${ico('check', 'i-sm')} Aprovar</button>
+      <button class="btn btn-danger btn-sm" type="button" data-recusar="${u.id}">${ico('x', 'i-sm')} Recusar</button>
+    </div>`).join('')}</div></section>` : '';
+  el.innerHTML = codigo + cardPend;
+  el.hidden = !(codigo || cardPend);
+  const cp = el.querySelector('[data-copiar]');
+  if (cp) {
+    cp.addEventListener('click', async () => {
+      const t = $('#cod-empresa').textContent;
+      try { await navigator.clipboard.writeText(t); toast('Código copiado.', 'ok'); } catch { toast(`Código: ${t}`); }
+    });
+  }
+  const nc = el.querySelector('[data-novo-codigo]');
+  if (nc) {
+    nc.addEventListener('click', async () => {
+      if (!(await confirmar('Gerar um código novo? O código atual deixa de funcionar para novos cadastros (quem já tem login não é afetado).', { ok: 'Gerar código novo' }))) return;
+      try {
+        const r = await api(`/api/empresas/${nc.dataset.novoCodigo}/codigo`, { corpo: {} });
+        $('#cod-empresa').textContent = r.codigo;
+        toast('Código novo gerado.', 'ok');
+      } catch (e) { toast(e.message, 'err'); }
+    });
+  }
+  el.querySelectorAll('[data-aprovar]').forEach((b) => b.addEventListener('click', () => aprovarUsuario(pend.find((u) => String(u.id) === b.dataset.aprovar), recarregar)));
+  el.querySelectorAll('[data-recusar]').forEach((b) => b.addEventListener('click', async () => {
+    const u = pend.find((x) => String(x.id) === b.dataset.recusar);
+    if (!(await confirmar(`Recusar o cadastro de ${u.nome} (${u.email})? A pessoa não entra no FrotaGest.`, { ok: 'Recusar', perigo: true }))) return;
+    try {
+      await api(`/api/usuarios/${u.id}/recusar`, { corpo: {} });
+      toast('Cadastro recusado.', 'ok');
+      atualizarPendentes();
+      recarregar();
+    } catch (e) { toast(e.message, 'err'); }
+  }));
+}
+
+async function aprovarUsuario(u, recarregar) {
+  if (!u) return;
+  const grupos = (await api(`/api/grupos?${qs({ empresa: u.empresa_id })}`)).grupos;
+  formulario({
+    titulo: `Aprovar ${u.nome}`,
+    icone: 'user-check',
+    textoSalvar: 'Aprovar acesso',
+    aviso: `${H(u.email)} criou a conta com o código da empresa${S.eu.perfil === 'master' ? ` <b>${H(u.empresa || '')}</b>` : ''}. Escolha o que a pessoa pode fazer.`,
+    campos: [
+      { nome: 'perfil', rotulo: 'Perfil', tipo: 'select', cheio: true, opcoes: [{ v: 'operador', t: 'Operador (mapa, câmeras, gravações e alertas)' }, { v: 'visualizador', t: 'Visualizador (mapa, câmeras ao vivo e histórico)' }, { v: 'admin', t: 'Administrador da empresa' }] },
+      { nome: 'todosGrupos', rotulo: 'Pode ver todos os grupos', tipo: 'check', se: 'perfil=operador|visualizador' },
+      { nome: 'grupos', rotulo: 'Grupos liberados', tipo: 'multi', opcoes: grupos.map((x) => ({ v: x.id, t: x.caminho })), se: 'perfil=operador|visualizador&todosGrupos=false', ajuda: 'Inclui os subgrupos de cada grupo marcado.' },
+    ],
+    valores: { perfil: 'operador', todosGrupos: true },
+    salvar: async (d) => {
+      const corpo = { perfil: d.perfil, todosGrupos: d.todosGrupos, grupos: d.grupos.map(Number) };
+      if (d.perfil === 'admin') { corpo.todosGrupos = true; corpo.grupos = []; }
+      await api(`/api/usuarios/${u.id}/aprovar`, { corpo });
+      toast(`Acesso de ${u.nome} aprovado.`, 'ok');
+      atualizarPendentes();
+      recarregar();
+    },
+  });
+}
 
 async function editarUsuario(u, aposSalvar) {
   let empresaId;
@@ -383,6 +480,7 @@ PAGINAS.empresas = paginaLista({
   ativo: (e) => !!e.ativo,
   colunas: [
     { t: 'Empresa', v: (e) => `<b>${H(e.nome)}</b><span class="sub">${H(e.documento ? fmtDoc(e.documento) : '')}</span>` },
+    { t: 'Código de cadastro', cls: 'mono', v: (e) => H(e.codigo_convite || '—') },
     { t: 'Cidade', v: (e) => H([e.cidade, e.uf].filter(Boolean).join(' / ') || '—') },
     { t: 'Contato', v: (e) => `${H(e.contato || '—')}<span class="sub">${H([e.telefone, e.email].filter(Boolean).join(' · '))}</span>` },
     { t: 'Veículos', cls: 'num', v: (e) => fmtNum(e.veiculos) },
