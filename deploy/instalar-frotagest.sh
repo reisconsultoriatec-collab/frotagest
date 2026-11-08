@@ -99,7 +99,7 @@ main() {
   done
 
   passo "3/7 Dependências do FrotaGest"
-  (cd "$PASTA" && npm install --omit=dev --no-audit --no-fund >/dev/null && sha256sum package.json | cut -c1-64 > node_modules/.frotagest-pacote)
+  (cd "$PASTA" && npm install --omit=dev --no-audit --no-fund >/dev/null && mkdir -p node_modules && sha256sum package.json | cut -c1-64 > node_modules/.frotagest-pacote)
   echo "    instaladas"
 
   passo "4/7 Configuração (config.json)"
@@ -112,10 +112,24 @@ main() {
     ' "$PASTA/config.json" "$SENHA_APP"
   else
     echo "    Dados do Firebase (console.firebase.google.com › Configurações do projeto › Seus apps › app da Web):"
-    local API_KEY PROJETO DONO
-    API_KEY="$(perguntar 'apiKey: ')"
-    PROJETO="$(perguntar 'projectId: ')"
-    DONO="$(perguntar 'Seu e-mail de login (será o master do sistema): ' | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
+    echo "    (no bloco firebaseConfig: copie só o que está entre aspas, sem as aspas)"
+    local API_KEY="" PROJETO="" DONO=""
+    # confere o formato para não gravar coisa errada (a apiKey do Firebase começa com AIza e tem 39 caracteres)
+    while :; do
+      API_KEY="$(perguntar 'apiKey (começa com AIza): ' | tr -d '[:space:]\"')"
+      [[ "$API_KEY" =~ ^AIza[0-9A-Za-z_-]{35}$ ]] && break
+      echo "    isso não parece a apiKey do Firebase. Ela começa com AIza e tem 39 caracteres."
+    done
+    while :; do
+      PROJETO="$(perguntar 'projectId (ex.: frotagest-1a2b3): ' | tr -d '[:space:]\"')"
+      [[ "$PROJETO" =~ ^[a-z][a-z0-9-]{4,38}[a-z0-9]$ ]] && break
+      echo "    isso não parece o projectId. Ele tem só letras minúsculas, números e hífen."
+    done
+    while :; do
+      DONO="$(perguntar 'Seu e-mail de login (será o master do sistema): ' | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
+      [[ "$DONO" =~ ^[^@[:space:]]+@[^@[:space:]]+\.[a-z]{2,}$ ]] && break
+      echo "    e-mail inválido."
+    done
     node -e '
       const fs = require("fs");
       const [exemplo, destino, senha, apiKey, projeto, dono, lab] = process.argv.slice(1);
