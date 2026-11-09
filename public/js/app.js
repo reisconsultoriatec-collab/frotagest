@@ -27,79 +27,87 @@ function validarSenha(s) {
   }
 }
 
-const campoSenha = (id, auto) => `<span class="pw"><input type="password" id="${id}" autocomplete="${auto}" required><button type="button" data-ver="${id}" aria-label="Mostrar senha">${ico('eye', 'i-sm')}</button></span>`;
+const campoSenha = (id, auto, placeholder) => `<span class="pw"><input type="password" id="${id}" autocomplete="${auto}" placeholder="${placeholder}" required><button type="button" data-ver="${id}" aria-label="Mostrar senha" title="Mostrar senha">${ico('eye', 'i-sm')}</button></span>
+  <div class="caps-lock" id="caps-${id}" hidden>${ico('alert-triangle')} Caps Lock ligado</div>`;
+
+const MARCA_CARTAO = `<div class="auth-card-nome"><span class="auth-marca">${ico('bus')}</span><span>FrotaGest</span></div>`;
 
 function mostrarGate(estado, extra = {}) {
   if (typeof extra === 'string') extra = { texto: extra };
   $('#carregando').hidden = true;
   $('#shell').hidden = true;
   $('#gate').hidden = false;
+  if (typeof iniciarTelaEntrada === 'function') iniciarTelaEntrada();
   const box = $('#gate-box');
-  const rodape = `<div class="gate-foot">Reis Tecnologia · FrotaGest ${H(S.config ? S.config.versao : '')}</div>`;
+  const versao = H(S.config ? S.config.versao : '');
+  const termos = `<p class="login-termos">Ao entrar, você concorda com os <a href="/termos" target="_blank" rel="noopener">Termos de uso</a> e a <a href="/privacidade" target="_blank" rel="noopener">Política de privacidade</a>.</p>`;
+  const rodape = `<div class="login-seguro">${ico('lock')} Conexão segura · acessos registrados</div>${termos}<p class="login-versao">FrotaGest ${versao} · Reis Tecnologia</p>`;
   const icone = (n, cls = '') => `<div class="gate-ico ${cls}">${ico(n)}</div>`;
+  const cabecalho = (sub) => `<div class="auth-card-marca">${MARCA_CARTAO}<p id="gate-saudacao">${sub}</p></div>`;
 
   if (estado === 'login' || estado === 'cadastro') {
-    const abas = `<div class="seg gate-abas" role="tablist">
-      <button class="seg-btn${estado === 'login' ? ' active' : ''}" type="button" data-aba="login">Entrar</button>
-      <button class="seg-btn${estado === 'cadastro' ? ' active' : ''}" type="button" data-aba="cadastro">Criar conta</button></div>`;
+    const abas = `<div class="login-tabs gate-abas" role="tablist">
+      <button class="login-tab${estado === 'login' ? ' active' : ''}" type="button" role="tab" aria-selected="${estado === 'login'}" data-aba="login">Entrar</button>
+      <button class="login-tab${estado === 'cadastro' ? ' active' : ''}" type="button" role="tab" aria-selected="${estado === 'cadastro'}" data-aba="cadastro">Criar conta</button></div>`;
     if (estado === 'login') {
-      box.innerHTML = `${icone('lock')}<h2>Entrar no FrotaGest</h2><p>Use o seu e-mail e a sua senha.</p>${abas}
-        <form class="login-form" id="login-form" novalidate>
-          <label class="fld">E-mail<input type="email" id="login-email" autocomplete="username" required></label>
-          <label class="fld">Senha${campoSenha('login-senha', 'current-password')}</label>
-          <p class="gate-msg err" id="gate-msg" hidden></p>
-          <button class="btn btn-primary" type="submit" id="gate-ok">Entrar</button>
-          <div class="gate-links"><button class="link" type="button" id="login-esqueci">Esqueci minha senha</button></div>
+      box.innerHTML = `${cabecalho(typeof saudacao === 'function' ? saudacao() : 'Monitoramento de frota')}${abas}
+        <form class="login-form gate-conteudo" id="login-form" novalidate>
+          <div class="input-group"><label for="login-email">E-mail</label><input type="email" id="login-email" autocomplete="username" placeholder="seu@email.com" required></div>
+          <div class="input-group"><label for="login-senha">Senha</label>${campoSenha('login-senha', 'current-password', 'Digite sua senha')}</div>
+          <label class="login-lembrar" title="Guarda só o e-mail neste aparelho, nunca a senha. Não marque em computador compartilhado."><input type="checkbox" id="login-lembrar"> Lembrar meu e-mail</label>
+          <p class="gate-msg err" id="gate-msg" role="alert" hidden></p>
+          <button class="btn-entrar" type="submit" id="gate-ok">${ico('login-2')} Entrar</button>
+          <button class="login-esqueci" type="button" id="login-esqueci">${ico('key')} Esqueci minha senha</button>
         </form>${rodape}`;
     } else {
-      box.innerHTML = `${icone('user-plus')}<h2>Criar conta</h2><p>Crie o seu login com o código que o administrador da sua empresa passou.</p>${abas}
-        <form class="login-form" id="cad-form" novalidate>
-          <label class="fld">Seu nome completo<input id="cad-nome" maxlength="120" autocomplete="name" required></label>
-          <label class="fld">E-mail<input type="email" id="cad-email" maxlength="160" autocomplete="username" required></label>
-          <label class="fld">Senha${campoSenha('cad-senha', 'new-password')}<small>Mínimo de 8 caracteres, com uma letra maiúscula e um número.</small></label>
-          <label class="fld">Código da empresa<input id="cad-codigo" maxlength="12" autocomplete="off" class="codigo-input" placeholder="Ex.: K7M2Q9XA">
-            <small>Peça ao administrador da sua empresa. O proprietário do sistema deixa em branco.</small></label>
-          <p class="gate-msg err" id="gate-msg" hidden></p>
-          <button class="btn btn-primary" type="submit" id="gate-ok">Criar conta</button>
+      box.innerHTML = `${cabecalho('Crie o seu login com o código da sua empresa.')}${abas}
+        <form class="login-form gate-conteudo" id="cad-form" novalidate>
+          <div class="input-group"><label for="cad-nome">Seu nome completo</label><input id="cad-nome" maxlength="120" autocomplete="name" placeholder="Nome e sobrenome" required></div>
+          <div class="input-group"><label for="cad-email">E-mail</label><input type="email" id="cad-email" maxlength="160" autocomplete="username" placeholder="seu@email.com" required></div>
+          <div class="input-group"><label for="cad-senha">Senha</label>${campoSenha('cad-senha', 'new-password', 'Crie uma senha')}<small>Mínimo de 8 caracteres, com uma letra maiúscula e um número.</small></div>
+          <div class="input-group"><label for="cad-codigo">Código da empresa</label><input id="cad-codigo" maxlength="12" autocomplete="off" class="codigo-input" placeholder="Ex.: K7M2Q9XA">
+            <small>Peça ao administrador da sua empresa. O proprietário do sistema deixa em branco.</small></div>
+          <p class="gate-msg err" id="gate-msg" role="alert" hidden></p>
+          <button class="btn-entrar" type="submit" id="gate-ok">${ico('user-plus')} Criar conta</button>
         </form>${rodape}`;
     }
   } else if (estado === 'completar') {
     const u = firebase.auth().currentUser;
-    box.innerHTML = `${icone('user-check')}<h2>Concluir cadastro</h2>
-      <p>O login <b>${H(u ? u.email : '')}</b> existe, mas falta concluir o cadastro no FrotaGest.</p>
+    box.innerHTML = `<div class="gate-conteudo">${icone('user-check')}<h2>Concluir cadastro</h2>
+      <p class="gate-texto">O login <b>${H(u ? u.email : '')}</b> existe, mas falta concluir o cadastro no FrotaGest.</p>
       <form class="login-form" id="comp-form" novalidate>
-        <label class="fld">Seu nome completo<input id="cad-nome" maxlength="120" autocomplete="name" required></label>
-        <label class="fld">Código da empresa<input id="cad-codigo" maxlength="12" autocomplete="off" class="codigo-input" placeholder="Ex.: K7M2Q9XA">
-          <small>Peça ao administrador da sua empresa. O proprietário do sistema deixa em branco.</small></label>
-        <p class="gate-msg err" id="gate-msg" hidden></p>
-        <button class="btn btn-primary" type="submit" id="gate-ok">Concluir cadastro</button>
-        <div class="gate-links"><button class="link" type="button" data-sair>Sair e usar outro login</button></div>
-      </form>${rodape}`;
+        <div class="input-group"><label for="cad-nome">Seu nome completo</label><input id="cad-nome" maxlength="120" autocomplete="name" required></div>
+        <div class="input-group"><label for="cad-codigo">Código da empresa</label><input id="cad-codigo" maxlength="12" autocomplete="off" class="codigo-input" placeholder="Ex.: K7M2Q9XA">
+          <small>Peça ao administrador da sua empresa. O proprietário do sistema deixa em branco.</small></div>
+        <p class="gate-msg err" id="gate-msg" role="alert" hidden></p>
+        <button class="btn-entrar" type="submit" id="gate-ok">Concluir cadastro</button>
+        <button class="link" type="button" data-sair>Sair e usar outro login</button>
+      </form></div>${rodape}`;
     $('#cad-nome').value = extra.nome || (u && u.displayName) || '';
     $('#cad-codigo').value = extra.codigo || '';
   } else if (estado === 'pendente') {
-    box.innerHTML = `${icone('clock-pause', 'aviso')}<h2>Aguardando aprovação</h2>
-      <p>Seu cadastro${extra.empresa ? ` em <b>${H(extra.empresa)}</b>` : ''} foi recebido. O administrador da empresa precisa aprovar o seu acesso e escolher o que você pode ver.</p>
+    box.innerHTML = `<div class="gate-conteudo">${icone('clock-pause', 'aviso')}<h2>Aguardando aprovação</h2>
+      <p class="gate-texto">Seu cadastro${extra.empresa ? ` em <b>${H(extra.empresa)}</b>` : ''} foi recebido. O administrador da empresa precisa aprovar o seu acesso e escolher o que você pode ver.</p>
       <p class="gate-msg info" id="gate-msg" hidden></p>
       <div class="gate-acoes"><button class="btn btn-primary" type="button" data-verificar>${ico('refresh', 'i-sm')} Verificar novamente</button>
-        <button class="btn btn-ghost" type="button" data-sair>Sair</button></div>${rodape}`;
+        <button class="btn" type="button" data-sair>Sair</button></div></div>${rodape}`;
   } else if (estado === 'verificar') {
-    box.innerHTML = `${icone('mail')}<h2>Confirme o seu e-mail</h2>
-      <p>${H(extra.texto || 'Enviamos um link de confirmação para o seu e-mail.')} Abra o e-mail (veja também o spam), clique no link e depois em "Já confirmei".</p>
+    box.innerHTML = `<div class="gate-conteudo">${icone('mail')}<h2>Confirme o seu e-mail</h2>
+      <p class="gate-texto">${H(extra.texto || 'Enviamos um link de confirmação para o seu e-mail.')} Abra o e-mail (veja também o spam), clique no link e depois em "Já confirmei".</p>
       <p class="gate-msg info" id="gate-msg" hidden></p>
       <div class="gate-acoes"><button class="btn btn-primary" type="button" data-ja>Já confirmei</button>
         <button class="btn" type="button" data-reenviar>Enviar o link de novo</button>
-        <button class="btn btn-ghost" type="button" data-sair>Sair</button></div>${rodape}`;
+        <button class="btn btn-ghost" type="button" data-sair>Sair</button></div></div>${rodape}`;
   } else {
-    const titulos = { bloqueado: 'Acesso não liberado', config: 'Login ainda não configurado', sdk: 'Não foi possível carregar o login', erro: 'Não foi possível abrir o FrotaGest' };
-    box.innerHTML = `${icone('info-circle')}<h2>${H(titulos[estado] || 'Aviso')}</h2><p>${H(extra.texto || '')}</p>
-      <div class="gate-acoes">${estado === 'bloqueado' || estado === 'erro' ? '<button class="btn btn-primary" type="button" data-sair>Entrar com outro login</button>' : '<button class="btn btn-primary" type="button" data-recarregar>Tentar de novo</button>'}</div>${rodape}`;
+    const titulos = { bloqueado: 'Acesso não liberado', config: 'Login ainda não configurado', sdk: 'Não foi possível carregar o login', erro: 'Não foi possível abrir o FrotaGest', inativo: 'Sessão encerrada' };
+    box.innerHTML = `<div class="gate-conteudo">${icone('info-circle')}<h2>${H(titulos[estado] || 'Aviso')}</h2><p class="gate-texto">${H(extra.texto || '')}</p>
+      <div class="gate-acoes">${estado === 'bloqueado' || estado === 'erro' ? '<button class="btn btn-primary" type="button" data-sair>Entrar com outro login</button>' : '<button class="btn btn-primary" type="button" data-recarregar>Tentar de novo</button>'}</div></div>${rodape}`;
   }
 
   const msg = $('#gate-msg');
   const mostrar = (t, tipo = 'err') => { if (!msg) return; msg.textContent = t; msg.className = `gate-msg ${tipo}`; msg.hidden = !t; };
   if (extra.erro) mostrar(extra.erro);
-  else if (extra.texto && (estado === 'login' || estado === 'cadastro')) mostrar(extra.texto);
+  else if (extra.texto && (estado === 'login' || estado === 'cadastro')) mostrar(extra.texto, extra.tipo || 'err');
 
   // eventos
   box.querySelectorAll('[data-aba]').forEach((b) => b.addEventListener('click', () => mostrarGate(b.dataset.aba)));
@@ -107,7 +115,7 @@ function mostrarGate(estado, extra = {}) {
     const s = $(`#${b.dataset.ver}`);
     s.type = s.type === 'password' ? 'text' : 'password';
   }));
-  box.querySelectorAll('[data-sair]').forEach((b) => b.addEventListener('click', sair));
+  box.querySelectorAll('[data-sair]').forEach((b) => b.addEventListener('click', () => sair()));
   const rec = box.querySelector('[data-recarregar]');
   if (rec) rec.addEventListener('click', () => location.reload());
   const verif = box.querySelector('[data-verificar]');
@@ -137,9 +145,15 @@ function mostrarGate(estado, extra = {}) {
     });
   }
 
+  box.querySelectorAll('.pw input').forEach((c) => avisarCapsLock(c, $(`#caps-${c.id}`)));
+
   if (estado === 'login') {
-    $('#login-email').value = pref('ultimoEmail', '');
-    setTimeout(() => ($('#login-email').value ? $('#login-senha') : $('#login-email')).focus(), 50);
+    const lembrado = emailLembrado();
+    $('#login-email').value = lembrado;
+    $('#login-lembrar').checked = !!lembrado;
+    $('#login-lembrar').addEventListener('change', (e) => { if (!e.target.checked) lembrarEmail('', false); });
+    // no computador o cursor já vai para o campo certo (no celular não abre o teclado sozinho)
+    try { if (window.matchMedia('(pointer: fine)').matches) setTimeout(() => ($('#login-email').value ? $('#login-senha') : $('#login-email')).focus({ preventScroll: true }), 60); } catch { /* segue */ }
     $('#login-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       const email = $('#login-email').value.trim();
@@ -150,15 +164,17 @@ function mostrarGate(estado, extra = {}) {
       b.textContent = 'Entrando…';
       mostrar('');
       try {
-        salvarPref('ultimoEmail', email);
+        const lembrar = $('#login-lembrar').checked;
         await firebase.auth().signInWithEmailAndPassword(email, senha);
+        lembrarEmail(email, lembrar);
+        marcarUso(); // a contagem de inatividade começa agora
       } catch (err) {
         if (ERROS_SENHA.includes(err.code)) {
           fetch('/api/conta/falha-login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) }).catch(() => {});
         }
         mostrar(ERROS_LOGIN[err.code] || `Não foi possível entrar (${err.code || err.message}).`);
         b.disabled = false;
-        b.textContent = 'Entrar';
+        b.innerHTML = `${ico('login-2')} Entrar`;
       }
     });
     $('#login-esqueci').addEventListener('click', async () => {
@@ -191,7 +207,7 @@ function mostrarGate(estado, extra = {}) {
       cadastrando = true;
       try {
         const cred = await firebase.auth().createUserWithEmailAndPassword(d.email, d.senha);
-        salvarPref('ultimoEmail', d.email);
+        marcarUso();
         cred.user.updateProfile({ displayName: d.nome }).catch(() => {});
         cred.user.sendEmailVerification().catch(() => {});
         await concluirCadastro(d.nome, d.codigo);
@@ -202,7 +218,7 @@ function mostrarGate(estado, extra = {}) {
         } else {
           mostrar(ERROS_LOGIN[err.code] || err.message);
           b.disabled = false;
-          b.textContent = 'Criar conta';
+          b.innerHTML = `${ico('user-plus')} Criar conta`;
         }
       } finally {
         cadastrando = false;
@@ -243,6 +259,8 @@ async function concluirCadastro(nome, codigo) {
 }
 
 async function entrar() {
+  // ficou sem uso além do limite (mesmo com a janela fechada): encerra antes de abrir o painel
+  if (sessaoVencida(lerNumero('fg:sessaoMin'))) { await encerrarPorInatividade(lerNumero('fg:sessaoMin')); return; }
   try {
     S.eu = await api('/api/eu', { headers: primeiroAcesso ? { 'X-Novo-Acesso': '1' } : {} });
     primeiroAcesso = false;
@@ -256,10 +274,12 @@ async function entrar() {
     mostrarGate('erro', e.message);
     return;
   }
+  if (sessaoVencida(S.eu.sessaoMin)) { await encerrarPorInatividade(S.eu.sessaoMin); return; }
   abrirApp();
 }
 
 async function abrirApp() {
+  if (typeof pararTelaEntrada === 'function') pararTelaEntrada();
   $('#gate').hidden = true;
   $('#carregando').hidden = true;
   $('#shell').hidden = false;
@@ -277,6 +297,8 @@ async function abrirApp() {
   atualizarResumoAlertas();
   atualizarPendentes();
   conectarEventos();
+  iniciarSessao();
+  atualizarBotaoSom();
   abrirRota();
 }
 
@@ -289,9 +311,14 @@ function atualizarSeletorEmpresa() {
   sel.hidden = !S.empresas.length;
 }
 
-async function sair() {
-  try { if (S.eu) await api('/api/sair', { corpo: {} }); } catch { /* sessão já encerrada */ }
+async function sair(motivo) {
+  try { if (S.eu || motivo) await api('/api/sair', { corpo: motivo ? { motivo } : {} }); } catch { /* sessão já encerrada */ }
   S.eu = null;
+  pararSessao();
+  limparSessaoLocal();
+  $('#nova-versao').hidden = true;
+  $('#tb-som-pop').hidden = true;
+  $$('.modal-back').forEach((m) => m.remove());
   pararEventos();
   if (S.paginaAtual && S.paginaAtual.sair) { try { S.paginaAtual.sair(); } catch { /* ok */ } }
   S.paginaAtual = null;
@@ -316,14 +343,20 @@ async function iniciar() {
     if (!user) {
       S.eu = null;
       pararEventos();
-      mostrarGate('login');
+      pararSessao();
+      mostrarGate('login', avisoLogin || {});
+      avisoLogin = null;
       return;
     }
     entrar();
   });
 
   // cabeçalho
-  $('#tb-sair').addEventListener('click', sair);
+  $('#tb-sair').addEventListener('click', () => sair());
+  $('#tb-atualizar').addEventListener('click', atualizarTela);
+  $('#tb-som').addEventListener('click', abrirMenuSom);
+  $('#nv-atualizar').addEventListener('click', () => location.reload());
+  $('#nv-fechar').addEventListener('click', () => { $('#nova-versao').hidden = true; });
   $('#tb-alertas').addEventListener('click', () => navegar('alertas'));
   $('#tb-menu').addEventListener('click', () => document.body.classList.toggle('sb-open'));
   $('#sb-backdrop').addEventListener('click', () => document.body.classList.remove('sb-open'));

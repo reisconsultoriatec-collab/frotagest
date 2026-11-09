@@ -2,7 +2,7 @@
 
 **Monitoramento de frota em tempo real para DVRs 4G (JT/T 808 + JT/T 1078) — Reis Tecnologia**
 
-Sistema próprio que substitui o CMSV6: mapa da frota ao vivo, câmeras ao vivo, gravações do cartão do DVR, alertas com registro do tratamento, histórico de trajetos, comunicações dos aparelhos e auditoria. Atende várias empresas (cada uma vê só a própria frota), com a Reis Tecnologia como master.
+Sistema próprio que substitui o CMSV6: mapa da frota ao vivo, câmeras ao vivo, gravações do cartão do DVR, alertas com registro do tratamento (com som e notificação na área de trabalho), histórico de trajetos, relatórios em Excel e PDF, comunicações dos aparelhos e auditoria. Atende várias empresas (cada uma vê só a própria frota), com a Reis Tecnologia como master.
 
 > **Regra do banco:** nenhum vídeo é gravado no banco de dados. O MySQL guarda só cadastros, posições, alertas, comunicações e auditoria. O vídeo ao vivo passa direto do DVR para o navegador; os downloads de gravação ficam no disco do servidor por poucos dias (com limite de espaço) e são apagados sozinhos.
 
@@ -51,9 +51,28 @@ Grupos podem ter subgrupos (ex.: Garagem › Linha 10); liberar um grupo libera 
 | `posicoes` | Todas as posições recebidas | 90 dias |
 | `alertas` | Alarmes (início, fim, gravidade) e o tratamento (quem, quando, o quê) | 365 dias |
 | `eventos_aparelho`, `comandos` | Comunicações: conexões/desconexões e comandos enviados com a resposta | 180 dias |
-| `auditoria` | Acessos, cadastros, vídeos assistidos, downloads, tratamento de alertas | 730 dias |
+| `auditoria` | Acessos, cadastros, câmeras abertas, gravações vistas e baixadas, relatórios exportados, tratamento de alertas | 730 dias (mínimo 180) |
 
 Os prazos mudam em **Sistema › Configurações**; a limpeza roda sozinha toda madrugada (3h). Datas sempre no horário de Brasília.
+
+## 3.1 Relatórios
+
+Em **Operação › Relatórios**, na tela, em **Excel (.xlsx)** e em **PDF** (gerados pelo próprio servidor, sem biblioteca externa):
+
+| Relatório | O que traz | Período |
+| --- | --- | --- |
+| Resumo por veículo | Km rodados, motor ligado, em movimento, parado ligado, velocidade máxima e média, excessos, paradas, alertas | até 31 dias* |
+| Excessos de velocidade | Cada trecho acima do limite escolhido: início, fim, duração, máxima, média e local | até 31 dias* |
+| Paradas | Onde e por quanto tempo ficou parado (a partir de N minutos), com o motor ligado ou desligado | até 31 dias* |
+| Alertas | Alertas do período com gravidade, situação e tratamento | até 92 dias |
+
+\* Para não pesar o servidor, veículos × dias fica em até 400 (ex.: 363 veículos por 1 dia, ou 1 veículo por 31 dias); com mais veículos, filtre por grupo. Cada exportação fica na auditoria.
+
+## 3.2 Sessão e avisos
+
+- **Sessão encerrada por falta de uso** depois do tempo de **Sistema › Configurações › Segurança** (padrão 60 min; 0 = nunca, só para telas de central/TV). Um minuto antes aparece “Você ainda está aí?”. Vale também se a janela foi fechada sem clicar em Sair.
+- **Barra do topo:** tempo conectado, botão de atualizar a tela, botão do som dos alertas (só gravidade alta, alta e média, todos ou sem som, e notificação na área de trabalho) e aviso quando sai uma versão nova.
+- **Tela de entrada** no padrão do OdontoWorld e do CondoGest, com “Lembrar meu e-mail” (guarda só o e-mail, e só se a pessoa marcar) e os links de **Termos de uso** (`/termos`) e **Política de privacidade** (`/privacidade`, LGPD).
 
 ---
 
@@ -174,7 +193,8 @@ Cada perfil também diz o **horário configurado no aparelho** (Brasília, ou UT
 - 30 tentativas inválidas em 10 min bloqueiam o IP por 15 min (IP real vindo da Cloudflare).
 - Banco só em 127.0.0.1; senhas aleatórias; entradas validadas e SQL sempre parametrizado.
 - Cabeçalhos de segurança (CSP, HSTS pelo Nginx, sem iframe); só os arquivos do painel são servidos.
-- Auditoria de acessos, senhas erradas, cadastros e aprovações, vídeos de gravação, downloads e tratamento de alertas.
+- Auditoria de acessos, senhas erradas, cadastros e aprovações, câmeras ao vivo abertas, gravações vistas e baixadas, relatórios exportados, sessões encerradas por falta de uso e tratamento de alertas.
+- Sessão encerrada depois de um tempo sem uso (configurável), mesmo com a janela fechada.
 - Criar conta exige o código da empresa e a aprovação do administrador; o código pode ser trocado a qualquer momento.
 - 2FA: previsto para uma próxima etapa.
 

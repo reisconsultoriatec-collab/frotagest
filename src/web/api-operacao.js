@@ -40,13 +40,15 @@ function registrar(srv) {
     return {
       id: u.id, nome: u.nome, email: u.email, perfil: u.perfil, perfilNome: u.perfilNome,
       empresaId: u.empresaId, empresaNome: u.empresaNome, todosGrupos: u.todosGrupos, pode: u.pode,
+      sessaoMin: config.numeroOuZero('sessao_inatividade_min'),
     };
   });
 
   r('POST', '/api/ws-ticket', async ({ u }) => ({ ticket: srv.newWsTicket(u), validoSeg: 60 }));
 
-  r('POST', '/api/sair', async ({ u, ip }) => {
-    await auditoria.registrar(u, 'saida', { descricao: 'saiu do painel', ip });
+  r('POST', '/api/sair', async ({ u, ip, body }) => {
+    if (body.motivo === 'inatividade') await auditoria.registrar(u, 'sessao_expirada', { descricao: 'sessão encerrada por falta de uso', ip });
+    else await auditoria.registrar(u, 'saida', { descricao: 'saiu do painel', ip });
     return { ok: true };
   });
 
@@ -329,11 +331,22 @@ function registrar(srv) {
   };
   const midia = (id) => frota.midiaPara(id, (gateway.devices.get(id) || {}).port || null);
 
-  r('POST', '/api/dvr/:ident/video/iniciar', async ({ u, params, body }) => {
+  // câmera ao vivo fica na auditoria (uma linha por pessoa, aparelho e canal a cada 10 min)
+  const vistos = new Map();
+  r('POST', '/api/dvr/:ident/video/iniciar', async ({ u, params, body, ip }) => {
     const id = dvr(u, params.ident, 'video');
     const ch = canal(body.canal);
     media.expect(id, ch, 'live');
     const serial = gateway.comoUsuario(u.id, () => gateway.startVideo(id, { channel: ch, stream: Number(body.fluxo) === 0 ? 0 : 1 }, midia(id)));
+    const chave = `${u.id}:${id}:${ch}`;
+    const t = Date.now();
+    if (!vistos.has(chave) || t - vistos.get(chave) > 600000) {
+      vistos.set(chave, t);
+      if (vistos.size > 5000) for (const [k, v] of vistos) if (t - v > 600000) vistos.delete(k);
+      const ap = frota.porIdent.get(id);
+      const v = ap ? frota.veiculoDoAparelho.get(ap.id) : null;
+      await auditoria.registrar(u, 'ver_ao_vivo', { entidade: 'aparelho', entidadeId: ap ? ap.id : id, descricao: `${v ? `${v.prefixo ? `${v.prefixo} · ` : ''}${v.placa}, ` : ''}canal ${ch}`, ip, empresaId: ap ? ap.empresa_id : null });
+    }
     return { ok: true, serial };
   });
 

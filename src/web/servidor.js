@@ -25,13 +25,15 @@ const MAX_BODY = 64 * 1024;
 const TIPOS = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
   '.woff': 'font/woff', '.woff2': 'font/woff2', '.png': 'image/png', '.svg': 'image/svg+xml', '.ico': 'image/x-icon',
-  '.json': 'application/json; charset=utf-8', '.webmanifest': 'application/manifest+json',
+  '.json': 'application/json; charset=utf-8', '.webmanifest': 'application/manifest+json', '.webp': 'image/webp',
 };
 
 /** Só os arquivos listados aqui são servidos — nenhum caminho vindo da URL chega ao disco. */
 function montarEstaticos() {
   const m = {
     '/': path.join(PUBLIC, 'index.html'),
+    '/termos': path.join(PUBLIC, 'termos.html'),
+    '/privacidade': path.join(PUBLIC, 'privacidade.html'),
     '/vendor/leaflet.js': path.join(MODULES, 'leaflet', 'dist', 'leaflet.js'),
     '/vendor/leaflet.css': path.join(MODULES, 'leaflet', 'dist', 'leaflet.css'),
     '/vendor/jmuxer.min.js': path.join(MODULES, 'jmuxer', 'dist', 'jmuxer.min.js'),
@@ -39,7 +41,7 @@ function montarEstaticos() {
   for (const img of ['layers.png', 'layers-2x.png', 'marker-icon.png', 'marker-icon-2x.png', 'marker-shadow.png']) {
     m[`/vendor/images/${img}`] = path.join(MODULES, 'leaflet', 'dist', 'images', img);
   }
-  for (const [pasta, re] of [['css', /^[\w-]+\.css$/], ['js', /^[\w-]+\.js$/], ['fonts', /^[\w-]+\.woff2?$/], ['img', /^[\w-]+\.(png|svg|ico)$/]]) {
+  for (const [pasta, re] of [['css', /^[\w-]+\.css$/], ['js', /^[\w-]+\.js$/], ['fonts', /^[\w-]+\.woff2?$/], ['img', /^[\w-]+\.(png|svg|ico|webp)$/]]) {
     let arquivos = [];
     try { arquivos = fs.readdirSync(path.join(PUBLIC, pasta)); } catch { /* pasta opcional */ }
     for (const f of arquivos) if (re.test(f)) m[`/${pasta}/${f}`] = path.join(PUBLIC, pasta, f);
@@ -420,7 +422,7 @@ class Servidor {
       conn.u = u;
       this.eventos.add(conn);
       conn.on('close', () => this.eventos.delete(conn));
-      conn.sendJson({ type: 'ola', streams: this.streamsVisiveis(u), downloads: this.downloadsVisiveis(u) });
+      conn.sendJson({ type: 'ola', versao: this.versao, streams: this.streamsVisiveis(u), downloads: this.downloadsVisiveis(u) });
       return;
     }
 

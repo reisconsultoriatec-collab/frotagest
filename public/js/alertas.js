@@ -23,7 +23,7 @@ PAGINAS.alertas = (() => {
             <label class="field">De<input type="datetime-local" id="al-de"></label>
             <label class="field">Até<input type="datetime-local" id="al-ate"></label>
             <div class="grow"></div>
-            <label class="check" title="Bipe quando chegar alerta de gravidade alta"><input type="checkbox" id="al-som"> Som nos alertas graves</label>
+            <button class="btn" type="button" id="al-som" title="Som e notificação quando chegar alerta novo">${ico('volume', 'i-sm')} Som e avisos</button>
             <button class="btn" type="button" id="al-csv">${ico('download', 'i-sm')} CSV</button>
           </div>
           <div class="card-head" style="border-bottom:0;padding-bottom:6px"><span class="count" id="al-total"></span></div>
@@ -35,8 +35,7 @@ PAGINAS.alertas = (() => {
     $('#al-veic').innerHTML = opcoesVeiculos(f.veiculo, { soComAparelho: false, vazio: 'Todos' });
     $('#al-de').value = paraInput(f.de);
     $('#al-ate').value = paraInput(f.ate);
-    $('#al-som').checked = pref('somAlertas', true);
-    $('#al-som').addEventListener('change', (e) => salvarPref('somAlertas', e.target.checked));
+    $('#al-som').addEventListener('click', (e) => { e.stopPropagation(); abrirMenuSom(); });
     const mudar = () => {
       f.situacao = $('#al-sit').value;
       f.gravidade = $('#al-grav').value;

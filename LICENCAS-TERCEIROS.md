@@ -12,6 +12,7 @@ O FrotaGest (Reis Tecnologia) usa os componentes abaixo, todos com licença livr
 | mysql2 3.x | Acesso ao MySQL (instalado pelo `npm install`) | MIT |
 | Firebase JS SDK 10.12.2 (compat) | Login, carregado de www.gstatic.com | Apache-2.0 |
 | MySQL 9 (imagem Docker oficial) | Banco de dados, em contêiner separado | GPLv2 (uso como serviço, sem alteração) |
+| Métricas das fontes padrão do PDF (Helvetica, Adobe Core 14 AFM) | Larguras das letras nos relatórios em PDF, em `src/relatorios/metricas.js` | Livre para uso, cópia e distribuição (aviso da Adobe nos arquivos AFM) |
 
 ## Tabler Icons — MIT
 

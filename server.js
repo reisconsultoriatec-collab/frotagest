@@ -28,6 +28,8 @@ const { Servidor } = require('./src/web/servidor');
 const apiCadastros = require('./src/web/api-cadastros');
 const apiOperacao = require('./src/web/api-operacao');
 const apiConta = require('./src/web/api-conta');
+const apiRelatorios = require('./src/web/api-relatorios');
+const { Relatorios } = require('./src/relatorios/relatorios');
 const { definirFuso, gerarCodigo } = require('./src/util/comum');
 const { version } = require('./package.json');
 
@@ -176,10 +178,12 @@ async function main() {
   srv = new Servidor({
     cfg: cfg.web, versao: version, gateway, media, mediaCfg: cfg.media, recorder, transcoders, frota, historico, monitor, acesso,
     firebase, banco, config, auditoria, retencao, logs: ring, mensagens, iniciadoEm: Date.now(),
+    relatorios: new Relatorios({ banco, frota, acesso }),
   });
   apiOperacao.registrar(srv);
   apiConta.registrar(srv);
   apiCadastros.registrar(srv);
+  apiRelatorios.registrar(srv);
   srv.onLog = (e) => log(e.level, e.text, { source: 'painel' });
 
   // atualizações do mapa: junta várias posições do mesmo aparelho (ex.: lote de área sem sinal) num envio só

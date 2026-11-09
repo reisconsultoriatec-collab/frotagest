@@ -1,0 +1,377 @@
+/* FrotaGest · Reis Tecnologia — tela de entrada (login, criar conta e avisos)
+ * No padrão do OdontoWorld e do CondoGest: fundo azul-noite fixo, à esquerda o painel do
+ * FrotaGest (a caneta escreve a frase, sublinha "em tempo real" e desenha um ônibus que liga
+ * os faróis e sai rodando), a prévia do painel e a cidade com a estrada ao fundo; à direita,
+ * o cartão de acesso. O painel some no celular. */
+
+#gate {
+  --ls-tinta: #7DD3FC; --ls-ceu: #38BDF8; --ls-luz: #FCD34D;
+  --ls-texto: #F1F6FF; --ls-texto-2: #A7B6D3; --ls-texto-3: #7486AA;
+  --ls-linha: rgba(148, 190, 255, .16); --ls-campo: #0A1530;
+  position: fixed; inset: 0; z-index: 1000; display: flex; isolation: isolate; overflow-y: auto; color: var(--ls-texto);
+  font-family: var(--sans); -webkit-font-smoothing: antialiased;
+}
+/* fundo azul-noite (também na tela de carregamento, para a passagem ser contínua) */
+#gate, .loading {
+  background: radial-gradient(1000px 640px at 92% -12%, rgba(56, 189, 248, .17), transparent 62%),
+              radial-gradient(820px 560px at -8% 110%, rgba(245, 158, 11, .08), transparent 62%),
+              linear-gradient(135deg, #061126 0%, #0C1F45 50%, #133A6E 100%);
+}
+.loading { color: var(--ls-texto-2, #A7B6D3); }
+.loading .spinner { border-color: rgba(148, 190, 255, .18); border-top-color: #F59E0B; }
+/* quadriculado bem sutil */
+#gate::before {
+  content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background-image: linear-gradient(rgba(255, 255, 255, .05) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, .05) 1px, transparent 1px);
+  background-size: 28px 28px; background-position: -1px -1px;
+  -webkit-mask-image: radial-gradient(ellipse 75% 85% at 28% 45%, #000 25%, transparent 80%);
+  mask-image: radial-gradient(ellipse 75% 85% at 28% 45%, #000 25%, transparent 80%);
+}
+#gate .i { width: 18px; height: 18px; }
+
+/* marca: ônibus azul-marinho no quadrado âmbar (a cor do FrotaGest) */
+#gate .auth-marca {
+  display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;
+  background: linear-gradient(180deg, #FBBF24, #F59E0B); color: #1A2744; box-shadow: 0 8px 20px -8px rgba(245, 158, 11, .7), inset 0 1px 0 rgba(255, 255, 255, .35);
+}
+#gate .auth-marca .i { width: 26px; height: 26px; stroke-width: 2; }
+
+/* ---------- painel do FrotaGest ---------- */
+#gate .auth-lado {
+  flex: 1.1 1 0; min-width: 0; position: sticky; top: 0; height: 100vh; min-height: 560px;
+  display: flex; flex-direction: column; justify-content: space-between; gap: 32px; padding: 44px clamp(32px, 6vw, 96px);
+}
+#gate .auth-lado::before {
+  content: ''; position: absolute; top: 0; bottom: 0; left: calc(clamp(32px, 6vw, 96px) - 24px); width: 1px;
+  background: linear-gradient(transparent, rgba(56, 189, 248, .45) 18%, rgba(56, 189, 248, .45) 82%, transparent);
+}
+#gate .auth-lado-marca { display: flex; align-items: center; gap: 12px; font-family: var(--display); font-size: 22px; font-weight: 700; letter-spacing: -.01em; color: #fff; position: relative; z-index: 1; }
+#gate .auth-lado-texto { max-width: 600px; position: relative; }
+#gate .auth-titulo {
+  font-family: var(--display); font-size: clamp(32px, 3.3vw, 48px); line-height: 1.18; letter-spacing: -.02em;
+  font-weight: 700; margin: 0 0 32px; text-wrap: balance; color: #fff;
+}
+/* frase escrita pela caneta: contorno azul-céu no traço, depois preenche de branco */
+#gate .so-leitor { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+#gate .esc-p { white-space: nowrap; }
+#gate .esc-l { color: transparent; -webkit-text-stroke: 1.1px transparent; }
+#gate .esc-l.traco { -webkit-text-stroke-color: var(--ls-tinta); }
+#gate .esc-l.traco.feito { color: #fff; -webkit-text-stroke-color: rgba(125, 211, 252, 0); animation: escPreenche .8s ease-out; }
+@keyframes escPreenche {
+  0%, 15% { color: rgba(255, 255, 255, 0); -webkit-text-stroke-color: var(--ls-tinta); }
+  37% { -webkit-text-stroke-color: var(--ls-tinta); }
+  90% { color: #fff; }
+  100% { color: #fff; -webkit-text-stroke-color: rgba(125, 211, 252, 0); }
+}
+#gate .auth-titulo.apagando .esc-l { color: transparent; -webkit-text-stroke-color: transparent; transition: color .45s ease, -webkit-text-stroke-color .45s ease; }
+#gate .esc-destaque { position: relative; }
+#gate .esc-risco { position: absolute; left: -3%; width: 106%; bottom: -.12em; height: .34em; overflow: visible; pointer-events: none; }
+#gate .esc-risco path { fill: none; stroke: #F59E0B; stroke-width: 3.2; stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 1; opacity: 0; }
+#gate .esc-risco.riscando path, #gate .auth-titulo.escrito .esc-risco path { opacity: 1; }
+#gate .auth-titulo.escrito .esc-l { color: #fff; -webkit-text-stroke-color: transparent; clip-path: none; }
+#gate .auth-titulo.escrito .esc-risco path { stroke-dashoffset: 0; }
+
+/* o ônibus: a caneta traça o contorno; depois ganha cor, rodas, janelas acesas, faróis, o sinal 4G e sai rodando */
+#gate .onibus { display: inline-block; width: 2.05em; height: 1.28em; margin: -.3em 0 -.1em .22em; vertical-align: -.2em; overflow: visible; }
+#gate .on-contorno { fill: none; stroke: var(--ls-tinta); stroke-width: 2.2; stroke-linejoin: round; stroke-linecap: round; stroke-dasharray: 400; stroke-dashoffset: 400; opacity: 0; }
+#gate .onibus.tracando .on-contorno, #gate .auth-titulo.escrito .on-contorno { opacity: 1; }
+#gate .on-carro { transform-box: view-box; }
+#gate .on-corpo { opacity: 0; }
+#gate .on-faixa { transform-box: fill-box; transform-origin: 0 50%; transform: scaleX(0); }
+#gate .on-janela { fill: #0B1D42; }
+#gate .on-vidro { fill: #0B1D42; }
+#gate .on-roda { opacity: 0; transform-box: fill-box; transform-origin: center; transform: scale(0); }
+#gate .on-raios { transform-box: fill-box; transform-origin: center; }
+#gate .on-farol, #gate .on-lanterna { opacity: 0; }
+#gate .on-feixe { opacity: 0; transform-box: fill-box; transform-origin: 0 50%; transform: scaleX(.2); }
+#gate .on-antena { transform-box: fill-box; transform-origin: 50% 100%; transform: scaleY(0); }
+#gate .on-antena path { fill: none; stroke: var(--ls-tinta); stroke-width: 1.4; stroke-linecap: round; }
+#gate .on-onda { fill: none; stroke: var(--ls-tinta); stroke-width: 1.5; stroke-linecap: round; opacity: 0; transform-box: fill-box; transform-origin: 50% 100%; }
+#gate .on-estrada { stroke: rgba(186, 230, 253, .55); stroke-width: 1.6; stroke-linecap: round; stroke-dasharray: 5 7; opacity: 0; }
+#gate .on-brilho-mov { transform: translateX(-30px); opacity: 0; }
+#gate .faisca { fill: #E0F2FE; transform-box: fill-box; transform-origin: center; transform: scale(0); opacity: 0; }
+
+/* montando (a classe entra quando a caneta termina o contorno) */
+#gate .onibus.construindo .on-corpo { opacity: 1; transition: opacity .45s ease .05s; }
+#gate .onibus.construindo .on-faixa { transform: none; transition: transform .45s cubic-bezier(.2, .8, .2, 1) .35s; }
+#gate .onibus.construindo .on-roda { opacity: 1; transform: none; transition: opacity .2s ease calc(.55s + var(--r) * .12s), transform .4s cubic-bezier(.3, 1.6, .5, 1) calc(.55s + var(--r) * .12s); }
+#gate .onibus.construindo .on-janela.acende { fill: var(--ls-luz); transition: fill .35s ease calc(.9s + var(--j) * .09s); }
+#gate .onibus.construindo .on-vidro { fill: #1E4D8F; transition: fill .4s ease 1.3s; }
+#gate .onibus.construindo .on-farol, #gate .onibus.construindo .on-lanterna { opacity: 1; transition: opacity .3s ease 1.55s; }
+#gate .onibus.construindo .on-feixe { opacity: .9; transform: none; transition: opacity .5s ease 1.6s, transform .6s cubic-bezier(.2, .8, .2, 1) 1.6s; }
+#gate .onibus.construindo .on-antena { transform: none; transition: transform .3s cubic-bezier(.2, .8, .2, 1) 1.75s; }
+#gate .onibus.construindo .on-onda { animation: onOnda 1.8s ease-out infinite; }
+#gate .onibus.construindo .on-onda.o1 { animation-delay: 2s; }
+#gate .onibus.construindo .on-onda.o2 { animation-delay: 2.25s; }
+#gate .onibus.construindo .on-onda.o3 { animation-delay: 2.5s; }
+#gate .onibus.construindo .on-estrada { opacity: 1; transition: opacity .4s ease 2s; animation: onEstrada .7s linear 2s infinite; }
+#gate .onibus.construindo .on-raios { animation: onGira .55s linear 2s infinite; }
+#gate .onibus.construindo .on-carro { animation: onBalanca .9s ease-in-out 2s infinite; }
+#gate .onibus.construindo .on-brilho-mov { animation: onVarre 1s ease 2.4s both; }
+#gate .onibus.construindo .faisca { animation: onFaisca 1s cubic-bezier(.2, .8, .2, 1) 2.6s both; }
+#gate .onibus.construindo .f2 { animation-delay: 2.8s; }
+/* desmontando (antes de escrever de novo) */
+#gate .onibus.demolindo .on-corpo, #gate .onibus.demolindo .on-roda, #gate .onibus.demolindo .on-farol, #gate .onibus.demolindo .on-lanterna,
+#gate .onibus.demolindo .on-feixe, #gate .onibus.demolindo .on-estrada { opacity: 0; transition: opacity .35s ease; }
+#gate .onibus.demolindo .on-faixa { transform: scaleX(0); transition: transform .3s ease; }
+#gate .onibus.demolindo .on-antena { transition: transform .3s ease; }
+#gate .onibus.demolindo .on-janela { transition: fill .25s ease; }
+#gate .onibus.demolindo .on-contorno { transition: stroke-dashoffset .6s ease; }
+/* pronta e parada (celular, "reduzir movimento") */
+#gate .auth-titulo.escrito .on-contorno { stroke-dashoffset: 0; }
+#gate .auth-titulo.escrito .on-corpo, #gate .auth-titulo.escrito .on-roda, #gate .auth-titulo.escrito .on-farol, #gate .auth-titulo.escrito .on-lanterna { opacity: 1; transform: none; }
+#gate .auth-titulo.escrito .on-faixa, #gate .auth-titulo.escrito .on-antena { transform: none; }
+#gate .auth-titulo.escrito .on-feixe { opacity: .9; transform: none; }
+#gate .auth-titulo.escrito .on-janela.acende { fill: var(--ls-luz); }
+#gate .auth-titulo.escrito .on-vidro { fill: #1E4D8F; }
+#gate .auth-titulo.escrito .on-onda { opacity: .8; }
+#gate .auth-titulo.escrito .faisca { transform: scale(1); opacity: .9; }
+@keyframes onOnda { 0% { opacity: 0; transform: scale(.6); } 25% { opacity: 1; } 100% { opacity: 0; transform: scale(1.15); } }
+@keyframes onEstrada { from { stroke-dashoffset: 0; } to { stroke-dashoffset: 12; } }
+@keyframes onGira { from { transform: rotate(0); } to { transform: rotate(360deg); } }
+@keyframes onBalanca { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-.5px); } }
+@keyframes onVarre { 0% { transform: translateX(-30px); opacity: 0; } 15% { opacity: 1; } 100% { transform: translateX(110px); opacity: 0; } }
+@keyframes onFaisca { 0% { transform: scale(0) rotate(-45deg); opacity: 0; } 55% { transform: scale(1.25) rotate(0); opacity: 1; } 100% { transform: scale(1); opacity: .9; } }
+
+/* a caneta */
+#gate .caneta { position: absolute; left: 0; top: 0; width: 0; height: 0; z-index: 2; pointer-events: none; opacity: 0; transition: opacity .35s ease; }
+#gate .caneta.visivel { opacity: 1; }
+#gate .caneta-mov { position: absolute; left: 0; top: 0; }
+#gate .caneta svg { position: absolute; left: 0; top: -10px; width: 124px; height: 20px; transform-origin: 0 10px; transform: rotate(-38deg); filter: drop-shadow(-3px 10px 8px rgba(2, 6, 23, .55)); }
+
+/* ---------- prévia do painel (vitrine): só decoração, com valores fictícios fixos no código ---------- */
+#gate .vitrine { max-width: 600px; margin: 0 0 26px; }
+#gate .vt-rotulo { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: rgba(225, 235, 255, .58); }
+#gate .vt-rotulo-nota { text-transform: none; letter-spacing: 0; font-weight: 500; color: rgba(225, 235, 255, .4); }
+#gate .vt-pulso { width: 7px; height: 7px; border-radius: 50%; background: #34D399; box-shadow: 0 0 0 0 rgba(52, 211, 153, .55); animation: vtPulso 2.2s ease-out infinite; }
+#gate .vt-grade { display: grid; grid-template-columns: 1.08fr 1fr; grid-template-rows: auto auto; gap: 12px; }
+#gate .vt-i1 { grid-row: 1 / span 2; }
+#gate .vt-item { min-width: 0; }
+#gate .vt-card {
+  height: 100%; border-radius: 14px; padding: 14px 16px; color: var(--ls-texto);
+  background: linear-gradient(180deg, rgba(255, 255, 255, .075), rgba(255, 255, 255, .03));
+  box-shadow: inset 0 0 0 1px rgba(148, 190, 255, .14), 0 18px 40px -22px rgba(2, 6, 23, .85);
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+  animation: vtFlutua 7s ease-in-out infinite;
+}
+#gate .vt-i2 .vt-card { animation-delay: -2.3s; }
+#gate .vt-i3 .vt-card { animation-delay: -4.6s; }
+#gate .vt-topo { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 500; color: var(--ls-texto-2); white-space: nowrap; }
+#gate .vt-chip { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 20px; font-size: 10.5px; background: rgba(52, 211, 153, .12); color: #6EE7B7; }
+#gate .vt-chip::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+#gate .vt-ic { width: 26px; height: 26px; border-radius: 8px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; }
+#gate .vt-ic .i { width: 15px; height: 15px; }
+#gate .vt-ic.azul { background: rgba(56, 189, 248, .14); color: #7DD3FC; }
+#gate .vt-ic.verde { background: rgba(52, 211, 153, .15); color: #6EE7B7; }
+#gate .vt-ic.ambar { background: rgba(251, 191, 36, .15); color: #FCD34D; }
+#gate .vt-ic.vermelho { background: rgba(248, 113, 113, .15); color: #FCA5A5; }
+#gate .vt-valor {
+  margin: 12px 0 3px; font-family: var(--display); font-size: clamp(22px, 2vw, 28px); font-weight: 700;
+  letter-spacing: -.02em; color: #fff; font-variant-numeric: tabular-nums; white-space: nowrap; transition: color .4s ease;
+}
+#gate .vt-valor small { font-size: .55em; font-weight: 600; color: var(--ls-texto-2); letter-spacing: 0; margin-left: 4px; }
+#gate .vt-valor.sobe { color: #6EE7B7; }
+#gate .vt-variacao { display: flex; align-items: center; gap: 5px; font-size: 12px; color: #6EE7B7; white-space: nowrap; }
+#gate .vt-variacao .i { width: 14px; height: 14px; }
+/* mini mapa com veículos andando nas ruas */
+#gate .vt-mapa { display: block; width: 100%; height: auto; margin-top: 12px; border-radius: 10px; overflow: hidden; background: rgba(6, 17, 38, .55); box-shadow: inset 0 0 0 1px rgba(148, 190, 255, .1); }
+#gate .vt-rua { fill: none; stroke: rgba(148, 190, 255, .13); stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; }
+#gate .vt-rua-fina { fill: none; stroke: rgba(148, 190, 255, .08); stroke-width: 2; }
+#gate .vt-rota { fill: none; stroke: #38BDF8; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1; stroke-dashoffset: 0; opacity: .7; }
+#gate .vt-carro { fill: #34D399; stroke: #061126; stroke-width: 1.2; }
+#gate .vt-carro.alerta { fill: #FBBF24; }
+#gate .vt-carro-halo { fill: #FBBF24; opacity: 0; transform-box: fill-box; transform-origin: center; animation: vtHalo 2s ease-out 1.6s infinite; }
+#gate .vt-garagem { fill: rgba(245, 158, 11, .2); stroke: rgba(245, 158, 11, .7); stroke-width: 1; }
+/* aviso que troca sozinho, com a barrinha do tempo até o próximo */
+#gate .vt-aviso { display: flex; align-items: center; gap: 10px; position: relative; overflow: hidden; }
+#gate .vt-aviso-txt { flex: 1; min-width: 0; }
+#gate .vt-aviso-txt strong { display: block; font-size: 13px; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#gate .vt-aviso-txt small { display: block; font-size: 11.5px; color: var(--ls-texto-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+#gate .vt-aviso-hora { align-self: flex-start; font-size: 10.5px; color: var(--ls-texto-3); }
+#gate .vt-aviso::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: linear-gradient(90deg, rgba(56, 189, 248, .7), rgba(56, 189, 248, 0)); transform-origin: left; transform: scaleX(0); }
+#gate .vt-aviso.troca::after { animation: vtTempo var(--vt-troca, 4.2s) linear both; }
+#gate .vt-aviso.troca .vt-ic, #gate .vt-aviso.troca .vt-aviso-txt { animation: vtTroca .45s cubic-bezier(.2, .8, .2, 1) both; }
+#gate .vt-aviso.troca .vt-aviso-txt { animation-delay: .05s; }
+/* km rodados no dia, com barras por horário */
+#gate .vt-km-linha { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; }
+#gate .vt-valor-p { font-size: clamp(20px, 1.8vw, 24px); margin: 10px 0 3px; }
+#gate .vt-barras { display: flex; align-items: flex-end; gap: 4px; height: 34px; padding-bottom: 4px; }
+#gate .vt-barras span { width: 7px; height: calc(var(--h) * 1%); border-radius: 3px 3px 1px 1px; background: rgba(125, 211, 252, .38); transform-origin: bottom; }
+#gate .vt-barras span:last-child { background: #FCD34D; box-shadow: 0 0 10px rgba(252, 211, 77, .45); }
+/* entrada da vitrine (classe vt-anima ligada pelo script; sem ela tudo aparece pronto) */
+#gate .vitrine.vt-anima .vt-rotulo { animation: lsSurgir .6s ease .2s both; }
+#gate .vitrine.vt-anima .vt-item { animation: vtSobe .7s cubic-bezier(.2, .8, .2, 1) both; }
+#gate .vitrine.vt-anima .vt-i1 { animation-delay: .35s; }
+#gate .vitrine.vt-anima .vt-i2 { animation-delay: .5s; }
+#gate .vitrine.vt-anima .vt-i3 { animation-delay: .65s; }
+#gate .vitrine.vt-anima .vt-rota { animation: vtLinha 1.6s cubic-bezier(.4, .1, .2, 1) .8s both; }
+#gate .vitrine.vt-anima .vt-barras span { animation: vtBarra .6s cubic-bezier(.2, .8, .2, 1) both; animation-delay: calc(.95s + var(--i) * .08s); }
+@keyframes vtSobe { from { opacity: 0; transform: translateY(16px) scale(.98); } to { opacity: 1; transform: none; } }
+@keyframes vtFlutua { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+@keyframes vtPulso { 0% { box-shadow: 0 0 0 0 rgba(52, 211, 153, .55); } 70%, 100% { box-shadow: 0 0 0 7px rgba(52, 211, 153, 0); } }
+@keyframes vtLinha { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes vtHalo { 0% { opacity: .55; transform: scale(1); } 100% { opacity: 0; transform: scale(3.4); } }
+@keyframes vtBarra { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+@keyframes vtTroca { from { opacity: 0; transform: translateY(9px); } to { opacity: 1; transform: none; } }
+@keyframes vtTempo { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+/* recursos, em selos compactos */
+#gate .auth-chips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; max-width: 600px; }
+#gate .auth-chips li {
+  display: inline-flex; align-items: center; gap: 6px; padding: 6px 11px 6px 9px; border-radius: 999px; font-size: 12.5px; font-weight: 500;
+  color: rgba(225, 235, 255, .82); background: rgba(255, 255, 255, .05); box-shadow: inset 0 0 0 1px rgba(148, 190, 255, .14);
+}
+#gate .auth-chips .i { color: var(--ls-ceu); width: 15px; height: 15px; }
+#gate .auth-lado-rodape { position: relative; z-index: 1; font-size: 12px; color: rgba(225, 235, 255, .42); text-shadow: 0 1px 10px rgba(2, 6, 23, .95), 0 0 2px rgba(2, 6, 23, .9); }
+/* logotipo da Reis Tecnologia acima do nome: posicionado por cima, não ocupa espaço no layout */
+#gate .auth-lado-logo { position: absolute; left: 0; bottom: calc(100% + 8px); height: 34px; width: auto; pointer-events: none; opacity: .9; filter: drop-shadow(0 2px 10px rgba(2, 6, 23, .9)); }
+
+/* ---------- cidade e estrada ao fundo ---------- */
+#gate .horizonte {
+  position: fixed; left: 0; right: 0; bottom: 0; height: clamp(110px, 24vh, 230px); z-index: -1; pointer-events: none;
+  opacity: 0; transform: translateY(16px); transition: opacity 1.6s ease .25s, transform 1.6s cubic-bezier(.2, .8, .2, 1) .25s;
+  -webkit-mask-image: linear-gradient(to top, #000 38%, rgba(0, 0, 0, .4) 72%, transparent);
+  mask-image: linear-gradient(to top, #000 38%, rgba(0, 0, 0, .4) 72%, transparent);
+}
+#gate .horizonte.pronto { opacity: 1; transform: none; }
+#gate .horizonte::before { content: ''; position: absolute; left: 8%; right: 8%; bottom: -45%; height: 95%; border-radius: 50%; background: radial-gradient(ellipse at center, rgba(56, 189, 248, .15), transparent 70%); }
+#gate .horizonte svg { position: absolute; left: 0; right: 0; top: 0; bottom: 16px; width: 100%; height: calc(100% - 16px); display: block; }
+#gate .hz-fundo { fill: #16397A; opacity: .5; }
+#gate .hz-frente { fill: #050D24; }
+#gate .hz-jan rect { fill: #FCD34D; fill-opacity: .07; transition: fill-opacity 1.8s ease; }
+#gate .hz-jan rect.acesa { fill-opacity: .68; }
+#gate .hz-luz { fill: #FB7185; opacity: .2; animation: hzPisca 3.4s ease-in-out infinite; }
+#gate .hz-luz:nth-of-type(2n) { animation-delay: -1.3s; }
+#gate .hz-luz:nth-of-type(3n) { animation-delay: -2.4s; }
+@keyframes hzPisca { 0%, 100% { opacity: .15; } 45%, 60% { opacity: .85; } }
+/* a estrada: faixa central andando e faróis passando nos dois sentidos */
+#gate .estrada { position: absolute; left: 0; right: 0; bottom: 0; height: 16px; background: #040A1C; overflow: hidden; box-shadow: 0 -1px 0 rgba(148, 190, 255, .12); }
+#gate .estrada::before {
+  content: ''; position: absolute; left: 0; right: -48px; top: 7px; height: 2px;
+  background: repeating-linear-gradient(90deg, rgba(252, 211, 77, .35) 0 18px, transparent 18px 48px); animation: hzFaixa 1.6s linear infinite;
+}
+#gate .carro { position: absolute; left: 0; width: 26px; height: 4px; border-radius: 2px; will-change: transform; }
+#gate .carro.ida { top: 9px; background: linear-gradient(90deg, rgba(254, 249, 195, 0), rgba(254, 249, 195, .95)); box-shadow: 10px 0 16px 2px rgba(254, 249, 195, .4); animation: hzIda var(--d, 11s) linear var(--a, 0s) infinite; }
+#gate .carro.volta { top: 3px; width: 18px; background: linear-gradient(90deg, rgba(248, 113, 113, .95), rgba(248, 113, 113, 0)); box-shadow: -4px 0 10px rgba(248, 113, 113, .45); animation: hzVolta var(--d, 14s) linear var(--a, 0s) infinite; }
+@keyframes hzFaixa { to { transform: translateX(-48px); } }
+@keyframes hzIda { from { transform: translateX(-40px); } to { transform: translateX(calc(100vw + 40px)); } }
+@keyframes hzVolta { from { transform: translateX(calc(100vw + 40px)); } to { transform: translateX(-40px); } }
+
+/* ---------- cartão de acesso ---------- */
+#gate .auth-direita { flex: .9 1 0; min-width: 0; position: relative; display: flex; align-items: center; justify-content: center; padding: 40px 28px 64px; }
+#gate .auth-direita::before { content: ''; position: absolute; width: 460px; height: 460px; max-width: 100%; border-radius: 50%; z-index: -1; background: radial-gradient(circle, rgba(56, 189, 248, .14), transparent 68%); filter: blur(10px); }
+#gate .gate-box {
+  width: 100%; max-width: 448px; text-align: left; color: var(--ls-texto); border-radius: 22px; padding: 38px 38px 24px;
+  background: linear-gradient(180deg, #13213F, #101C37);
+  box-shadow: 0 44px 90px -28px rgba(2, 6, 23, .75), 0 0 0 1px rgba(148, 190, 255, .10), inset 0 1px 0 rgba(255, 255, 255, .05);
+}
+#gate .auth-card-marca { text-align: center; margin-bottom: 24px; }
+#gate .auth-card-nome { display: inline-flex; align-items: center; gap: 11px; font-family: var(--display); font-size: 29px; font-weight: 700; letter-spacing: -.015em; color: #fff; }
+#gate .auth-card-nome .auth-marca { width: 40px; height: 40px; border-radius: 11px; }
+#gate .auth-card-marca p { color: var(--ls-texto-2); font-size: 14px; margin: 4px 0 0; }
+#gate #gate-saudacao strong { color: #fff; font-weight: 600; }
+#gate .login-tabs { display: flex; border-bottom: 2px solid var(--ls-linha); margin: 0 0 22px; gap: 2px; }
+#gate .login-tab { flex: 1 1 auto; white-space: nowrap; padding: 11px 6px 12px; font: inherit; font-size: 14px; font-weight: 500; color: var(--ls-texto-2); background: none; border: 0; border-bottom: 2px solid transparent; margin-bottom: -2px; cursor: pointer; }
+#gate .login-tab:hover { color: var(--ls-texto); }
+#gate .login-tab.active { color: #fff; font-weight: 600; border-bottom-color: #F59E0B; }
+#gate .login-tab:focus-visible { outline: 2px solid var(--ls-ceu); outline-offset: 2px; border-radius: 4px; }
+#gate .login-form { display: flex; flex-direction: column; gap: 0; }
+#gate .input-group { margin-bottom: 15px; }
+#gate .input-group label { display: block; font-size: 13px; font-weight: 600; color: var(--ls-texto); margin-bottom: 6px; }
+#gate .input-group input {
+  width: 100%; padding: 12px 14px; font: inherit; font-size: 14px; border-radius: 10px;
+  border: 1px solid var(--ls-linha); background: var(--ls-campo); color: var(--ls-texto); transition: border-color .15s, box-shadow .15s;
+}
+#gate .input-group input::placeholder { color: var(--ls-texto-3); }
+#gate .input-group input:focus { outline: none; border-color: var(--ls-ceu); box-shadow: 0 0 0 3px rgba(56, 189, 248, .18); }
+#gate .input-group input:-webkit-autofill { -webkit-box-shadow: 0 0 0 1000px var(--ls-campo) inset; -webkit-text-fill-color: var(--ls-texto); caret-color: var(--ls-texto); }
+#gate .input-group small { display: block; margin-top: 5px; font-size: 11.5px; line-height: 1.4; color: var(--ls-texto-3); }
+#gate .input-group .codigo-input { text-transform: uppercase; letter-spacing: 2px; font-family: var(--mono); }
+#gate .pw { position: relative; display: flex; }
+#gate .pw input { padding-right: 44px; }
+#gate .pw button { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); border: 0; background: none; color: var(--ls-texto-3); cursor: pointer; padding: 6px; display: grid; border-radius: 6px; }
+#gate .pw button:hover, #gate .pw button:focus-visible { color: var(--ls-texto); }
+#gate .caps-lock { display: flex; align-items: center; gap: 5px; color: #FCD34D; font-size: 11.5px; margin-top: 5px; }
+#gate .caps-lock .i { width: 14px; height: 14px; }
+#gate .login-lembrar { display: inline-flex; align-items: center; gap: 8px; margin: -3px 0 14px; cursor: pointer; user-select: none; font-size: 13px; color: var(--ls-texto-2); align-self: flex-start; }
+#gate .login-lembrar input { width: 16px; height: 16px; margin: 0; accent-color: var(--ls-ceu); cursor: pointer; }
+#gate .login-lembrar:hover { color: var(--ls-texto); }
+#gate .gate-msg { font-size: 13px; border-radius: 9px; padding: 9px 12px; margin: 0 0 12px; line-height: 1.45; }
+#gate .gate-msg.err { background: rgba(248, 113, 113, .12); color: #FCA5A5; }
+#gate .gate-msg.ok { background: rgba(52, 211, 153, .12); color: #6EE7B7; }
+#gate .gate-msg.info { background: rgba(56, 189, 248, .12); color: #7DD3FC; }
+#gate .btn-entrar, #gate .gate-box .btn-primary {
+  width: 100%; padding: 13px; font: inherit; font-size: 15px; font-weight: 700; border-radius: 10px; border: 0; cursor: pointer; color: #1A2744;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  background: linear-gradient(135deg, #FBBF24, #F59E0B); box-shadow: 0 10px 22px -10px rgba(245, 158, 11, .8), inset 0 1px 0 rgba(255, 255, 255, .3);
+  transition: filter .15s, transform .1s;
+}
+#gate .btn-entrar:hover, #gate .gate-box .btn-primary:hover { filter: brightness(1.06); }
+#gate .btn-entrar:active:not(:disabled) { transform: translateY(1px); }
+#gate .btn-entrar:focus-visible, #gate .gate-box .btn:focus-visible { outline: 2px solid var(--ls-tinta); outline-offset: 3px; }
+#gate .btn-entrar:disabled, #gate .gate-box .btn:disabled { opacity: .8; cursor: wait; filter: none; }
+#gate .gate-box .btn { font: inherit; font-size: 14px; font-weight: 600; padding: 11px 16px; border-radius: 10px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  background: rgba(255, 255, 255, .04); color: var(--ls-texto); border: 1px solid var(--ls-linha); }
+#gate .gate-box .btn:hover { border-color: rgba(148, 190, 255, .35); background: rgba(255, 255, 255, .07); }
+#gate .gate-box .btn-primary { width: auto; border: 0; }
+#gate .gate-box .btn-ghost { background: none; border-color: transparent; color: var(--ls-texto-2); }
+#gate .gate-acoes { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 18px; }
+#gate .gate-acoes .btn-primary { flex: 1 1 auto; }
+#gate .login-esqueci, #gate .gate-box .link {
+  display: flex; align-items: center; justify-content: center; gap: 6px; margin: 14px auto 0; background: none; border: 0; font: inherit;
+  color: var(--ls-tinta); font-size: 13.5px; font-weight: 500; cursor: pointer; padding: 4px 8px; border-radius: 6px;
+}
+#gate .login-esqueci:hover, #gate .gate-box .link:hover { text-decoration: underline; text-underline-offset: 3px; }
+#gate .login-esqueci .i { color: var(--ls-ceu); width: 16px; height: 16px; }
+#gate .gate-ico { width: 48px; height: 48px; border-radius: 14px; display: grid; place-items: center; margin: 0 auto 14px; background: rgba(56, 189, 248, .12); color: var(--ls-tinta); }
+#gate .gate-ico .i { width: 24px; height: 24px; }
+#gate .gate-ico.aviso { background: rgba(251, 191, 36, .14); color: #FCD34D; }
+#gate .gate-box h2 { font-family: var(--display); font-size: 22px; color: #fff; text-align: center; margin: 0 0 6px; }
+#gate .gate-box .gate-texto { color: var(--ls-texto-2); font-size: 14px; line-height: 1.55; text-align: center; margin: 0 0 16px; }
+#gate .gate-box .gate-texto b { color: #fff; }
+#gate .login-seguro { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 20px; color: var(--ls-texto-2); font-size: 12.5px; }
+#gate .login-seguro .i { width: 15px; height: 15px; color: #6EE7B7; }
+#gate .login-termos { margin: 10px 0 0; font-size: 12px; line-height: 1.5; text-align: center; color: var(--ls-texto-3); }
+#gate .login-versao { margin: 8px 0 0; text-align: center; font-size: 12px; color: var(--ls-texto-3); }
+#gate .login-termos a, #gate .login-versao a { color: var(--ls-texto-2); text-decoration: underline; text-decoration-color: rgba(167, 182, 211, .4); text-underline-offset: 2px; }
+#gate .login-termos a:hover { color: var(--ls-texto); text-decoration-color: currentColor; }
+#gate .login-termos a:focus-visible { outline: 2px solid var(--ls-ceu); outline-offset: 2px; border-radius: 3px; }
+
+/* entrada da tela e troca de aba */
+#gate.entrando .gate-box { animation: lsSubir .6s cubic-bezier(.2, .8, .2, 1) both; }
+#gate.entrando .auth-lado-marca, #gate.entrando .auth-chips li { animation: lsSurgir .6s cubic-bezier(.2, .8, .2, 1) both; }
+#gate.entrando .auth-chips li:nth-child(1) { animation-delay: .8s; }
+#gate.entrando .auth-chips li:nth-child(2) { animation-delay: .88s; }
+#gate.entrando .auth-chips li:nth-child(3) { animation-delay: .96s; }
+#gate.entrando .auth-chips li:nth-child(4) { animation-delay: 1.04s; }
+#gate .gate-conteudo { animation: lsAparecer .22s ease both; }
+@keyframes lsSubir { from { opacity: 0; transform: translateY(22px) scale(.985); } to { opacity: 1; transform: none; } }
+@keyframes lsSurgir { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes lsAparecer { from { opacity: 0; } to { opacity: 1; } }
+
+@media (max-width: 960px) {
+  #gate .auth-lado { display: none; }
+  #gate .auth-direita { flex: 1 1 auto; padding: 28px 16px 56px; }
+}
+/* telas mais baixas (notebooks): os selos saem primeiro; em telas bem baixas, sai a prévia e voltam os selos */
+@media (min-width: 961px) and (max-height: 800px) {
+  #gate .auth-lado { padding-top: 32px; padding-bottom: 28px; }
+  #gate .auth-titulo { margin-bottom: 24px; }
+  #gate .vitrine { margin-bottom: 0; }
+  #gate .auth-chips { display: none; }
+}
+@media (min-width: 961px) and (max-height: 620px) {
+  #gate .vitrine { display: none; }
+  #gate .auth-chips { display: flex; }
+}
+@media (max-width: 520px) {
+  #gate .gate-box { padding: 30px 20px 22px; border-radius: 18px; }
+  #gate .auth-card-nome { font-size: 25px; }
+  #gate .login-tab { font-size: 13px; }
+  #gate .input-group input { font-size: 16px; } /* evita o zoom automático do iPhone ao tocar no campo */
+}
+@media (prefers-reduced-motion: reduce) {
+  #gate.entrando .gate-box, #gate.entrando .auth-lado-marca, #gate.entrando .auth-chips li, #gate .gate-conteudo,
+  #gate .vt-card, #gate .vt-pulso, #gate .vt-carro-halo, #gate .vitrine.vt-anima *, #gate .vt-aviso.troca *, #gate .vt-aviso.troca::after,
+  #gate .estrada::before, #gate .carro, #gate .onibus * { animation: none !important; }
+  #gate .carro { display: none; }
+}

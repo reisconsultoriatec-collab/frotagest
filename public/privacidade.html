@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#1A2744">
+<link rel="icon" href="/img/favicon.svg" type="image/svg+xml">
+<title>Política de privacidade · FrotaGest</title>
+<meta name="description" content="Como o FrotaGest trata os dados pessoais de usuários, motoristas e passageiros, conforme a LGPD.">
+<style>
+  :root { --navy: #1A2744; --amber: #F59E0B; --amber-d: #B45309; --bg: #F1F5F9; --card: #fff; --text: #1E293B; --text2: #475569; --muted: #64748B; --border: #E2E8F0; }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; line-height: 1.65; font-size: 15px; }
+  header { background: linear-gradient(135deg, #061126 0%, #0C1F45 50%, #133A6E 100%); color: #fff; padding: 28px 16px 72px; }
+  .topo { max-width: 820px; margin: 0 auto; display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 18px; }
+  .topo svg { width: 32px; height: 32px; }
+  header h1 { max-width: 820px; margin: 22px auto 6px; font-size: 28px; line-height: 1.25; }
+  header p { max-width: 820px; margin: 0 auto; color: #CBD5E1; font-size: 14px; }
+  main { max-width: 820px; margin: -48px auto 0; padding: 0 16px 40px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 28px 28px 20px; box-shadow: 0 8px 24px rgba(15, 23, 42, .06); }
+  .resumo { background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 12px; padding: 14px 18px; margin-bottom: 22px; }
+  .resumo strong { color: var(--navy); }
+  .resumo ul { margin: 6px 0 0; padding-left: 20px; }
+  nav.indice { border: 1px solid var(--border); border-radius: 12px; padding: 12px 18px; margin-bottom: 24px; font-size: 14px; }
+  nav.indice ol { margin: 6px 0 0; padding-left: 20px; columns: 2; column-gap: 28px; }
+  nav.indice a { color: var(--amber-d); text-decoration: none; }
+  nav.indice a:hover { text-decoration: underline; }
+  h2 { font-size: 19px; color: var(--navy); margin: 30px 0 8px; scroll-margin-top: 16px; }
+  h3 { font-size: 15.5px; color: var(--navy); margin: 18px 0 4px; }
+  ul, ol { padding-left: 22px; }
+  li { margin-bottom: 4px; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 14px; font-size: 14px; }
+  th, td { border: 1px solid var(--border); padding: 8px 10px; text-align: left; vertical-align: top; }
+  th { background: #F8FAFC; color: var(--navy); }
+  .tabela { overflow-x: auto; }
+  a { color: var(--amber-d); }
+  .nota { color: var(--muted); font-size: 13.5px; }
+  .alerta { background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 12px; padding: 12px 16px; margin: 12px 0; }
+  footer { text-align: center; color: var(--muted); font-size: 12.5px; margin-top: 18px; }
+  footer a { color: var(--muted); }
+  .acoes { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 26px; }
+  .acoes a, .acoes button { border: 1px solid var(--border); background: #fff; color: var(--navy); border-radius: 9px; padding: 9px 14px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; text-decoration: none; }
+  @media (max-width: 600px) { header h1 { font-size: 23px; } .card { padding: 22px 18px 14px; } nav.indice ol { columns: 1; } }
+  @media print {
+    body { background: #fff; font-size: 11pt; } header { background: none; color: #000; padding: 0 0 8px; } header p { color: #333; }
+    main { margin: 0; padding: 0; } .card { border: 0; box-shadow: none; padding: 0; } .acoes, nav.indice { display: none; } h2 { break-after: avoid; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="topo"><svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#F59E0B"/><rect x="5.5" y="9" width="21" height="13" rx="2.6" fill="#1A2744"/><rect x="7.8" y="11.3" width="4.6" height="4.4" fill="#F59E0B"/><rect x="13.7" y="11.3" width="4.6" height="4.4" fill="#F59E0B"/><rect x="19.6" y="11.3" width="4.6" height="4.4" fill="#F59E0B"/><circle cx="10.6" cy="22.6" r="2.7" fill="#1A2744"/><circle cx="21.4" cy="22.6" r="2.7" fill="#1A2744"/></svg> FrotaGest</div>
+  <h1>Política de privacidade</h1>
+  <p>Versão 2026-11 · novembro de 2026 · conforme a Lei Geral de Proteção de Dados (Lei 13.709/2018)</p>
+</header>
+<main>
+<article class="card">
+  <div class="resumo">
+    <strong>Em poucas palavras</strong>
+    <ul>
+      <li>Os dados são da <strong>empresa</strong> dona da frota, que decide como usá-los. A <strong>Reis Tecnologia</strong> fornece o FrotaGest e trata os dados só a serviço da empresa.</li>
+      <li>Usamos os dados para monitorar a frota: onde cada veículo está, alarmes, câmeras e gravações do DVR, histórico de trajetos e relatórios. <strong>Nada é vendido nem usado para propaganda.</strong></li>
+      <li><strong>O FrotaGest não guarda vídeo no banco de dados.</strong> As gravações ficam no cartão de memória do DVR, no veículo.</li>
+      <li>Cada pessoa vê só os veículos dos grupos liberados para ela, e cada empresa vê só a própria frota. Câmeras abertas, gravações baixadas e relatórios exportados ficam registrados.</li>
+      <li>Para pedir cópia, correção ou exclusão dos seus dados, fale com a <strong>empresa</strong> onde trabalha ou que opera o veículo.</li>
+    </ul>
+  </div>
+
+  <nav class="indice" aria-label="Índice">
+    <strong>Nesta página</strong>
+    <ol>
+      <li><a href="#quem">Quem cuida dos dados</a></li>
+      <li><a href="#quais">Quais dados tratamos</a></li>
+      <li><a href="#para-que">Para que usamos e com qual base legal</a></li>
+      <li><a href="#quem-ve">Quem vê o quê</a></li>
+      <li><a href="#compartilhamento">Com quem compartilhamos</a></li>
+      <li><a href="#tempo">Por quanto tempo guardamos</a></li>
+      <li><a href="#seguranca">Como protegemos</a></li>
+      <li><a href="#direitos">Seus direitos e como exercê-los</a></li>
+      <li><a href="#navegador">Dados no navegador</a></li>
+      <li><a href="#incidentes">Incidentes de segurança</a></li>
+      <li><a href="#mudancas">Mudanças nesta política</a></li>
+      <li><a href="#contato">Contato</a></li>
+    </ol>
+  </nav>
+
+  <h2 id="quem">1. Quem cuida dos dados</h2>
+  <p>O FrotaGest é um sistema de monitoramento de frota usado por empresas que operam veículos. Cada empresa tem os próprios dados, separados dos demais.</p>
+  <ul>
+    <li><strong>Controladora</strong> (art. 5º, VI da LGPD): a <strong>empresa</strong> dona ou operadora da frota. É ela quem decide instalar os aparelhos, quem acessa o sistema e para quê, e quem responde aos pedidos dos titulares.</li>
+    <li><strong>Operadora</strong> (art. 5º, VII): a <strong>Reis Tecnologia</strong>, que desenvolve e mantém o FrotaGest e trata os dados apenas para prestar o serviço à empresa, seguindo as instruções dela.</li>
+    <li><strong>Encarregado</strong> (art. 41): cada empresa indica a pessoa responsável pela comunicação com os titulares e com a Autoridade Nacional de Proteção de Dados (ANPD). O nome e o contato podem ser pedidos à empresa.</li>
+  </ul>
+
+  <h2 id="quais">2. Quais dados tratamos</h2>
+  <div class="tabela"><table>
+    <thead><tr><th>De quem ou do quê</th><th>Quais dados</th></tr></thead>
+    <tbody>
+      <tr><td>Quem tem conta no sistema</td><td>Nome, e-mail, empresa, perfil (administrador, operador ou visualizador), grupos de veículos liberados, situação da conta e data do último acesso.</td></tr>
+      <tr><td>Veículos e aparelhos</td><td>Placa, prefixo, descrição, grupo, número do DVR, fabricante, modelo e número do chip de celular.</td></tr>
+      <tr><td>Posições dos veículos</td><td>Data e hora, latitude e longitude, velocidade, direção, altitude, ignição ligada ou desligada, qualidade do sinal de GPS e de celular e hodômetro. Como cada veículo é dirigido por uma pessoa, a posição pode indicar onde o motorista estava.</td></tr>
+      <tr><td>Imagens das câmeras</td><td>Vídeo ao vivo e gravações do cartão de memória do DVR, que podem mostrar motoristas, passageiros e pessoas na via. O vídeo ao vivo passa pelo servidor sem ser gravado. As gravações continuam no DVR; o servidor só guarda, por pouco tempo, os trechos que alguém pediu para baixar (veja o item 6).</td></tr>
+      <tr><td>Alertas</td><td>Alarmes enviados pelo DVR (como excesso de velocidade, botão de emergência e falhas de câmera), com data, hora, local e velocidade, e o tratamento registrado pela central: quem tratou, quando e a descrição.</td></tr>
+      <tr><td>Comunicação dos aparelhos</td><td>Conexões, desconexões, comandos enviados e respostas, com data e hora.</td></tr>
+      <tr><td>Todos que acessam</td><td>Data, hora e endereço de internet (IP) das entradas, saídas e tentativas de login, e das ações feitas: cadastros, tratamento de alertas, câmeras abertas, gravações vistas e baixadas e relatórios exportados.</td></tr>
+    </tbody>
+  </table></div>
+  <p>O FrotaGest não faz reconhecimento facial nem identifica pessoas nas imagens. Pedimos às empresas que não registrem dados sensíveis, como saúde, religião ou origem racial, nos campos de texto livre (por exemplo, a descrição do tratamento de um alerta).</p>
+  <p>As senhas não ficam no FrotaGest: o login é feito por um serviço especializado (veja o item 5), e nem a empresa nem a Reis Tecnologia conseguem ver a sua senha.</p>
+
+  <h2 id="para-que">3. Para que usamos e com qual base legal</h2>
+  <div class="tabela"><table>
+    <thead><tr><th>Finalidade</th><th>Base legal (LGPD)</th></tr></thead>
+    <tbody>
+      <tr><td>Acompanhar a frota em tempo real, histórico de trajetos, relatórios de quilometragem, velocidade e paradas</td><td>Legítimo interesse da empresa na gestão, na manutenção e na segurança da frota e do patrimônio (art. 7º, IX)</td></tr>
+      <tr><td>Alarmes de emergência e acompanhamento de ocorrências com os veículos</td><td>Proteção da vida e da segurança física de motoristas, passageiros e terceiros (art. 7º, VII) e legítimo interesse (art. 7º, IX)</td></tr>
+      <tr><td>Câmeras ao vivo e gravações para apurar ocorrências, acidentes e reclamações</td><td>Legítimo interesse (art. 7º, IX) e exercício regular de direitos em processos (art. 7º, VI)</td></tr>
+      <tr><td>Contas de acesso, registro de acessos, prevenção de fraudes e auditoria</td><td>Legítimo interesse e Marco Civil da Internet (Lei 12.965/2014, art. 15) (art. 7º, II e IX)</td></tr>
+    </tbody>
+  </table></div>
+  <p>Não usamos os dados para publicidade e não traçamos perfil de comportamento das pessoas. Cabe à empresa informar motoristas e passageiros de que os veículos têm rastreamento e câmeras e usar os dados só para essas finalidades.</p>
+
+  <h2 id="quem-ve">4. Quem vê o quê</h2>
+  <ul>
+    <li><strong>Administradores da empresa</strong>: todos os veículos e cadastros da empresa, os registros de acesso e a aprovação de novas contas.</li>
+    <li><strong>Operadores</strong>: os veículos dos grupos liberados para eles, com mapa, câmeras, gravações e tratamento de alertas.</li>
+    <li><strong>Visualizadores</strong>: o mapa, as câmeras ao vivo, os alertas e o histórico dos veículos liberados, sem acesso às gravações nem ao tratamento de alertas.</li>
+    <li>Cada empresa vê apenas a própria frota. A Reis Tecnologia acessa os dados só para suporte e manutenção do sistema.</li>
+  </ul>
+  <p>Essas regras valem no servidor: o navegador de cada pessoa recebe apenas os dados dos veículos que ela pode ver.</p>
+
+  <h2 id="compartilhamento">5. Com quem compartilhamos</h2>
+  <ul>
+    <li><strong>Reis Tecnologia</strong>, operadora do FrotaGest, para manter o sistema funcionando e dar suporte.</li>
+    <li><strong>Oracle Cloud</strong>, onde ficam o servidor e o banco de dados do FrotaGest, contratados pela Reis Tecnologia.</li>
+    <li><strong>Google Firebase</strong>, que faz o login (Firebase Authentication) e guarda o e-mail e a senha protegida de quem tem conta.</li>
+    <li><strong>Cloudflare</strong>, que protege e entrega a conexão segura (HTTPS) com o painel.</li>
+    <li><strong>Operadoras de celular</strong> dos chips instalados nos DVRs, por onde passam as posições e o vídeo entre o veículo e o servidor.</li>
+    <li><strong>Serviços de mapa</strong> (OpenStreetMap, Esri e CARTO), que entregam as imagens do mapa. Eles recebem o endereço IP do navegador e a região do mapa exibida, mas não recebem os dados dos veículos.</li>
+    <li><strong>Órgãos públicos</strong>, quando a lei exigir (por exemplo, ordem judicial).</li>
+  </ul>
+  <p><strong>Transferência internacional:</strong> alguns desses serviços podem processar dados em servidores fora do Brasil. Nesses casos, a transferência segue o art. 33 da LGPD, com fornecedores que adotam cláusulas contratuais e garantias de proteção equivalentes às da lei brasileira.</p>
+  <p>Os dados nunca são vendidos, alugados ou cedidos para propaganda.</p>
+
+  <h2 id="tempo">6. Por quanto tempo guardamos</h2>
+  <p>Os prazos são configurados no FrotaGest e, depois deles, os registros são apagados automaticamente todos os dias. Os prazos padrão são:</p>
+  <ul>
+    <li><strong>Posições dos veículos</strong>: 90 dias.</li>
+    <li><strong>Comunicação dos aparelhos</strong>: 180 dias.</li>
+    <li><strong>Alertas e o tratamento registrado</strong>: 1 ano.</li>
+    <li><strong>Registros de acesso e auditoria</strong>: 2 anos (nunca menos de 6 meses, como pede o Marco Civil da Internet).</li>
+    <li><strong>Trechos de gravação baixados</strong>: ficam no servidor por até 7 dias, para quem pediu poder baixar de novo, e depois são apagados. As gravações no cartão de memória do DVR seguem a capacidade do cartão: as mais antigas são sobrescritas pelas novas.</li>
+    <li><strong>Conta de acesso</strong>: enquanto houver vínculo com a empresa. O administrador desativa a conta de quem sai.</li>
+  </ul>
+  <p>Cópias tiradas do sistema (trechos de vídeo salvos, relatórios em Excel ou PDF) passam a ser responsabilidade da empresa, que define por quanto tempo guardá-las. Se a empresa deixar de usar o FrotaGest, a Reis Tecnologia elimina os dados dela em até 90 dias, salvo obrigação legal de guardá-los (art. 16).</p>
+
+  <h2 id="seguranca">7. Como protegemos</h2>
+  <ul>
+    <li>Conexão sempre criptografada (HTTPS) entre o navegador e o servidor.</li>
+    <li>Senhas guardadas pelo serviço de login do Google, nunca no FrotaGest.</li>
+    <li>Contas novas só entram no sistema depois de aprovadas pelo administrador da empresa.</li>
+    <li>Acesso por perfil e por grupos de veículos, conferido no servidor a cada pedido.</li>
+    <li>Aparelhos desconhecidos podem ser recusados, para que só os DVRs cadastrados se conectem.</li>
+    <li>Bloqueio temporário depois de muitas tentativas de acesso inválidas.</li>
+    <li>Trilha de auditoria com entradas, tentativas de login, câmeras abertas, gravações baixadas, relatórios exportados e alterações nos cadastros.</li>
+    <li>Encerramento da sessão depois de um tempo sem uso.</li>
+  </ul>
+
+  <h2 id="direitos">8. Seus direitos e como exercê-los</h2>
+  <p>Pelo art. 18 da LGPD, você pode pedir à empresa, a qualquer momento e sem custo:</p>
+  <ul>
+    <li>confirmação de que os seus dados são tratados e <strong>acesso</strong> a eles;</li>
+    <li><strong>correção</strong> de dados incompletos, inexatos ou desatualizados;</li>
+    <li>anonimização, bloqueio ou <strong>eliminação</strong> de dados desnecessários, excessivos ou tratados em desacordo com a lei;</li>
+    <li><strong>portabilidade</strong> dos dados;</li>
+    <li><strong>informação</strong> sobre com quem os dados são compartilhados.</li>
+  </ul>
+  <h3>Como pedir</h3>
+  <p>Fale com a empresa onde trabalha ou que opera o veículo, ou com o encarregado de dados dela. A empresa aciona a Reis Tecnologia quando necessário. A lei prevê até 15 dias para a resposta completa (art. 19, II).</p>
+  <p>Alguns pedidos têm limites legais: por exemplo, a empresa pode guardar uma gravação enquanto ela for necessária para apurar uma ocorrência ou para um processo. Nesses casos, a empresa explica o motivo na resposta. Se não ficar satisfeito, você também pode reclamar à ANPD (<a href="https://www.gov.br/anpd" target="_blank" rel="noopener noreferrer">gov.br/anpd</a>).</p>
+
+  <h2 id="navegador">9. Dados no navegador</h2>
+  <p>O FrotaGest não usa cookies de propaganda nem de rastreamento. O navegador guarda apenas:</p>
+  <ul>
+    <li>a sessão de login, para você não precisar digitar a senha a cada tela;</li>
+    <li>preferências simples, como a empresa escolhida, os filtros das telas e o som dos alertas;</li>
+    <li>a hora do último uso, para encerrar a sessão depois do tempo sem uso mesmo que a janela tenha sido fechada;</li>
+    <li>o seu e-mail, <strong>só se você marcar "Lembrar meu e-mail"</strong> na tela de entrada (a senha nunca é guardada). Para esquecer, basta desmarcar a opção.</li>
+  </ul>
+  <div class="alerta"><strong>Em computador de uso coletivo</strong>, sempre saia da conta pelo botão Sair ao terminar e não marque "Lembrar meu e-mail". Para mais proteção, use também uma janela anônima.</div>
+  <p>A biblioteca de login é carregada do Google (gstatic.com), que recebe o endereço IP do aparelho para entregar o arquivo.</p>
+
+  <h2 id="incidentes">10. Incidentes de segurança</h2>
+  <p>Se acontecer um incidente que possa causar risco ou dano relevante aos titulares, a empresa e a Reis Tecnologia comunicam a ANPD e as pessoas afetadas, com o que aconteceu, os dados envolvidos e as medidas tomadas (art. 48).</p>
+
+  <h2 id="mudancas">11. Mudanças nesta política</h2>
+  <p>Quando esta política mudar, a versão nova é publicada nesta página, com a data no topo. Mudanças importantes também são avisadas às empresas.</p>
+
+  <h2 id="contato">12. Contato</h2>
+  <p>Para dúvidas e pedidos sobre os seus dados, procure a <strong>empresa</strong> onde trabalha ou que opera o veículo, ou o <strong>encarregado de dados</strong> dela. A empresa aciona a Reis Tecnologia quando necessário.</p>
+  <p class="nota">Leia também os <a href="/termos">Termos de uso</a>.</p>
+
+  <div class="acoes">
+    <a href="/">Voltar ao FrotaGest</a>
+    <button type="button" data-imprimir>Imprimir ou salvar em PDF</button>
+  </div>
+</article>
+<footer>FrotaGest · Reis Tecnologia · <a href="/termos">Termos de uso</a></footer>
+</main>
+<script src="/js/legal.js"></script>
+</body>
+</html>

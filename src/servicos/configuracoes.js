@@ -10,7 +10,8 @@ const CHAVES = {
   retencao_posicoes_dias: { padrao: '90', min: 7, max: 1825, titulo: 'Guardar posições por (dias)' },
   retencao_eventos_dias: { padrao: '180', min: 7, max: 1825, titulo: 'Guardar comunicações por (dias)' },
   retencao_alertas_dias: { padrao: '365', min: 30, max: 3650, titulo: 'Guardar alertas por (dias)' },
-  retencao_auditoria_dias: { padrao: '730', min: 90, max: 3650, titulo: 'Guardar auditoria por (dias)' },
+  retencao_auditoria_dias: { padrao: '730', min: 180, max: 3650, titulo: 'Guardar auditoria por (dias)' },
+  sessao_inatividade_min: { padrao: '60', min: 0, max: 1440, titulo: 'Encerrar a sessão sem uso após (minutos)' },
 };
 
 class Configuracoes {
@@ -30,6 +31,12 @@ class Configuracoes {
 
   numero(chave) {
     return Number(this.valores.get(chave)) || Number(CHAVES[chave].padrao);
+  }
+
+  /** Como numero(), mas aceitando 0 (ex.: 0 = nunca encerrar a sessão). */
+  numeroOuZero(chave) {
+    const n = Number(this.valores.get(chave));
+    return Number.isFinite(n) ? n : Number(CHAVES[chave].padrao);
   }
 
   lista() {

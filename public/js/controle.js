@@ -10,7 +10,8 @@ const NOMES_ACAO = {
   excluir: 'Excluiu', convite: 'Enviou convite', tratar_alerta: 'Tratou alerta', ver_gravacao: 'Assistiu gravação',
   baixar_gravacao: 'Baixou gravação', salvar_gravacao: 'Salvou gravação', limpeza: 'Limpeza do histórico',
   cadastro: 'Criou a conta', cadastro_recusado: 'Código de empresa inválido', aprovar: 'Aprovou cadastro', recusar: 'Recusou cadastro',
-  novo_codigo: 'Gerou código de cadastro', falha_login: 'Senha errada',
+  novo_codigo: 'Gerou código de cadastro', falha_login: 'Senha errada', ver_ao_vivo: 'Abriu câmera ao vivo',
+  exportar_relatorio: 'Exportou relatório', sessao_expirada: 'Sessão encerrada por inatividade',
 };
 const NOMES_ENTIDADE = {
   empresa: 'Empresa', usuario: 'Usuário', grupo: 'Grupo', veiculo: 'Veículo', aparelho: 'Aparelho', aparelho_pendente: 'Aparelho pendente',
@@ -366,6 +367,9 @@ PAGINAS.sistema = (() => {
         <div class="form-sep">Quanto tempo guardar o histórico</div>
         ${num('retencao_posicoes_dias')}${num('retencao_eventos_dias')}${num('retencao_alertas_dias')}${num('retencao_auditoria_dias')}
         <div class="field full"><small>Nenhum vídeo é guardado no banco. As posições são o que mais ocupa espaço: com 363 veículos, cada 30 dias somam alguns GB.</small></div>
+        <div class="form-sep">Segurança</div>
+        ${num('sessao_inatividade_min')}
+        <div class="field full"><small>Depois desse tempo sem mexer no painel, a pessoa precisa entrar de novo (um minuto antes aparece um aviso para continuar). Vale também se a janela foi fechada sem clicar em Sair. Use 0 só em telas de central ou TV que precisam ficar sempre abertas.</small></div>
       </div>
       <p class="form-erro" hidden></p>
       <div style="margin-top:16px"><button class="btn btn-primary" type="submit">${ico('check', 'i-sm')} Salvar configurações</button></div>

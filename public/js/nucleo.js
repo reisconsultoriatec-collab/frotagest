@@ -8,7 +8,8 @@ const ico = (n, cls = '') => `<svg class="i ${cls}" aria-hidden="true"><use href
 const WS_PROTO = location.protocol === 'https:' ? 'wss' : 'ws';
 /* Ícones usados por nome calculado (para o gerador do sprite): ico('lock') ico('info-circle') ico('user') ico('steering-wheel')
    ico('clock') ico('gauge') ico('route') ico('map-pin') ico('wifi') ico('bus') ico('plug-connected-x') ico('alert-triangle')
-   ico('user-plus') ico('user-check') ico('clock-pause') ico('mail') ico('refresh') ico('key') ico('copy') */
+   ico('user-plus') ico('user-check') ico('clock-pause') ico('mail') ico('refresh') ico('key') ico('copy')
+   ico('volume-off') ico('volume') ico('wifi') ico('video') ico('check') ico('download') ico('alert-triangle') ico('bell-ringing') */
 
 /** Estado do painel. */
 const S = {
@@ -104,27 +105,6 @@ function toast(texto, tipo = '') {
   setTimeout(() => t.remove(), tipo === 'err' ? 7000 : 4500);
 }
 
-/** Bipe curto para alertas graves (sem arquivo de áudio). */
-let audioCtx = null;
-function bipe() {
-  if (!pref('somAlertas', true)) return;
-  try {
-    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-    const t0 = audioCtx.currentTime;
-    for (let i = 0; i < 2; i++) {
-      const o = audioCtx.createOscillator();
-      const g = audioCtx.createGain();
-      o.frequency.value = 880;
-      g.gain.setValueAtTime(0.0001, t0 + i * 0.22);
-      g.gain.exponentialRampToValueAtTime(0.25, t0 + i * 0.22 + 0.02);
-      g.gain.exponentialRampToValueAtTime(0.0001, t0 + i * 0.22 + 0.18);
-      o.connect(g).connect(audioCtx.destination);
-      o.start(t0 + i * 0.22);
-      o.stop(t0 + i * 0.22 + 0.2);
-    }
-  } catch { /* sem áudio */ }
-}
-
 /* ---------- API ---------- */
 
 const qs = (o) => new URLSearchParams(Object.entries(o).filter(([, v]) => v !== '' && v !== null && v !== undefined)).toString();
@@ -198,6 +178,7 @@ function atualizarResumoAlertas() {
       const nb = $('#nav-alertas');
       if (nb) { nb.hidden = !n; nb.textContent = n > 99 ? '99+' : String(n); }
       atualizarSelosGrupos();
+      tituloDaAba(S.tituloBase || 'FrotaGest');
       emit('resumo-alertas');
     } catch { /* tenta de novo no próximo evento */ }
   }, 400);
@@ -265,6 +246,7 @@ function pararEventos() {
 function tratarEvento(m) {
   switch (m.type) {
     case 'ola':
+      verificarVersao(m.versao);
       S.streams = new Map((m.streams || []).map((s) => [s.key, s]));
       S.downloads = new Map((m.downloads || []).map((d) => [d.id, d]));
       // reconectou: traz a frota de novo (pode ter mudado enquanto estava fora)
@@ -278,11 +260,7 @@ function tratarEvento(m) {
       break;
     case 'alerta':
       atualizarResumoAlertas();
-      if (m.acao === 'novo' && m.alerta.gravidade === 'alta') {
-        const it = [...S.itens.values()].find((i) => i.aparelhoId === m.alerta.aparelhoId);
-        toast(`Alerta: ${m.alerta.nome} — ${rotulo(it) || m.alerta.ident}`, 'err');
-        bipe();
-      }
+      if (m.acao === 'novo') avisarAlertaNovo(m.alerta);
       emit('alerta', m);
       break;
     case 'stream':
@@ -311,11 +289,12 @@ const NAV = [
     grupo: 'Cadastros',
     pode: 'cadastros',
     itens: [
-      { id: 'veiculos', nome: 'Veículos', ico: 'bus' },
-      { id: 'grupos', nome: 'Grupos', ico: 'folders' },
-      { id: 'usuarios', nome: 'Usuários', ico: 'users', badge: 'nav-pendentes', badgeCls: 'warn' },
-      { id: 'aparelhos', nome: 'Aparelhos (DVR)', ico: 'device-cctv' },
+      // na ordem em que se monta uma empresa: empresa → DVRs → grupos → veículos → pessoas
       { id: 'empresas', nome: 'Empresas', ico: 'building', master: true },
+      { id: 'aparelhos', nome: 'Aparelhos (DVR)', ico: 'device-cctv' },
+      { id: 'grupos', nome: 'Grupos', ico: 'folders' },
+      { id: 'veiculos', nome: 'Veículos', ico: 'bus' },
+      { id: 'usuarios', nome: 'Usuários', ico: 'users', badge: 'nav-pendentes', badgeCls: 'warn' },
     ],
   },
   {
@@ -325,6 +304,7 @@ const NAV = [
       { id: 'mapa', nome: 'Monitoramento', ico: 'map-2' },
       { id: 'alertas', nome: 'Alertas', ico: 'bell-ringing', badge: 'nav-alertas' },
       { id: 'historico', nome: 'Histórico', ico: 'route' },
+      { id: 'relatorios', nome: 'Relatórios', ico: 'file-analytics' },
       { id: 'gravacoes', nome: 'Gravações', ico: 'video', pode: 'gravacoes' },
     ],
   },
@@ -439,7 +419,8 @@ function abrirRota() {
   document.body.classList.remove('sb-open');
   $('#tb-titulo').textContent = pag.titulo;
   $('#tb-sub').textContent = typeof pag.sub === 'function' ? pag.sub() : (pag.sub || '');
-  document.title = `${pag.titulo} · FrotaGest`;
+  S.tituloBase = pag.titulo;
+  tituloDaAba(pag.titulo);
   const c = $('#conteudo');
   c.className = `content${pag.cheia ? ' full' : ''}`;
   c.innerHTML = '';
@@ -601,6 +582,26 @@ function tabela(colunas, linhas, { vazio = 'Nada para mostrar.', linhaCls = null
     ? linhas.map((l) => `<tr class="${linhaCls ? linhaCls(l) : ''}" ${atributos ? atributos(l) : ''}>${colunas.map((c) => `<td class="${c.cls || ''}">${c.v(l)}</td>`).join('')}</tr>`).join('')
     : `<tr><td class="empty" colspan="${colunas.length}">${H(vazio)}</td></tr>`;
   return `<table class="tbl"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+}
+
+/** Baixa um arquivo da API (com o login) e salva com o nome que o servidor mandar. */
+async function baixarArquivo(caminho, nomePadrao = 'arquivo') {
+  const pedir = async (forcar) => fetch(caminho, { headers: { Authorization: `Bearer ${await token(forcar)}` } });
+  let r = await pedir(false);
+  if (r.status === 401) r = await pedir(true);
+  if (!r.ok) {
+    let j = {};
+    try { j = await r.json(); } catch { /* sem corpo */ }
+    throw Object.assign(new Error(j.erro || `Erro ${r.status}`), { status: r.status });
+  }
+  const m = /filename="([^"]+)"/.exec(r.headers.get('Content-Disposition') || '');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(await r.blob());
+  a.download = m ? m[1] : nomePadrao;
+  document.body.append(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+  return a.download;
 }
 
 function baixarCsv(nome, linhas) {
