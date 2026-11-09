@@ -65,6 +65,29 @@ p { margin: 6px 0 0; line-height: 1.5; }
 .sb-sub { font-size: 11.5px; color: #8E9AB8; margin-top: 2px; }
 .sb-nav { display: flex; flex-direction: column; gap: 2px; padding: 6px 12px; flex: 1; overflow-y: auto; }
 .sb-group { font-size: 10.5px; text-transform: uppercase; letter-spacing: .1em; color: #6F7C9C; font-weight: 600; padding: 16px 12px 6px; }
+/* Grupos recolhíveis do menu: abre com um clique no nome, um por vez */
+.sb-grp + .sb-grp { margin-top: 2px; }
+.sb-grp-tit { display: flex; align-items: center; gap: 8px; width: 100%; padding: 14px 12px 8px; background: none; border: 0; border-radius: 8px; cursor: pointer;
+  font: inherit; font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .1em; color: #6F7C9C; text-align: left; transition: color .15s; }
+.sb-grp-tit:hover, .sb-grp-tit:focus-visible { color: #C7D0E4; }
+.sb-grp-tit:focus-visible { outline: 2px solid var(--amber); outline-offset: -2px; }
+.sb-grp-nome { flex: 1; }
+.sb-grp-seta { width: 14px; height: 14px; transition: transform .2s; }
+.sb-grp.aberto .sb-grp-tit { color: #C7D0E4; }
+.sb-grp.aberto .sb-grp-seta { transform: rotate(90deg); }
+.sb-grp.tem-ativo .sb-grp-tit { color: #FBBF24; }
+.sb-grp-selo { min-width: 18px; height: 18px; padding: 0 5px; font-size: 10px; letter-spacing: 0; margin-left: 0; }
+.sb-grp-selo.err { background: var(--err); color: #fff; }
+.sb-grp-selo.warn { background: var(--amber); color: var(--navy); }
+.sb-grp-selo[hidden], .sb-grp.aberto .sb-grp-selo { display: none; }
+.sb-grp-itens { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .22s ease; }
+.sb-grp.aberto .sb-grp-itens { grid-template-rows: 1fr; }
+/* a margem negativa deixa a barrinha do item ativo aparecer; fechado, some também do Tab */
+.sb-grp-itens > div { min-height: 0; overflow: hidden; visibility: hidden; display: flex; flex-direction: column; gap: 2px; margin: 0 -12px; padding: 0 12px; transition: visibility 0s .22s; }
+.sb-grp.aberto .sb-grp-itens > div { visibility: visible; transition: visibility 0s 0s; }
+@media (prefers-reduced-motion: reduce) {
+  .sb-grp-itens, .sb-grp-seta, .sb-grp-itens > div { transition: none; }
+}
 .sb-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 10px; color: var(--navy-ink); text-decoration: none; font-weight: 500; font-size: 14px; position: relative; transition: background .15s, color .15s; }
 .sb-item:hover { background: rgba(255, 255, 255, .06); color: #fff; }
 .sb-item.active { background: rgba(245, 158, 11, .14); color: #FBBF24; font-weight: 600; }

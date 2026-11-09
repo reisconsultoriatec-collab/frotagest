@@ -197,6 +197,7 @@ function atualizarResumoAlertas() {
       b.textContent = n > 99 ? '99+' : String(n);
       const nb = $('#nav-alertas');
       if (nb) { nb.hidden = !n; nb.textContent = n > 99 ? '99+' : String(n); }
+      atualizarSelosGrupos();
       emit('resumo-alertas');
     } catch { /* tenta de novo no próximo evento */ }
   }, 400);
@@ -213,6 +214,7 @@ function atualizarPendentes() {
       S.pendentes = r.total;
       const nb = $('#nav-pendentes');
       if (nb) { nb.hidden = !r.total; nb.textContent = String(r.total); }
+      atualizarSelosGrupos();
       emit('pendentes');
     } catch { /* tenta de novo no próximo aviso */ }
   }, 300);
@@ -343,18 +345,71 @@ function podeVer(item) {
   return true;
 }
 
+/* Menu recolhível (mesmo padrão do EduGest): cada grupo abre com um clique no
+ * nome, um por vez, e o grupo da página atual abre sozinho. Com o grupo
+ * fechado, os selos dos itens (alertas, cadastros pendentes) somam no título
+ * para o aviso não sumir. */
 function montarNav() {
   let html = '';
-  for (const g of NAV) {
-    if (g.pode && !S.eu.pode[g.pode]) continue;
+  NAV.forEach((g, n) => {
+    if (g.pode && !S.eu.pode[g.pode]) return;
     const itens = g.itens.filter(podeVer);
-    if (!itens.length) continue;
-    html += `<div class="sb-group">${H(g.grupo)}</div>`;
-    for (const it of itens) {
-      html += `<a class="sb-item" href="#/${it.id}" data-nav="${it.id}">${ico(it.ico)}<span>${H(it.nome)}</span>${it.badge ? `<span class="sb-badge ${it.badgeCls || 'err'}" id="${it.badge}" hidden></span>` : ''}</a>`;
-    }
+    if (!itens.length) return;
+    const links = itens.map((it) => `<a class="sb-item" href="#/${it.id}" data-nav="${it.id}">${ico(it.ico)}<span>${H(it.nome)}</span>${it.badge ? `<span class="sb-badge ${it.badgeCls || 'err'}" id="${it.badge}" hidden></span>` : ''}</a>`).join('');
+    html += `<div class="sb-grp" data-grupo="${n}">
+      <button type="button" class="sb-grp-tit" aria-expanded="false" aria-controls="sb-grp-${n}">
+        <span class="sb-grp-nome">${H(g.grupo)}</span><span class="sb-badge sb-grp-selo" hidden></span>${ico('chevron-right', 'sb-grp-seta')}
+      </button>
+      <div class="sb-grp-itens" id="sb-grp-${n}"><div>${links}</div></div>
+    </div>`;
+  });
+  const nav = $('#nav');
+  nav.innerHTML = html;
+  if (!nav.dataset.ligado) {
+    nav.dataset.ligado = '1';
+    nav.addEventListener('click', (e) => {
+      const tit = e.target.closest('.sb-grp-tit');
+      if (tit) abrirGrupo(tit.closest('.sb-grp'), true);
+    });
   }
-  $('#nav').innerHTML = html;
+  const atual = (location.hash.replace(/^#\/?/, '').split('?')[0]) || 'inicio';
+  marcarGrupo(atual);
+  atualizarSelosGrupos();
+}
+
+/** Abre um grupo e fecha os outros; "alternar" fecha se ele já estiver aberto. */
+function abrirGrupo(grupo, alternar) {
+  const abrir = !(alternar && grupo && grupo.classList.contains('aberto'));
+  $$('.sb-grp').forEach((g) => {
+    const aberto = abrir && g === grupo;
+    g.classList.toggle('aberto', aberto);
+    g.querySelector('.sb-grp-tit').setAttribute('aria-expanded', String(aberto));
+  });
+}
+
+/** Destaca o grupo da página atual e o abre. */
+function marcarGrupo(id) {
+  const item = $(`.sb-item[data-nav="${id}"]`);
+  const grupo = item ? item.closest('.sb-grp') : null;
+  $$('.sb-grp').forEach((g) => g.classList.toggle('tem-ativo', g === grupo));
+  if (grupo) abrirGrupo(grupo, false);
+}
+
+/** Soma os selos visíveis de cada grupo e mostra no título (só aparece com o grupo fechado). */
+function atualizarSelosGrupos() {
+  $$('.sb-grp').forEach((g) => {
+    const selos = [...g.querySelectorAll('.sb-item .sb-badge')].filter((b) => !b.hidden && b.textContent);
+    const total = selos.reduce((t, b) => t + (parseInt(b.textContent, 10) || 0), 0);
+    const mais = selos.some((b) => b.textContent.endsWith('+'));
+    const selo = g.querySelector('.sb-grp-selo');
+    selo.hidden = !total;
+    selo.textContent = total ? (mais || total > 99 ? '99+' : String(total)) : '';
+    selo.className = `sb-badge sb-grp-selo ${selos.some((b) => b.classList.contains('err')) ? 'err' : 'warn'}`;
+    selo.title = selos.map((b) => {
+      const nome = b.closest('.sb-item').querySelector('span').textContent;
+      return `${nome}: ${b.textContent}`;
+    }).join(' · ');
+  });
 }
 
 function navegar(id, params = '') {
@@ -380,6 +435,7 @@ function abrirRota() {
   }
   S.paginaAtual = pag;
   $$('.sb-item').forEach((a) => a.classList.toggle('active', a.dataset.nav === (pag.id || id)));
+  marcarGrupo(pag.id || id);
   document.body.classList.remove('sb-open');
   $('#tb-titulo').textContent = pag.titulo;
   $('#tb-sub').textContent = typeof pag.sub === 'function' ? pag.sub() : (pag.sub || '');
