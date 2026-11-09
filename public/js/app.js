@@ -354,6 +354,7 @@ async function iniciar() {
   // cabeçalho
   $('#tb-sair').addEventListener('click', () => sair());
   $('#tb-atualizar').addEventListener('click', atualizarTela);
+  $('#tb-tema').addEventListener('click', trocarTema);
   $('#tb-som').addEventListener('click', abrirMenuSom);
   $('#nv-atualizar').addEventListener('click', () => location.reload());
   $('#nv-fechar').addEventListener('click', () => { $('#nova-versao').hidden = true; });

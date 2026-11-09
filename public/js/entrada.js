@@ -1,5 +1,5 @@
 'use strict';
-/* FrotaGest — enfeites da tela de entrada: frase escrita pela caneta com o ônibus no fim, prévia do
+/* FrotaGest — enfeites da tela de entrada: frase trazida por um ônibus que estaciona no fim, prévia do
  * painel, cidade com a estrada ao fundo, saudação e "Lembrar meu e-mail". Tudo aqui é decoração:
  * nada lê dados do servidor, e se alguma animação falhar o login continua funcionando.
  * No padrão do OdontoWorld e do CondoGest. Reis Tecnologia */
@@ -7,32 +7,35 @@
 const reduzirMovimento = () => { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; } };
 const gateNaTela = () => { const g = document.getElementById('gate'); return !!(g && !g.hidden); };
 
-/* ---------- frase escrita pela caneta ---------- */
-// A caneta escreve a frase (cada letra: contorno azul-céu que se preenche de branco), sublinha
-// "em tempo real" e desenha o contorno de um ônibus no fim da frase. Quando a caneta sai, o ônibus
-// ganha cor, rodas, janelas acesas, faróis e o sinal do 4G, e fica "rodando" na estrada.
-// A frase fica parada para leitura, se apaga e o ciclo recomeça. Só roda com o painel visível.
+/* ---------- frase trazida pelo ônibus ---------- */
+// Um ônibus entra pela esquerda e percorre cada linha da frase; as letras vão aparecendo atrás dele
+// (como se ele viesse trazendo o texto) e ele deixa o sublinhado âmbar em "em tempo real". Na última
+// linha ele estaciona no fim da frase, acende os faróis e o sinal do 4G. A frase fica parada para
+// leitura, o ônibus sai pela direita levando o texto e o ciclo recomeça. Só roda com o painel
+// visível; no celular e com "reduzir movimento" tudo aparece pronto e parado.
 const ENTRADA_FRASE = 'Sua frota monitorada em tempo real e sem complicações';
 const ENTRADA_DESTAQUE = 'em tempo real';
-const ENTRADA_TEMPO = { inicio: 650, chega: 380, risca: 520, ida: 620, desenho: 1500, sai: 480, parada: 9000, apaga: 450, onda: 7, respiro: 600 };
+const ENTRADA_TEMPO = { inicio: 500, velocidade: 0.6, parada: 9000, partida: 1000, apaga: 450, onda: 7, respiro: 700 };
 
-// Ônibus (viewBox 96 x 60). A caneta traça da esquerda para a direita: chão, traseira, teto, frente e chão.
-const ONIBUS_CONTORNO = 'M2 54H9V16.5Q9 11 14.5 11H73Q80.5 11 83.5 17.5L87.5 29V54H94';
-function onibusSvg() {
+// Ônibus de lado, virado para a direita (viewBox 96 x 60, rodas no chão em y = 54).
+// "sufixo" separa os ids quando há mais de um ônibus na página.
+function onibusSvg(sufixo = '', classe = '') {
+  const id = (n) => `on-${n}${sufixo}`;
   const janelas = [13, 23, 33, 43, 53].map((x, i) => `<rect class="on-janela${i === 3 ? '' : ' acende'}" style="--j:${[2, 0, 3, 0, 1][i]}" x="${x}" y="16" width="8" height="12" rx="1"/>`).join('');
-  const roda = (cx, r) => `<g class="on-roda" style="--r:${r}"><circle cx="${cx}" cy="48" r="6" fill="#091330" stroke="rgba(125,211,252,.85)" stroke-width="1.2"/>`
-    + `<g class="on-raios"><path d="M${cx - 3.6} 48H${cx + 3.6}M${cx - 1.8} ${(48 - 3.1).toFixed(1)}L${cx + 1.8} ${(48 + 3.1).toFixed(1)}M${cx + 1.8} ${(48 - 3.1).toFixed(1)}L${cx - 1.8} ${(48 + 3.1).toFixed(1)}" stroke="#94A3B8" stroke-width=".9" stroke-linecap="round"/></g>`
+  const roda = (cx) => `<g class="on-roda"><circle cx="${cx}" cy="48" r="6" fill="#091330" stroke="rgba(125,211,252,.85)" stroke-width="1.2"/>`
+    + `<g class="on-raios"><path d="M${cx - 3.6} 48H${cx + 3.6}M${cx - 1.8} 44.9L${cx + 1.8} 51.1M${cx + 1.8} 44.9L${cx - 1.8} 51.1" stroke="#94A3B8" stroke-width=".9" stroke-linecap="round"/></g>`
     + `<circle cx="${cx}" cy="48" r="1.6" fill="#E2E8F0"/></g>`;
-  return '<svg class="onibus" viewBox="0 0 96 60" aria-hidden="true"><defs>'
-    + '<clipPath id="on-recorte"><path d="M9 48V16.5Q9 11 14.5 11H73Q80.5 11 83.5 17.5L87.5 29V48Z"/></clipPath>'
-    + '<linearGradient id="on-corpo" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2D5AA0"/><stop offset="1" stop-color="#173461"/></linearGradient>'
-    + '<linearGradient id="on-feixe" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#FEF9C3" stop-opacity=".85"/><stop offset="1" stop-color="#FEF9C3" stop-opacity="0"/></linearGradient>'
-    + '<linearGradient id="on-luz" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".5" stop-color="#fff" stop-opacity=".5"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>'
+  const corpo = 'M9 48V16.5Q9 11 14.5 11H73Q80.5 11 83.5 17.5L87.5 29V48Z';
+  return `<svg class="onibus ${classe}" viewBox="0 0 96 60" aria-hidden="true"><defs>`
+    + `<clipPath id="${id('recorte')}"><path d="${corpo}"/></clipPath>`
+    + `<linearGradient id="${id('corpo')}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2D5AA0"/><stop offset="1" stop-color="#173461"/></linearGradient>`
+    + `<linearGradient id="${id('feixe')}" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#FEF9C3" stop-opacity=".85"/><stop offset="1" stop-color="#FEF9C3" stop-opacity="0"/></linearGradient>`
+    + `<linearGradient id="${id('luz')}" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".5" stop-color="#fff" stop-opacity=".5"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>`
     + '</defs>'
     + '<path class="on-estrada" d="M2 57.5H94"/>'
-    + '<path class="on-feixe" d="M88 41.6L120 33V50.5Z" fill="url(#on-feixe)"/>'
+    + `<path class="on-feixe" d="M88 41.6L120 33V50.5Z" fill="url(#${id('feixe')})"/>`
     + '<g class="on-carro">'
-    +   '<path class="on-corpo" d="M9 48V16.5Q9 11 14.5 11H73Q80.5 11 83.5 17.5L87.5 29V48Z" fill="url(#on-corpo)"/>'
+    +   `<path class="on-corpo" d="${corpo}" fill="url(#${id('corpo')})"/>`
     +   '<rect class="on-faixa" x="9" y="33.5" width="78.5" height="3" fill="#F59E0B"/>'
     +   janelas
     +   '<rect class="on-vidro" x="63" y="16" width="8" height="25" rx="1"/><path d="M67 16V41" stroke="#0B1D42" stroke-width=".8"/>'
@@ -41,24 +44,14 @@ function onibusSvg() {
     +   '<rect class="on-lanterna" x="8.4" y="39" width="2.2" height="4.6" rx=".6" fill="#F87171"/>'
     +   '<g class="on-antena"><path d="M40 11V5.4"/><circle cx="40" cy="4.6" r="1.1" fill="#7DD3FC"/></g>'
     +   '<path class="on-onda o1" d="M36.6 2.4Q40 -.6 43.4 2.4"/><path class="on-onda o2" d="M34.2 .2Q40 -4.8 45.8 .2"/><path class="on-onda o3" d="M31.8 -2Q40 -9 48.2 -2"/>'
-    +   '<g clip-path="url(#on-recorte)"><g class="on-brilho-mov"><rect x="0" y="-10" width="14" height="80" fill="url(#on-luz)" transform="skewX(-22)"/></g></g>'
+    +   `<path class="on-contorno" d="${corpo}"/>`
+    +   `<g clip-path="url(#${id('recorte')})"><g class="on-brilho-mov"><rect x="0" y="-10" width="14" height="80" fill="url(#${id('luz')})" transform="skewX(-22)"/></g></g>`
     + '</g>'
-    + roda(22, 0) + roda(74, 1)
-    + `<path class="on-contorno" d="${ONIBUS_CONTORNO}"/>`
+    + roda(22) + roda(74)
     + '<g transform="translate(93 16)"><path class="faisca f1" d="M0-6C.6-1.2 1.2-.6 6 0 1.2.6.6 1.2 0 6-.6 1.2-1.2.6-6 0-1.2-.6-.6-1.2 0-6z"/></g>'
     + '<g transform="translate(3 24)"><path class="faisca f2" d="M0-4C.4-.8.8-.4 4 0 .8.4.4.8 0 4-.4.8-.8.4-4 0-.8-.4-.4-.8 0-4z"/></g>'
     + '</svg>';
 }
-
-// Caneta de corpo azul laqueado e partes de metal; a ponta fica na origem (0, 11)
-const CANETA_SVG = '<svg viewBox="0 0 136 22" aria-hidden="true"><defs>'
-  + '<linearGradient id="fg-caneta-corpo" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7CB8FF"/><stop offset=".3" stop-color="#2F6FE0"/><stop offset=".7" stop-color="#173B8F"/><stop offset="1" stop-color="#0A1A45"/></linearGradient>'
-  + '<linearGradient id="fg-caneta-metal" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F8FAFC"/><stop offset=".45" stop-color="#CBD5E1"/><stop offset=".75" stop-color="#8A9BB4"/><stop offset="1" stop-color="#CBD5E1"/></linearGradient></defs>'
-  + '<path d="M0 11 5.5 9.4v3.2z" fill="#0F172A"/><path d="M5 9.5 25 4.2v13.6L5 12.5z" fill="url(#fg-caneta-metal)"/>'
-  + '<rect x="25" y="3.6" width="3" height="14.8" fill="#E2E8F0"/><rect x="28" y="3.4" width="88" height="15.2" fill="url(#fg-caneta-corpo)"/>'
-  + '<rect x="28" y="5.2" width="88" height="1.3" fill="#fff" opacity=".35"/><rect x="70" y="3.4" width="4" height="15.2" fill="url(#fg-caneta-metal)"/>'
-  + '<rect x="116" y="3.4" width="2.6" height="15.2" fill="url(#fg-caneta-metal)"/><path d="M118.6 3.4h8.6a7.6 7.6 0 0 1 0 15.2h-8.6z" fill="url(#fg-caneta-corpo)"/>'
-  + '<rect x="86" y=".6" width="38" height="3.4" rx="1.7" fill="url(#fg-caneta-metal)"/><circle cx="87.6" cy="2.3" r="2.1" fill="#E2E8F0"/></svg>';
 
 const _escrita = { quadro: 0, espera: 0, ativa: false, volta: 0 };
 
@@ -71,13 +64,13 @@ function montarFrase() {
     if (p === ENTRADA_DESTAQUE) {
       return `<span class="esc-p esc-destaque">${letras}<svg class="esc-risco" viewBox="0 0 200 14" preserveAspectRatio="none" aria-hidden="true"><path d="M3 9C45 5 90 4 130 6S185 9 197 5" pathLength="1"/></svg></span>`;
     }
-    return `<span class="esc-p">${letras}${k === palavras.length - 1 ? onibusSvg() : ''}</span>`;
+    return `<span class="esc-p">${letras}${k === palavras.length - 1 ? onibusSvg('', 'parado') : ''}</span>`;
   }).join(' ');
   h1.innerHTML = `<span class="so-leitor">${H(ENTRADA_FRASE)}</span><span class="esc" aria-hidden="true">${html}</span>`;
   h1.setAttribute('data-montada', '1');
-  h1.classList.add('escrito'); // até a caneta começar, a frase fica pronta e legível
-  const mov = document.querySelector('#gate .caneta-mov');
-  if (mov) mov.innerHTML = CANETA_SVG;
+  h1.classList.add('escrito'); // até o ônibus começar, a frase fica pronta e legível
+  const mov = document.querySelector('#gate .veiculo-mov');
+  if (mov) mov.innerHTML = onibusSvg('-m', 'andando');
 }
 
 function escreverFrase() {
@@ -87,177 +80,155 @@ function escreverFrase() {
   const t = document.getElementById('gate');
   const h1 = t && t.querySelector('.auth-titulo');
   const caixa = t && t.querySelector('.auth-lado-texto');
-  const caneta = t && t.querySelector('.caneta');
-  if (!h1 || !caixa || !caneta) return;
+  const veiculo = t && t.querySelector('.veiculo');
+  if (!h1 || !caixa || !veiculo) return;
   const letras = [...h1.querySelectorAll('.esc-l')];
   const risco = h1.querySelector('.esc-risco');
   const traco = risco && risco.querySelector('path');
-  const desenho = h1.querySelector('.onibus');
-  const contorno = desenho && desenho.querySelector('.on-contorno');
-  const mov = caneta.firstElementChild;
-  let tamDesenho = 0;
+  const parado = h1.querySelector('.onibus.parado');
+  const primeiroDestaque = risco ? letras.indexOf(risco.parentElement.querySelector('.esc-l')) : -1;
   const naTela = () => h1.isConnected && gateNaTela() && !!caixa.offsetParent;
+  const limparLetras = () => letras.forEach((l) => { l.classList.remove('vis'); l.style.transitionDelay = ''; });
   const pronto = () => {
     cancelAnimationFrame(esc.quadro); clearTimeout(esc.espera); esc.ativa = false;
-    letras.forEach((l) => { l.style.clipPath = ''; l.style.transitionDelay = ''; });
+    limparLetras();
     if (traco) { traco.style.strokeDashoffset = ''; traco.style.transition = ''; }
-    if (contorno) { contorno.style.strokeDasharray = ''; contorno.style.strokeDashoffset = ''; contorno.style.transition = ''; }
-    if (desenho) desenho.classList.remove('construindo', 'demolindo', 'tracando');
     if (risco) risco.classList.remove('riscando');
-    h1.classList.remove('apagando'); h1.classList.add('escrito');
-    caneta.classList.remove('visivel', 'saindo');
+    if (parado) parado.classList.remove('chegou');
+    h1.classList.remove('apagando', 'trazendo'); h1.classList.add('escrito');
+    veiculo.classList.remove('visivel');
   };
-  if (reduzirMovimento() || !caixa.offsetParent || !letras.length) { pronto(); return; }
+  if (reduzirMovimento() || !caixa.offsetParent || !letras.length || !parado) { pronto(); return; }
   esc.ativa = true;
   const volta = ++esc.volta;
-  letras.forEach((l) => { l.classList.remove('traco', 'feito'); l.style.clipPath = ''; l.style.transitionDelay = ''; });
+  limparLetras();
   if (traco) { traco.style.transition = ''; traco.style.strokeDashoffset = ''; }
-  if (desenho) desenho.classList.remove('construindo', 'demolindo', 'tracando');
   if (risco) risco.classList.remove('riscando');
-  if (contorno) { contorno.style.transition = ''; contorno.style.strokeDasharray = ''; contorno.style.strokeDashoffset = ''; }
-  caneta.classList.remove('visivel', 'saindo');
+  parado.classList.remove('chegou');
+  veiculo.classList.remove('visivel');
 
-  // roteiro (refeito a cada volta, com a fonte carregada e a largura atual)
-  let passos = [];
+  // roteiro (refeito a cada volta, com a fonte carregada e a largura atual): as linhas da frase,
+  // onde o ônibus anda em cada uma e onde ele estaciona
+  let linhas = [];
+  let vaga = null;
+  let caixaRisco = null;
   const roteiro = () => {
-    const r0 = letras.map((l) => l.getBoundingClientRect());
-    passos = letras.map((l, i) => {
-      const anterior = i ? letras[i - 1].textContent : '';
-      const novaLinha = i > 0 && r0[i].top - r0[i - 1].top > 4;
-      const novaPalavra = i > 0 && !l.previousElementSibling;
-      let desloca = i === 0 || novaLinha ? 420 : novaPalavra ? 70 : 0;
-      if (novaPalavra && anterior === ',') desloca += 200;
-      return { desloca, escreve: 12 + r0[i].width * 0.95 + Math.random() * 10, novaLinha, novaPalavra };
+    const b = caixa.getBoundingClientRect();
+    const rel = (r) => ({ x: r.left - b.left, y: r.top - b.top, w: r.width, h: r.height });
+    const rs = letras.map((l) => rel(l.getBoundingClientRect()));
+    linhas = [];
+    rs.forEach((r, i) => {
+      const atual = linhas[linhas.length - 1];
+      if (!atual || Math.abs(r.y - atual.topo) > 4) linhas.push({ topo: r.y, esq: r.x, dir: r.x + r.w, letras: [i] });
+      else { atual.dir = Math.max(atual.dir, r.x + r.w); atual.letras.push(i); }
     });
-    if (contorno) {
-      tamDesenho = contorno.getTotalLength();
-      contorno.style.transition = '';
-      contorno.style.strokeDasharray = String(tamDesenho);
-      contorno.style.strokeDashoffset = String(tamDesenho);
-    }
+    vaga = rel(parado.getBoundingClientRect());
+    veiculo.style.width = `${vaga.w.toFixed(1)}px`;
+    veiculo.style.height = `${vaga.h.toFixed(1)}px`;
+    const alturaOnibus = vaga.y - linhas[linhas.length - 1].topo; // a mesma altura em todas as linhas
+    linhas.forEach((ln, k) => {
+      ln.y = ln.topo + alturaOnibus;
+      ln.de = ln.esq - vaga.w - 28;
+      ln.ate = k === linhas.length - 1 ? vaga.x : ln.dir + 18;
+      ln.ms = Math.max(500, (ln.ate - ln.de) / T.velocidade);
+      ln.revela = ln.letras.map((i) => ({ i, x: rs[i].x + rs[i].w * 0.35 }));
+      ln.temRisco = ln.letras.includes(primeiroDestaque);
+    });
+    caixaRisco = risco ? rel(risco.getBoundingClientRect()) : null;
   };
+  // arranque e freada suaves: acelera no começo da primeira linha e freia ao estacionar
+  const A = 0.22;
+  const arranca = (f) => (f < A ? (f * f) / (2 * A * (1 - A / 2)) : (f - A / 2) / (1 - A / 2));
+  const freia = (f) => 1 - arranca(1 - f);
   const suave = (f) => (f < 0.5 ? 2 * f * f : 1 - ((-2 * f + 2) ** 2) / 2);
-  const ponta = (r, b, direita) => ({ x: (direita ? r.right : r.left) - b.left, y: r.top + r.height * 0.8 - b.top });
-  const por = (p, sobe = 0, gira = 0) => {
-    caneta.style.transform = `translate(${p.x.toFixed(1)}px, ${p.y.toFixed(1)}px)`;
-    mov.style.transform = `translateY(${(-sobe).toFixed(1)}px) rotate(${gira.toFixed(2)}deg)`;
+  const por = (x, y, opacidade) => {
+    veiculo.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`;
+    veiculo.style.opacity = String(opacidade);
   };
-  const entre = (a, c, f) => ({ x: a.x + (c.x - a.x) * f, y: a.y + (c.y - a.y) * f });
-  const noRisco = (b, f) => {
-    const rr = risco.getBoundingClientRect();
-    const pt = traco.getPointAtLength(f * traco.getTotalLength());
-    return { x: rr.left + (pt.x / 200) * rr.width - b.left, y: rr.top + (pt.y / 14) * rr.height - b.top };
-  };
-  const noDesenho = (b, f) => {
-    const m = contorno.getScreenCTM();
-    const pt = contorno.getPointAtLength(f * tamDesenho);
-    return { x: m.a * pt.x + m.c * pt.y + m.e - b.left, y: m.b * pt.x + m.d * pt.y + m.f - b.top };
-  };
-  let i = 0;
+  let k = 0;
   let tempo = 0;
-  let fase = 'letras';
   let ultimo = null;
-  let deOnde = null;
 
   function quadro(agora) {
     if (!naTela()) { pronto(); return; }
-    tempo += ultimo === null ? 0 : Math.min(agora - ultimo, 50);
+    tempo += ultimo === null ? 0 : Math.min(agora - ultimo, 50); // aba escondida: continua de onde parou
     ultimo = agora;
-    const b = caixa.getBoundingClientRect();
-    let f;
-    let g;
-    if (fase === 'letras') {
-      for (;;) {
-        const p = passos[i];
-        const r = letras[i].getBoundingClientRect();
-        const ini = ponta(r, b, false);
-        const fim = ponta(r, b, true);
-        if (tempo < p.desloca) {
-          f = tempo / p.desloca;
-          const de = i ? ponta(letras[i - 1].getBoundingClientRect(), b, true) : { x: ini.x + 34, y: ini.y - 40 };
-          por(entre(de, ini, i === 0 || p.novaLinha ? suave(f) : f), (p.novaLinha ? 12 : p.novaPalavra ? 4 : 0) * Math.sin(f * Math.PI));
-          break;
-        }
-        g = (tempo - p.desloca) / p.escreve;
-        if (g < 1) {
-          letras[i].classList.add('traco');
-          letras[i].style.clipPath = `inset(-35% ${((1 - g) * 100).toFixed(1)}% -35% -12%)`;
-          por(entre(ini, fim, g), 2.5 * Math.sin(g * Math.PI), -2 * Math.sin(g * Math.PI));
-          break;
-        }
-        letras[i].style.clipPath = 'inset(-35% -12% -35% -12%)';
-        letras[i].classList.add('traco', 'feito');
-        tempo -= p.desloca + p.escreve;
-        i += 1;
-        if (i >= letras.length) { fase = risco ? 'chega' : contorno ? 'ida' : 'sai'; deOnde = fim; break; }
+    for (;;) {
+      const ln = linhas[k];
+      const ultimaLinha = k === linhas.length - 1;
+      const f = Math.min(1, tempo / ln.ms);
+      const e = k === 0 && ultimaLinha ? suave(f) : k === 0 ? arranca(f) : ultimaLinha ? freia(f) : f;
+      const x = ln.de + (ln.ate - ln.de) * e;
+      // entra e sai de cena nas trocas de linha (na última, chega inteiro na vaga)
+      const op = Math.min(1, f / 0.12, ultimaLinha ? 1 : (1 - f) / 0.12);
+      por(x, ln.y, Math.max(0, op));
+      for (const r of ln.revela) if (x >= r.x && !letras[r.i].classList.contains('vis')) letras[r.i].classList.add('vis');
+      if (ln.temRisco && caixaRisco && x > caixaRisco.x) {
+        const g = Math.max(0, Math.min(1, (x - caixaRisco.x) / caixaRisco.w));
+        risco.classList.add('riscando');
+        traco.style.strokeDashoffset = String(1 - g);
       }
-    }
-    if (fase === 'chega') {
-      f = Math.min(1, tempo / T.chega);
-      por(entre(deOnde, noRisco(b, 0), suave(f)), 10 * Math.sin(f * Math.PI));
-      if (f >= 1) { tempo -= T.chega; fase = 'risca'; risco.classList.add('riscando'); }
-    }
-    if (fase === 'risca') {
-      f = Math.min(1, tempo / T.risca);
-      traco.style.strokeDashoffset = String(1 - f);
-      por(noRisco(b, f), 0, -1.5 * Math.sin(f * Math.PI));
-      if (f >= 1) { tempo -= T.risca; deOnde = noRisco(b, 1); fase = contorno ? 'ida' : 'sai'; }
-    }
-    if (fase === 'ida') {
-      f = Math.min(1, tempo / T.ida);
-      por(entre(deOnde, noDesenho(b, 0), suave(f)), 18 * Math.sin(f * Math.PI));
-      if (f >= 1) { tempo -= T.ida; fase = 'desenho'; desenho.classList.add('tracando'); }
-    }
-    if (fase === 'desenho') {
-      f = Math.min(1, tempo / T.desenho);
-      g = f * 0.85 + suave(f) * 0.15;
-      contorno.style.strokeDashoffset = String(tamDesenho * (1 - g));
-      por(noDesenho(b, g), 0, -1.2 * Math.sin(g * Math.PI * 2));
-      if (f >= 1) { tempo -= T.desenho; fase = 'sai'; deOnde = noDesenho(b, 1); desenho.classList.add('construindo'); }
-    }
-    if (fase === 'sai') {
-      f = Math.min(1, tempo / T.sai);
-      if (!caneta.classList.contains('saindo')) { caneta.classList.add('saindo'); caneta.classList.remove('visivel'); }
-      por(entre(deOnde, { x: deOnde.x + 30, y: deOnde.y - 38 }, suave(f)));
-      if (f >= 1) { esc.espera = setTimeout(apagar, T.parada); return; }
+      if (f < 1) break;
+      tempo -= ln.ms;
+      k += 1;
+      if (k >= linhas.length) { estacionar(); return; }
     }
     esc.quadro = requestAnimationFrame(quadro);
   }
 
-  function apagar() {
-    if (!naTela()) { pronto(); return; }
-    letras.forEach((l, k) => { l.style.transitionDelay = `${k * T.onda}ms`; });
-    h1.classList.add('apagando');
-    if (traco) { traco.style.transition = 'stroke-dashoffset .6s ease'; traco.style.strokeDashoffset = '1'; }
-    if (desenho) {
-      desenho.classList.remove('construindo'); desenho.classList.add('demolindo');
-      contorno.style.strokeDashoffset = String(tamDesenho);
-    }
-    esc.espera = setTimeout(() => {
-      letras.forEach((l) => { l.classList.remove('traco', 'feito'); l.style.transitionDelay = ''; l.style.clipPath = ''; });
-      h1.classList.remove('apagando');
-      if (traco) traco.style.transition = '';
-      if (risco) risco.classList.remove('riscando');
-      if (desenho) desenho.classList.remove('demolindo', 'tracando');
-      esc.espera = setTimeout(escrever, T.respiro);
-    }, T.apaga + letras.length * T.onda);
+  function estacionar() {
+    letras.forEach((l) => l.classList.add('vis'));
+    if (traco) traco.style.strokeDashoffset = '0';
+    parado.classList.add('chegou');
+    veiculo.classList.remove('visivel');
+    esc.espera = setTimeout(partir, T.parada);
   }
 
-  function escrever() {
+  // o ônibus sai pela direita e o texto vai embora com ele
+  function partir() {
+    if (!naTela()) { pronto(); return; }
+    parado.classList.remove('chegou');
+    veiculo.classList.add('visivel');
+    letras.forEach((l, n) => { l.style.transitionDelay = `${n * T.onda}ms`; });
+    h1.classList.add('apagando');
+    if (traco) { traco.style.transition = 'stroke-dashoffset .6s ease'; traco.style.strokeDashoffset = '1'; }
+    const x0 = vaga.x;
+    let inicio = null;
+    const sair = (agora) => {
+      if (!naTela()) { pronto(); return; }
+      if (inicio === null) inicio = agora;
+      const f = Math.min(1, (agora - inicio) / T.partida);
+      por(x0 + 220 * f * f, vaga.y, f < 0.55 ? 1 : Math.max(0, (1 - f) / 0.45));
+      if (f < 1) { esc.quadro = requestAnimationFrame(sair); return; }
+      veiculo.classList.remove('visivel');
+      esc.espera = setTimeout(() => {
+        limparLetras();
+        h1.classList.remove('apagando');
+        if (traco) traco.style.transition = '';
+        if (risco) risco.classList.remove('riscando');
+        esc.espera = setTimeout(trazer, T.respiro);
+      }, Math.max(0, T.apaga + letras.length * T.onda - T.partida));
+    };
+    esc.quadro = requestAnimationFrame(sair);
+  }
+
+  function trazer() {
     if (!naTela()) { pronto(); return; }
     roteiro();
-    i = 0; tempo = 0; fase = 'letras'; ultimo = null; deOnde = null;
-    caneta.classList.remove('saindo'); caneta.classList.add('visivel');
+    k = 0; tempo = 0; ultimo = null;
+    por(linhas[0].de, linhas[0].y, 0);
+    veiculo.classList.add('visivel');
     esc.quadro = requestAnimationFrame(quadro);
   }
 
   h1.classList.remove('escrito', 'apagando');
+  h1.classList.add('trazendo');
   const fontes = document.fonts && document.fonts.ready
     ? Promise.race([document.fonts.ready, new Promise((ok) => setTimeout(ok, 1500))]) : Promise.resolve();
   const comeco = Date.now();
   fontes.then(() => {
     if (!esc.ativa || volta !== esc.volta) return;
-    esc.espera = setTimeout(escrever, Math.max(0, T.inicio - (Date.now() - comeco)));
+    esc.espera = setTimeout(trazer, Math.max(0, T.inicio - (Date.now() - comeco)));
   });
 }
 
@@ -380,34 +351,33 @@ function montarHorizonte() {
   let frente = '';
   let jan = '';
   let luz = '';
-  for (let x = -20; x < L + 20;) {
-    const w = 50 + r() * 80;
-    const alt = 110 + r() * 125;
+  // poucos prédios, mais baixos e espaçados: a tela fica mais limpa
+  for (let x = -20 + r() * 60; x < L + 20;) {
+    const w = 70 + r() * 70;
+    const alt = 70 + r() * 80;
     fundo += `<rect x="${n(x)}" y="${n(A - alt)}" width="${n(w)}" height="${n(alt)}"/>`;
-    if (r() < 0.3) fundo += `<rect x="${n(x + w * 0.22)}" y="${n(A - alt - 12 - r() * 16)}" width="${n(w * 0.56)}" height="30"/>`;
-    x += w + 2 + r() * 12;
+    x += w + 70 + r() * 170;
   }
-  for (let x = -8; x < L + 8;) {
-    const w = 45 + Math.floor(r() * 8) * 9;
-    const alt = 46 + r() * 118;
+  for (let x = 10 + r() * 80; x < L + 8;) {
+    const w = 42 + Math.floor(r() * 5) * 9;
+    const alt = 36 + r() * 82;
     const y = A - alt;
     frente += `<rect x="${n(x)}" y="${n(y)}" width="${w}" height="${n(alt + 1)}"/>`;
-    if (r() < 0.25) frente += `<rect x="${n(x + 9)}" y="${n(y - 10)}" width="${w - 18}" height="12"/>`;
-    if (alt > 128 && r() < 0.55) {
+    if (alt > 96 && r() < 0.45) {
       const ax = n(x + w * (0.3 + r() * 0.4));
-      const ah = 16 + r() * 16;
+      const ah = 14 + r() * 12;
       frente += `<rect x="${ax}" y="${n(y - ah)}" width="2" height="${n(ah + 1)}"/>`;
       luz += `<circle class="hz-luz" cx="${n(ax + 1)}" cy="${n(y - ah)}" r="2.4"/>`;
     }
-    if (r() > 0.14) {
+    if (r() > 0.2) {
       for (let jy = y + 9; jy < A - 10; jy += 12) {
-        if (r() < 0.12) continue;
+        if (r() < 0.25) continue;
         for (let jx = x + 7; jx < x + w - 9; jx += 9) {
-          if (r() < 0.8) jan += `<rect x="${n(jx)}" y="${n(jy)}" width="4" height="5"${r() < 0.24 ? ' class="acesa"' : ''}/>`;
+          if (r() < 0.6) jan += `<rect x="${n(jx)}" y="${n(jy)}" width="4" height="5"${r() < 0.2 ? ' class="acesa"' : ''}/>`;
         }
       }
     }
-    x += w + 4 + r() * 9;
+    x += w + 60 + r() * 190;
   }
   // faróis na estrada: tempos e atrasos diferentes para não andarem juntos
   let carros = '';
@@ -495,8 +465,8 @@ function iniciarTelaEntrada() {
 function pararTelaEntrada() {
   try {
     cancelAnimationFrame(_escrita.quadro); clearTimeout(_escrita.espera); _escrita.ativa = false; _escrita.volta++;
-    const caneta = document.querySelector('#gate .caneta');
-    if (caneta) caneta.classList.remove('visivel', 'saindo');
+    const veiculo = document.querySelector('#gate .veiculo');
+    if (veiculo) veiculo.classList.remove('visivel');
     pararVitrine();
     clearInterval(_horizonte.timer); _horizonte.timer = 0;
     const g = document.getElementById('gate');

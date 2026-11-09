@@ -1,7 +1,7 @@
 /* FrotaGest · Reis Tecnologia — tela de entrada (login, criar conta e avisos)
  * No padrão do OdontoWorld e do CondoGest: fundo azul-noite fixo, à esquerda o painel do
- * FrotaGest (a caneta escreve a frase, sublinha "em tempo real" e desenha um ônibus que liga
- * os faróis e sai rodando), a prévia do painel e a cidade com a estrada ao fundo; à direita,
+ * FrotaGest (um ônibus percorre as linhas trazendo a frase, sublinha "em tempo real" e estaciona
+ * no fim com os faróis acesos), a prévia do painel e a cidade com a estrada ao fundo; à direita,
  * o cartão de acesso. O painel some no celular. */
 
 #gate {
@@ -51,93 +51,74 @@
   font-family: var(--display); font-size: clamp(32px, 3.3vw, 48px); line-height: 1.18; letter-spacing: -.02em;
   font-weight: 700; margin: 0 0 32px; text-wrap: balance; color: #fff;
 }
-/* frase escrita pela caneta: contorno azul-céu no traço, depois preenche de branco */
+/* frase trazida pelo ônibus: cada letra aparece atrás dele, num brilho âmbar que vira branco */
 #gate .so-leitor { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 #gate .esc-p { white-space: nowrap; }
-#gate .esc-l { color: transparent; -webkit-text-stroke: 1.1px transparent; }
-#gate .esc-l.traco { -webkit-text-stroke-color: var(--ls-tinta); }
-#gate .esc-l.traco.feito { color: #fff; -webkit-text-stroke-color: rgba(125, 211, 252, 0); animation: escPreenche .8s ease-out; }
-@keyframes escPreenche {
-  0%, 15% { color: rgba(255, 255, 255, 0); -webkit-text-stroke-color: var(--ls-tinta); }
-  37% { -webkit-text-stroke-color: var(--ls-tinta); }
-  90% { color: #fff; }
-  100% { color: #fff; -webkit-text-stroke-color: rgba(125, 211, 252, 0); }
+#gate .esc-l { opacity: 0; }
+#gate .esc-l.vis { opacity: 1; animation: letraChega .6s ease-out; }
+@keyframes letraChega {
+  0% { opacity: 0; color: #FCD34D; text-shadow: 0 0 18px rgba(252, 211, 77, .95); }
+  30% { opacity: 1; color: #FDE68A; text-shadow: 0 0 10px rgba(252, 211, 77, .6); }
+  100% { opacity: 1; color: #fff; text-shadow: 0 0 0 rgba(252, 211, 77, 0); }
 }
-#gate .auth-titulo.apagando .esc-l { color: transparent; -webkit-text-stroke-color: transparent; transition: color .45s ease, -webkit-text-stroke-color .45s ease; }
+#gate .auth-titulo.escrito .esc-l { opacity: 1; animation: none; }
+#gate .auth-titulo.apagando .esc-l { opacity: 0; transition: opacity .45s ease; }
 #gate .esc-destaque { position: relative; }
 #gate .esc-risco { position: absolute; left: -3%; width: 106%; bottom: -.12em; height: .34em; overflow: visible; pointer-events: none; }
 #gate .esc-risco path { fill: none; stroke: #F59E0B; stroke-width: 3.2; stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 1; opacity: 0; }
 #gate .esc-risco.riscando path, #gate .auth-titulo.escrito .esc-risco path { opacity: 1; }
-#gate .auth-titulo.escrito .esc-l { color: #fff; -webkit-text-stroke-color: transparent; clip-path: none; }
 #gate .auth-titulo.escrito .esc-risco path { stroke-dashoffset: 0; }
 
-/* o ônibus: a caneta traça o contorno; depois ganha cor, rodas, janelas acesas, faróis, o sinal 4G e sai rodando */
-#gate .onibus { display: inline-block; width: 2.05em; height: 1.28em; margin: -.3em 0 -.1em .22em; vertical-align: -.2em; overflow: visible; }
-#gate .on-contorno { fill: none; stroke: var(--ls-tinta); stroke-width: 2.2; stroke-linejoin: round; stroke-linecap: round; stroke-dasharray: 400; stroke-dashoffset: 400; opacity: 0; }
-#gate .onibus.tracando .on-contorno, #gate .auth-titulo.escrito .on-contorno { opacity: 1; }
-#gate .on-carro { transform-box: view-box; }
-#gate .on-corpo { opacity: 0; }
-#gate .on-faixa { transform-box: fill-box; transform-origin: 0 50%; transform: scaleX(0); }
+/* o ônibus (o parado, no fim da frase, e o que anda trazendo o texto) */
+#gate .onibus { display: block; overflow: visible; }
+#gate .onibus.parado { display: inline-block; width: 2.05em; height: 1.28em; margin: -.3em 0 -.1em .22em; vertical-align: -.2em; opacity: 0; }
+#gate .onibus.parado.chegou, #gate .auth-titulo.escrito .onibus.parado { opacity: 1; }
+#gate .on-contorno { fill: none; stroke: var(--ls-tinta); stroke-width: 1.6; stroke-linejoin: round; opacity: .9; }
 #gate .on-janela { fill: #0B1D42; }
-#gate .on-vidro { fill: #0B1D42; }
-#gate .on-roda { opacity: 0; transform-box: fill-box; transform-origin: center; transform: scale(0); }
-#gate .on-raios { transform-box: fill-box; transform-origin: center; }
-#gate .on-farol, #gate .on-lanterna { opacity: 0; }
-#gate .on-feixe { opacity: 0; transform-box: fill-box; transform-origin: 0 50%; transform: scaleX(.2); }
-#gate .on-antena { transform-box: fill-box; transform-origin: 50% 100%; transform: scaleY(0); }
+#gate .on-janela.acende { fill: var(--ls-luz); }
+#gate .on-vidro { fill: #1E4D8F; }
+#gate .on-feixe { opacity: .9; transform-box: fill-box; transform-origin: 0 50%; }
 #gate .on-antena path { fill: none; stroke: var(--ls-tinta); stroke-width: 1.4; stroke-linecap: round; }
 #gate .on-onda { fill: none; stroke: var(--ls-tinta); stroke-width: 1.5; stroke-linecap: round; opacity: 0; transform-box: fill-box; transform-origin: 50% 100%; }
-#gate .on-estrada { stroke: rgba(186, 230, 253, .55); stroke-width: 1.6; stroke-linecap: round; stroke-dasharray: 5 7; opacity: 0; }
+#gate .on-estrada { stroke: rgba(186, 230, 253, .45); stroke-width: 1.6; stroke-linecap: round; stroke-dasharray: 5 7; opacity: 0; }
+#gate .on-raios { transform-box: fill-box; transform-origin: center; }
 #gate .on-brilho-mov { transform: translateX(-30px); opacity: 0; }
 #gate .faisca { fill: #E0F2FE; transform-box: fill-box; transform-origin: center; transform: scale(0); opacity: 0; }
-
-/* montando (a classe entra quando a caneta termina o contorno) */
-#gate .onibus.construindo .on-corpo { opacity: 1; transition: opacity .45s ease .05s; }
-#gate .onibus.construindo .on-faixa { transform: none; transition: transform .45s cubic-bezier(.2, .8, .2, 1) .35s; }
-#gate .onibus.construindo .on-roda { opacity: 1; transform: none; transition: opacity .2s ease calc(.55s + var(--r) * .12s), transform .4s cubic-bezier(.3, 1.6, .5, 1) calc(.55s + var(--r) * .12s); }
-#gate .onibus.construindo .on-janela.acende { fill: var(--ls-luz); transition: fill .35s ease calc(.9s + var(--j) * .09s); }
-#gate .onibus.construindo .on-vidro { fill: #1E4D8F; transition: fill .4s ease 1.3s; }
-#gate .onibus.construindo .on-farol, #gate .onibus.construindo .on-lanterna { opacity: 1; transition: opacity .3s ease 1.55s; }
-#gate .onibus.construindo .on-feixe { opacity: .9; transform: none; transition: opacity .5s ease 1.6s, transform .6s cubic-bezier(.2, .8, .2, 1) 1.6s; }
-#gate .onibus.construindo .on-antena { transform: none; transition: transform .3s cubic-bezier(.2, .8, .2, 1) 1.75s; }
-#gate .onibus.construindo .on-onda { animation: onOnda 1.8s ease-out infinite; }
-#gate .onibus.construindo .on-onda.o1 { animation-delay: 2s; }
-#gate .onibus.construindo .on-onda.o2 { animation-delay: 2.25s; }
-#gate .onibus.construindo .on-onda.o3 { animation-delay: 2.5s; }
-#gate .onibus.construindo .on-estrada { opacity: 1; transition: opacity .4s ease 2s; animation: onEstrada .7s linear 2s infinite; }
-#gate .onibus.construindo .on-raios { animation: onGira .55s linear 2s infinite; }
-#gate .onibus.construindo .on-carro { animation: onBalanca .9s ease-in-out 2s infinite; }
-#gate .onibus.construindo .on-brilho-mov { animation: onVarre 1s ease 2.4s both; }
-#gate .onibus.construindo .faisca { animation: onFaisca 1s cubic-bezier(.2, .8, .2, 1) 2.6s both; }
-#gate .onibus.construindo .f2 { animation-delay: 2.8s; }
-/* desmontando (antes de escrever de novo) */
-#gate .onibus.demolindo .on-corpo, #gate .onibus.demolindo .on-roda, #gate .onibus.demolindo .on-farol, #gate .onibus.demolindo .on-lanterna,
-#gate .onibus.demolindo .on-feixe, #gate .onibus.demolindo .on-estrada { opacity: 0; transition: opacity .35s ease; }
-#gate .onibus.demolindo .on-faixa { transform: scaleX(0); transition: transform .3s ease; }
-#gate .onibus.demolindo .on-antena { transition: transform .3s ease; }
-#gate .onibus.demolindo .on-janela { transition: fill .25s ease; }
-#gate .onibus.demolindo .on-contorno { transition: stroke-dashoffset .6s ease; }
+/* chegou na vaga: pisca os faróis, acende as janelas, liga o sinal do 4G */
+#gate .onibus.chegou .on-feixe { animation: farolLiga .7s ease both; }
+#gate .onibus.chegou .on-farol, #gate .onibus.chegou .on-lanterna { animation: farolPisca .7s ease both; }
+#gate .onibus.chegou .on-janela.acende { animation: janelaAcende .4s ease calc(.15s + var(--j) * .08s) both; }
+#gate .onibus.chegou .on-estrada { opacity: 1; transition: opacity .4s ease; }
+#gate .onibus.chegou .on-onda { animation: onOnda 1.8s ease-out infinite; }
+#gate .onibus.chegou .on-onda.o1 { animation-delay: .5s; }
+#gate .onibus.chegou .on-onda.o2 { animation-delay: .75s; }
+#gate .onibus.chegou .on-onda.o3 { animation-delay: 1s; }
+#gate .onibus.chegou .on-brilho-mov { animation: onVarre 1s ease .6s both; }
+#gate .onibus.chegou .faisca { animation: onFaisca 1s cubic-bezier(.2, .8, .2, 1) .9s both; }
+#gate .onibus.chegou .f2 { animation-delay: 1.1s; }
 /* pronta e parada (celular, "reduzir movimento") */
-#gate .auth-titulo.escrito .on-contorno { stroke-dashoffset: 0; }
-#gate .auth-titulo.escrito .on-corpo, #gate .auth-titulo.escrito .on-roda, #gate .auth-titulo.escrito .on-farol, #gate .auth-titulo.escrito .on-lanterna { opacity: 1; transform: none; }
-#gate .auth-titulo.escrito .on-faixa, #gate .auth-titulo.escrito .on-antena { transform: none; }
-#gate .auth-titulo.escrito .on-feixe { opacity: .9; transform: none; }
-#gate .auth-titulo.escrito .on-janela.acende { fill: var(--ls-luz); }
-#gate .auth-titulo.escrito .on-vidro { fill: #1E4D8F; }
 #gate .auth-titulo.escrito .on-onda { opacity: .8; }
+#gate .auth-titulo.escrito .on-estrada { opacity: 1; }
 #gate .auth-titulo.escrito .faisca { transform: scale(1); opacity: .9; }
+/* o que anda: rodas girando, um leve balanço e o rastro de velocidade */
+#gate .veiculo { position: absolute; left: 0; top: 0; z-index: 2; pointer-events: none; opacity: 0; visibility: hidden; will-change: transform, opacity; }
+#gate .veiculo.visivel { visibility: visible; }
+#gate .veiculo-mov { position: absolute; inset: 0; animation: onBalanca .5s ease-in-out infinite; }
+#gate .veiculo-mov .onibus { width: 100%; height: 100%; filter: drop-shadow(0 8px 10px rgba(2, 6, 23, .55)); }
+#gate .veiculo .on-raios { animation: onGira .35s linear infinite; }
+#gate .veiculo::before {
+  content: ''; position: absolute; right: 100%; top: 34%; width: 70px; height: 34%; margin-right: -8px; border-radius: 8px;
+  background: repeating-linear-gradient(180deg, transparent 0 22%, rgba(125, 211, 252, .5) 22% 30%, transparent 30% 48%);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000); mask-image: linear-gradient(90deg, transparent, #000);
+}
+@keyframes farolLiga { 0% { opacity: 0; transform: scaleX(.2); } 30% { opacity: 1; transform: scaleX(1); } 45% { opacity: .2; } 60%, 100% { opacity: .9; transform: none; } }
+@keyframes farolPisca { 0% { opacity: .3; } 30% { opacity: 1; } 45% { opacity: .3; } 60%, 100% { opacity: 1; } }
+@keyframes janelaAcende { from { fill: #0B1D42; } to { fill: var(--ls-luz); } }
 @keyframes onOnda { 0% { opacity: 0; transform: scale(.6); } 25% { opacity: 1; } 100% { opacity: 0; transform: scale(1.15); } }
-@keyframes onEstrada { from { stroke-dashoffset: 0; } to { stroke-dashoffset: 12; } }
 @keyframes onGira { from { transform: rotate(0); } to { transform: rotate(360deg); } }
-@keyframes onBalanca { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-.5px); } }
+@keyframes onBalanca { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-1px); } }
 @keyframes onVarre { 0% { transform: translateX(-30px); opacity: 0; } 15% { opacity: 1; } 100% { transform: translateX(110px); opacity: 0; } }
 @keyframes onFaisca { 0% { transform: scale(0) rotate(-45deg); opacity: 0; } 55% { transform: scale(1.25) rotate(0); opacity: 1; } 100% { transform: scale(1); opacity: .9; } }
-
-/* a caneta */
-#gate .caneta { position: absolute; left: 0; top: 0; width: 0; height: 0; z-index: 2; pointer-events: none; opacity: 0; transition: opacity .35s ease; }
-#gate .caneta.visivel { opacity: 1; }
-#gate .caneta-mov { position: absolute; left: 0; top: 0; }
-#gate .caneta svg { position: absolute; left: 0; top: -10px; width: 124px; height: 20px; transform-origin: 0 10px; transform: rotate(-38deg); filter: drop-shadow(-3px 10px 8px rgba(2, 6, 23, .55)); }
 
 /* ---------- prévia do painel (vitrine): só decoração, com valores fictícios fixos no código ---------- */
 #gate .vitrine { max-width: 600px; margin: 0 0 26px; }
@@ -227,7 +208,7 @@
 
 /* ---------- cidade e estrada ao fundo ---------- */
 #gate .horizonte {
-  position: fixed; left: 0; right: 0; bottom: 0; height: clamp(110px, 24vh, 230px); z-index: -1; pointer-events: none;
+  position: fixed; left: 0; right: 0; bottom: 0; height: clamp(90px, 19vh, 180px); z-index: -1; pointer-events: none;
   opacity: 0; transform: translateY(16px); transition: opacity 1.6s ease .25s, transform 1.6s cubic-bezier(.2, .8, .2, 1) .25s;
   -webkit-mask-image: linear-gradient(to top, #000 38%, rgba(0, 0, 0, .4) 72%, transparent);
   mask-image: linear-gradient(to top, #000 38%, rgba(0, 0, 0, .4) 72%, transparent);
@@ -372,6 +353,6 @@
 @media (prefers-reduced-motion: reduce) {
   #gate.entrando .gate-box, #gate.entrando .auth-lado-marca, #gate.entrando .auth-chips li, #gate .gate-conteudo,
   #gate .vt-card, #gate .vt-pulso, #gate .vt-carro-halo, #gate .vitrine.vt-anima *, #gate .vt-aviso.troca *, #gate .vt-aviso.troca::after,
-  #gate .estrada::before, #gate .carro, #gate .onibus * { animation: none !important; }
+  #gate .estrada::before, #gate .carro, #gate .onibus *, #gate .esc-l, #gate .veiculo-mov { animation: none !important; }
   #gate .carro { display: none; }
 }

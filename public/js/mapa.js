@@ -5,12 +5,12 @@ const CAMADAS = {
   osm: {
     nome: 'Ruas · OpenStreetMap',
     url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-    opts: { maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>' },
+    opts: { maxZoom: 19, className: 'camada-ruas', attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>' },
   },
   esri: {
     nome: 'Ruas · Esri',
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
-    opts: { maxZoom: 19, attribution: 'Mapa &copy; Esri' },
+    opts: { maxZoom: 19, className: 'camada-ruas', attribution: 'Mapa &copy; Esri' },
   },
   satelite: {
     nome: 'Satélite · Esri',

@@ -3,6 +3,37 @@
  * aviso de versão nova, e o aviso de alertas novos com som e notificação na área de trabalho.
  * Reis Tecnologia */
 
+/* ---------- tema claro ou escuro ---------- */
+// A escolha fica no navegador; sem escolha, segue o tema do sistema operacional.
+// A tela de entrada é sempre escura (padrão dos outros sistemas da Reis Tecnologia).
+
+function temaAtual() { return document.documentElement.dataset.tema === 'escuro' ? 'escuro' : 'claro'; }
+
+function aplicarTema(tema) {
+  document.documentElement.dataset.tema = tema;
+  const b = document.getElementById('tb-tema');
+  if (!b) return;
+  b.innerHTML = ico(tema === 'escuro' ? 'sun' : 'moon');
+  b.title = tema === 'escuro' ? 'Tema claro' : 'Tema escuro';
+  b.setAttribute('aria-pressed', String(tema === 'escuro'));
+}
+
+function trocarTema() {
+  const novo = temaAtual() === 'escuro' ? 'claro' : 'escuro';
+  document.body.classList.add('trocando-tema');
+  aplicarTema(novo);
+  salvarPref('tema', novo);
+  setTimeout(() => document.body.classList.remove('trocando-tema'), 400);
+}
+
+(function iniciarTema() {
+  let t = pref('tema', null);
+  if (t !== 'claro' && t !== 'escuro') {
+    try { t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'escuro' : 'claro'; } catch { t = 'claro'; }
+  }
+  aplicarTema(t);
+}());
+
 /* ---------- armazenamento simples (o navegador pode bloquear) ---------- */
 
 function lerNumero(chave) { try { return Number(localStorage.getItem(chave)) || 0; } catch { return 0; } }

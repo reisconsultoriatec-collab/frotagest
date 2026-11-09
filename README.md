@@ -71,8 +71,9 @@ Em **Operação › Relatórios**, na tela, em **Excel (.xlsx)** e em **PDF** (g
 ## 3.2 Sessão e avisos
 
 - **Sessão encerrada por falta de uso** depois do tempo de **Sistema › Configurações › Segurança** (padrão 60 min; 0 = nunca, só para telas de central/TV). Um minuto antes aparece “Você ainda está aí?”. Vale também se a janela foi fechada sem clicar em Sair.
+- **Tema claro ou escuro:** botão da lua/sol no topo; a escolha fica no navegador (sem escolha, segue o tema do sistema). No escuro, o mapa de ruas também escurece; o satélite fica como está.
 - **Barra do topo:** tempo conectado, botão de atualizar a tela, botão do som dos alertas (só gravidade alta, alta e média, todos ou sem som, e notificação na área de trabalho) e aviso quando sai uma versão nova.
-- **Tela de entrada** no padrão do OdontoWorld e do CondoGest, com “Lembrar meu e-mail” (guarda só o e-mail, e só se a pessoa marcar) e os links de **Termos de uso** (`/termos`) e **Política de privacidade** (`/privacidade`, LGPD).
+- **Tela de entrada** no padrão do OdontoWorld e do CondoGest (um ônibus percorre as linhas trazendo a frase e estaciona no fim), com “Lembrar meu e-mail” (guarda só o e-mail, e só se a pessoa marcar) e os links de **Termos de uso** (`/termos`) e **Política de privacidade** (`/privacidade`, LGPD).
 
 ---
 

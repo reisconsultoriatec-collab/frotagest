@@ -99,7 +99,7 @@ PAGINAS.inicio = (() => {
     const off = itensVisiveis().filter((i) => !i.pendente && !i.semAparelho && !i.online)
       .sort((a, b) => (msDe(a.ultimoContato) || 0) - (msDe(b.ultimoContato) || 0)).slice(0, 8);
     if (!off.length) { box.innerHTML = '<div class="list-empty">Todos os aparelhos estão online.</div>'; return; }
-    box.innerHTML = off.map((i) => `<div class="list-item"><div class="list-ico" style="background:#EEF1F6;color:var(--ink-2)">${ico('plug-connected-x')}</div>
+    box.innerHTML = off.map((i) => `<div class="list-item"><div class="list-ico" style="background:var(--fundo-suave);color:var(--ink-2)">${ico('plug-connected-x')}</div>
       <div class="list-main"><div class="list-title">${H(rotulo(i))}</div>
         <div class="list-sub">${i.ultimoContato ? `Último contato ${H(atras(i.ultimoContato))} (${H(fmtDataHora(i.ultimoContato))})` : 'Nunca conectou'}</div></div>
       <button class="link" type="button" data-veiculo="${H(i.chave)}">Ver ${ico('chevron-right', 'i-sm')}</button></div>`).join('');
