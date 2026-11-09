@@ -304,16 +304,7 @@ function tratarEvento(m) {
 /* ---------- navegação ---------- */
 
 const NAV = [
-  {
-    grupo: 'Operação',
-    itens: [
-      { id: 'inicio', nome: 'Início', ico: 'layout-dashboard' },
-      { id: 'mapa', nome: 'Monitoramento', ico: 'map-2' },
-      { id: 'alertas', nome: 'Alertas', ico: 'bell-ringing', badge: 'nav-alertas' },
-      { id: 'historico', nome: 'Histórico', ico: 'route' },
-      { id: 'gravacoes', nome: 'Gravações', ico: 'video', pode: 'gravacoes' },
-    ],
-  },
+  // Cadastros primeiro: é por onde a empresa começa (quem não cadastra não vê este grupo)
   {
     grupo: 'Cadastros',
     pode: 'cadastros',
@@ -323,6 +314,16 @@ const NAV = [
       { id: 'usuarios', nome: 'Usuários', ico: 'users', badge: 'nav-pendentes', badgeCls: 'warn' },
       { id: 'aparelhos', nome: 'Aparelhos (DVR)', ico: 'device-cctv' },
       { id: 'empresas', nome: 'Empresas', ico: 'building', master: true },
+    ],
+  },
+  {
+    grupo: 'Operação',
+    itens: [
+      { id: 'inicio', nome: 'Início', ico: 'layout-dashboard' },
+      { id: 'mapa', nome: 'Monitoramento', ico: 'map-2' },
+      { id: 'alertas', nome: 'Alertas', ico: 'bell-ringing', badge: 'nav-alertas' },
+      { id: 'historico', nome: 'Histórico', ico: 'route' },
+      { id: 'gravacoes', nome: 'Gravações', ico: 'video', pode: 'gravacoes' },
     ],
   },
   {
