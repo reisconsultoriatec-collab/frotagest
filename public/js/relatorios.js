@@ -66,6 +66,10 @@ PAGINAS.relatorios = (() => {
   function render(c, params) {
     if (params.tipo && TIPOS.some((t) => t.id === params.tipo)) f.tipo = params.tipo;
     if (params.cerca) { f.cerca = params.cerca; f.finalidade = ''; }
+    // vindo do dashboard: período e grupo já escolhidos
+    const dh = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
+    if (dh.test(params.de || '') && dh.test(params.ate || '')) { f.de = params.de; f.ate = params.ate; }
+    if (params.grupo !== undefined && 'grupo' in f) f.grupo = params.grupo;
     if (!f.de) {
       f.de = `${textoServidor().slice(0, 10)} 00:00:00`;
       f.ate = `${textoServidor().slice(0, 10)} 23:59:59`;

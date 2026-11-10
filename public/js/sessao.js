@@ -11,6 +11,7 @@ function temaAtual() { return document.documentElement.dataset.tema === 'escuro'
 
 function aplicarTema(tema) {
   document.documentElement.dataset.tema = tema;
+  if (typeof emit === 'function') emit('tema', tema); // gráficos pegam as cores do tema novo
   const b = document.getElementById('tb-tema');
   if (!b) return;
   b.innerHTML = ico(tema === 'escuro' ? 'sun' : 'moon');

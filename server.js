@@ -38,6 +38,8 @@ const apiAcessos = require('./src/web/api-acessos');
 const apiDoisFatores = require('./src/web/api-2fa');
 const { Relatorios } = require('./src/relatorios/relatorios');
 const { Logotipos } = require('./src/servicos/logotipos');
+const { Painel } = require('./src/servicos/painel');
+const apiPainel = require('./src/web/api-painel');
 const { definirFuso, gerarCodigo } = require('./src/util/comum');
 const { version } = require('./package.json');
 
@@ -193,6 +195,7 @@ async function main() {
     cfg: cfg.web, versao: version, gateway, media, mediaCfg: cfg.media, recorder, transcoders, frota, historico, monitor, acesso,
     firebase, banco, config, auditoria, retencao, logs: ring, mensagens, iniciadoEm: Date.now(), cercas, doisFatores, logotipos: new Logotipos(banco),
     relatorios: new Relatorios({ banco, frota, acesso, cercas }),
+    painel: new Painel({ banco, frota, log: (level, text) => log(level, text) }),
   });
   apiOperacao.registrar(srv);
   apiConta.registrar(srv);
@@ -202,6 +205,7 @@ async function main() {
   apiCercas.registrar(srv);
   apiOnline.registrar(srv);
   apiAcessos.registrar(srv);
+  apiPainel.registrar(srv);
   apiDoisFatores.registrar(srv);
   srv.onLog = (e) => log(e.level, e.text, { source: 'painel' });
 
@@ -274,6 +278,7 @@ async function main() {
     process.exit(1);
   }
   retencao.iniciar();
+  srv.painel.iniciar();
   limparLogs();
 
   let saindo = false;

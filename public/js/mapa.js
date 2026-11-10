@@ -20,7 +20,7 @@ const CAMADAS = {
 };
 
 /** Mapa Leaflet com troca de camada (lembrada) e troca automática se o OpenStreetMap não responder. */
-function criarMapa(el) {
+function criarMapa(el, { silencioso = false } = {}) {
   if (!window.L) {
     el.innerHTML = '<div class="map-fallback">Mapa indisponível: a biblioteca não carregou (rode "npm install" no servidor).</div>';
     return null;
@@ -45,7 +45,7 @@ function criarMapa(el) {
     if (falhas !== 6 || atual !== 'osm') return;
     mapa.removeLayer(camadas.osm);
     camadas.esri.addTo(mapa);
-    toast('O OpenStreetMap não respondeu; o mapa passou para a Esri.');
+    if (!silencioso) toast('O OpenStreetMap não respondeu; o mapa passou para a Esri.');
   });
   return mapa;
 }
@@ -96,6 +96,7 @@ PAGINAS.mapa = (() => {
 
   function render(c, params) {
     filtros.status = pref('filtroStatus', 'todos');
+    if (params.g !== undefined) filtros.grupo = String(params.g); // vindo do dashboard com um grupo escolhido
     c.innerHTML = `
       <div class="mon">
         <section class="card fleet">

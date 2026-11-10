@@ -56,6 +56,7 @@ A tabela acima é o **padrão** de cada perfil. Em **Controle › Controle de ac
 | `sessoes_encerradas` | Logins encerrados por um administrador em “Usuários online” (só aquele aparelho) | 90 dias |
 | `empresas_logo` | Logotipo de cada empresa cliente (PNG para a tela, JPEG para os PDFs) | sempre |
 | `usuarios.acessos` | Controle de acesso: só os menus e ações que diferem do padrão do perfil (vazio = padrão) | sempre |
+| `painel_dias`, `painel_dias_ok` | Dashboard: totais de cada dia por veículo (km, km por hora, tempos, excessos, alertas), calculados das posições uma vez por dia | sempre (o dia de hoje é calculado ao vivo) |
 | `codigos_recuperacao`, `sessoes_2fa` | Verificação em duas etapas: códigos de recuperação (só o resumo SHA-256) e os logins que já passaram pela segunda etapa | até zerar / 90 dias |
 | `eventos_aparelho`, `comandos` | Comunicações: conexões/desconexões e comandos enviados com a resposta | 180 dias |
 | `auditoria` | Acessos, cadastros, câmeras abertas, gravações vistas e baixadas, relatórios exportados, tratamento de alertas | 730 dias (mínimo 180) |
@@ -127,7 +128,19 @@ Em **Controle › Controle de acesso**: escolha a pessoa na lista e marque, menu
 - Trocar o perfil de alguém (em Usuários) volta os menus dele ao padrão do perfil novo (o Controle de acesso dado pelo master continua).
 - Cada alteração fica na auditoria com o que entrou e o que saiu (“+ Veículos (ver, incluir); − Câmeras ao vivo (ver)”).
 
-## 3.7 Sessão e avisos
+## 3.7 Dashboard (Início)
+
+A tela inicial é um dashboard da frota que se atualiza sozinho:
+
+- **Km rodados hoje** em destaque, comparado com **ontem até a mesma hora** (comparar meio dia com o dia inteiro de ontem não diria nada), com o minigráfico das horas.
+- **Online agora, em movimento, alertas de hoje e na garagem** (a garagem vem das cercas com finalidade Garagem).
+- **Situação da frota agora** (em movimento, parados, offline) e como foi o dia (quantos comunicaram e quantos rodaram), ao lado do **mapa** com todos os veículos.
+- **Hoje, hora a hora** (km ou veículos rodando, com a linha de ontem), **últimos 14 dias**, **alertas de hoje** por hora e gravidade e por tipo, **garagens agora**, **quem mais rodou hoje** e **quem está sem comunicação** há mais tempo, e a tabela **por grupo**.
+- **Filtro por grupo** no alto vale para tudo (ou clique num grupo na tabela). Passe o mouse (ou use as setas do teclado) nos gráficos para ver os números; "Ver como tabela" mostra os mesmos números em tabela.
+- Cada cartão leva para a tela do assunto: a situação leva ao Monitoramento já filtrado, um dia do gráfico abre o relatório daquele dia, um veículo abre no mapa. Tudo respeita o **Controle de acesso** (quem não tem Alertas não vê os gráficos de alerta, e o servidor nem manda esses dados).
+- Os km e os tempos usam **a mesma conta dos relatórios**. O dia de hoje é calculado ao vivo, lendo só as posições novas; cada dia fechado fica guardado em `painel_dias`, e ao iniciar o servidor completa sozinho os últimos 14 dias que faltarem. Excesso de velocidade no dashboard: acima de 80 km/h.
+
+## 3.8 Sessão e avisos
 
 - **Sessão encerrada por falta de uso** depois do tempo de **Sistema › Configurações › Segurança** (padrão 60 min; 0 = nunca, só para telas de central/TV). Um minuto antes aparece “Você ainda está aí?”. Vale também se a janela foi fechada sem clicar em Sair.
 - **Tema claro ou escuro:** botão da lua/sol no topo; a escolha fica no navegador (sem escolha, segue o tema do sistema). No escuro, o mapa de ruas também escurece; o satélite fica como está.
