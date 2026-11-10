@@ -29,7 +29,32 @@ class Acesso {
     this.log = log;
     this.cache = new Map(); // uid → { u, ate }
     this.acessos = new Map(); // usuario_id → última gravação de ultimo_acesso
+    this.encerradas = new Set(); // `${uid}:${auth_time}` dos logins encerrados por um administrador
     frota.on('recarregada', () => this.invalidar());
+  }
+
+  /** Logins encerrados nos últimos 90 dias (os mais antigos o Firebase já não renova). */
+  async carregarEncerradas() {
+    try {
+      await this.banco.query('DELETE FROM sessoes_encerradas WHERE encerrado_em < NOW() - INTERVAL 90 DAY');
+      const rows = await this.banco.query('SELECT firebase_uid, auth_time FROM sessoes_encerradas');
+      this.encerradas = new Set(rows.map((r) => `${r.firebase_uid}:${r.auth_time}`));
+    } catch (e) {
+      this.log('erro', `Falha ao ler as sessões encerradas: ${e.message}`);
+    }
+  }
+
+  /** Encerra um login (só aquele aparelho/navegador): os próximos pedidos dele são recusados. */
+  async encerrarSessao(uid, authTime, usuarioId, porId) {
+    this.encerradas.add(`${uid}:${authTime}`);
+    await this.banco.query(
+      'INSERT IGNORE INTO sessoes_encerradas (firebase_uid, auth_time, usuario_id, encerrado_por) VALUES (?)',
+      [[uid, authTime, usuarioId, porId]],
+    );
+  }
+
+  sessaoEncerrada(claims) {
+    return this.encerradas.has(`${claims.uid}:${claims.authTime}`);
   }
 
   invalidar() {
@@ -61,7 +86,12 @@ class Acesso {
   }
 
   async doToken(token) {
-    const claims = await this.claims(token);
+    return this.doClaims(await this.claims(token));
+  }
+
+  /** Login já conferido → usuário do FrotaGest (recusa o login que um administrador encerrou). */
+  async doClaims(claims) {
+    if (this.sessaoEncerrada(claims)) throw new HttpErro(401, 'Sua sessão foi encerrada por um administrador. Entre novamente.', 'sessao_encerrada');
     const c = this.cache.get(claims.uid);
     if (c && c.ate > Date.now()) return c.u;
     const u = await this.resolver(claims);

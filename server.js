@@ -19,6 +19,7 @@ const { Banco } = require('./src/banco/db');
 const { Frota } = require('./src/servicos/frota');
 const { Historico } = require('./src/servicos/historico');
 const { Monitor } = require('./src/servicos/monitor');
+const { Cercas } = require('./src/servicos/cercas');
 const { Configuracoes } = require('./src/servicos/configuracoes');
 const { Auditoria } = require('./src/servicos/auditoria');
 const { Retencao } = require('./src/servicos/retencao');
@@ -30,6 +31,8 @@ const apiOperacao = require('./src/web/api-operacao');
 const apiConta = require('./src/web/api-conta');
 const apiRelatorios = require('./src/web/api-relatorios');
 const apiSaude = require('./src/web/api-saude');
+const apiCercas = require('./src/web/api-cercas');
+const apiOnline = require('./src/web/api-online');
 const { Relatorios } = require('./src/relatorios/relatorios');
 const { definirFuso, gerarCodigo } = require('./src/util/comum');
 const { version } = require('./package.json');
@@ -158,6 +161,9 @@ async function main() {
   await frota.carregar();
   const historico = new Historico(banco, frota, (level, text) => log(level, text));
   await historico.iniciar();
+  const cercas = new Cercas({ banco, frota, historico, log: (level, text) => log(level, text) });
+  await cercas.carregar();
+  frota.on('recarregada', () => cercas.recalcular());
   const auditoria = new Auditoria(banco, (level, text) => log(level, text));
   const retencao = new Retencao(banco, config, (level, text) => log(level, text));
 
@@ -168,24 +174,27 @@ async function main() {
   const midiaPara = (id) => frota.midiaPara(id, (gateway.devices.get(id) || {}).port || null);
   const recorder = new Recorder(cfg.gravacoes, DATA, gateway, media, midiaPara);
   const transcoders = new TranscoderManager(cfg.media, media, cfg.gravacoes.ffmpeg);
-  const monitor = new Monitor({ frota, gateway, historico });
+  const monitor = new Monitor({ frota, gateway, historico, cercas });
   const fbOpcoes = { publicUrl: cfg.web.publicUrl };
   // só para testes automatizados (certificados e API de contas simulados)
   if (process.env.FROTAGEST_TESTE_CERTS) fbOpcoes.buscarCertificados = async () => ({ certs: JSON.parse(fs.readFileSync(process.env.FROTAGEST_TESTE_CERTS, 'utf8')), validadeSeg: 60 });
   if (process.env.FROTAGEST_TESTE_IDT) fbOpcoes.idtBase = process.env.FROTAGEST_TESTE_IDT;
   const firebase = new Firebase(cfg.firebase, fbOpcoes);
   const acesso = new Acesso({ banco, firebase, frota, proprietarios: cfg.proprietarios, log: (level, text) => log(level, text) });
+  await acesso.carregarEncerradas();
 
   srv = new Servidor({
     cfg: cfg.web, versao: version, gateway, media, mediaCfg: cfg.media, recorder, transcoders, frota, historico, monitor, acesso,
-    firebase, banco, config, auditoria, retencao, logs: ring, mensagens, iniciadoEm: Date.now(),
-    relatorios: new Relatorios({ banco, frota, acesso }),
+    firebase, banco, config, auditoria, retencao, logs: ring, mensagens, iniciadoEm: Date.now(), cercas,
+    relatorios: new Relatorios({ banco, frota, acesso, cercas }),
   });
   apiOperacao.registrar(srv);
   apiConta.registrar(srv);
   apiCadastros.registrar(srv);
   apiRelatorios.registrar(srv);
   apiSaude.registrar(srv);
+  apiCercas.registrar(srv);
+  apiOnline.registrar(srv);
   srv.onLog = (e) => log(e.level, e.text, { source: 'painel' });
 
   // atualizações do mapa: junta várias posições do mesmo aparelho (ex.: lote de área sem sinal) num envio só
@@ -229,9 +238,12 @@ async function main() {
     historico.evento(d.id, d.ok ? 'autenticou' : 'autenticacao_recusada', { detalhe: [d.nota, d.imei && `IMEI ${d.imei}`, d.firmware && `firmware ${d.firmware}`].filter(Boolean).join(' · ') });
   });
   gateway.on('position', ({ id, position }) => {
-    historico.posicao(id, position, position.receivedAt);
+    const r = historico.posicao(id, position, position.receivedAt);
+    try { cercas.posicao(id, position, r); } catch (e) { log('erro', `Cercas: ${e.message}`); }
     agendarItem(id);
   });
+  // entrou/saiu de cerca: as telas abertas na lista de cercas e no modo TV atualizam a ocupação
+  cercas.on('evento', (ev) => srv.enviarCerca(ev));
   gateway.on('commandSent', (c) => historico.comando(c));
   gateway.on('command', (c) => historico.resposta(c));
   media.on('stream', (s) => srv.enviarStream(s));
@@ -277,7 +289,7 @@ async function main() {
   console.log(`  Login:              Firebase — ${fb}`);
   console.log(`  DVRs (sinalização): porta(s) ${portaTxt(r1)}`);
   console.log(`  Vídeo:              porta(s) ${portaTxt(r2)}`);
-  console.log(`  Cadastros:          ${frota.empresas.size} empresa(s), ${frota.veiculos.size} veículo(s), ${frota.aparelhos.size} aparelho(s)`);
+  console.log(`  Cadastros:          ${frota.empresas.size} empresa(s), ${frota.veiculos.size} veículo(s), ${frota.aparelhos.size} aparelho(s), ${cercas.lista.size} cerca(s)`);
   console.log(`  Painel:             http://${cfg.web.host === '0.0.0.0' ? '127.0.0.1' : cfg.web.host}:${cfg.web.port}${cfg.web.publicUrl ? `  ·  ${cfg.web.publicUrl}` : ''}`);
   console.log(`  Vídeo H.265:        ${transcoders.enabled ? 'convertido para H.264 no servidor' : `enviado direto ao navegador (${transcoders.reason || 'conversão desligada'})`}`);
   if (!cfg.proprietarios.length) console.log('  Aviso: nenhum e-mail em "proprietarios" no config.json — ninguém entra como master.');

@@ -7,6 +7,7 @@
  */
 const { HttpErro, validar: V, paraMs, formatar } = require('../util/comum');
 const { empresaAlvo } = require('../auth/acesso');
+const { Rastreio, distM, FOLGA_M } = require('../servicos/geo');
 
 const PARADO_KMH = 3; // até 3 km/h conta como parado (o GPS oscila com o veículo parado)
 const LACUNA_SEG = 600; // mais de 10 min sem posição: o intervalo não entra nos tempos
@@ -23,7 +24,10 @@ const TIPOS = {
   velocidade: { titulo: 'Excessos de velocidade', arquivo: 'excessos-de-velocidade' },
   paradas: { titulo: 'Paradas', arquivo: 'paradas' },
   alertas: { titulo: 'Alertas no período', arquivo: 'alertas' },
+  garagem: { titulo: 'Saídas e chegadas na garagem', arquivo: 'saidas-e-chegadas-na-garagem' },
+  cercas: { titulo: 'Entradas e saídas das cercas', arquivo: 'entradas-e-saidas-das-cercas' },
 };
+const NOMES_FINALIDADE = { garagem: 'Garagem', ponto: 'Ponto ou terminal', area: 'Área de interesse', proibida: 'Área proibida' };
 
 /* ---------- formatação (PDF e textos) ---------- */
 
@@ -59,6 +63,34 @@ function distanciaKm(la1, lo1, la2, lo2) {
 }
 
 const coord = (la, lo) => (Number.isFinite(la) && Number.isFinite(lo) ? `${la.toFixed(5)}, ${lo.toFixed(5)}` : '');
+
+/**
+ * Passa as posições de um veículo pelas cercas (o mesmo cálculo dos avisos ao vivo) e chama
+ * aoEvento({ cerca, tipo, dataHora, t, km, rastreio }) a cada entrada/saída. "anterior" é a última
+ * posição antes do período: diz onde o veículo estava no começo, sem gerar evento.
+ * Devolve o rastreio (com onde ficou no fim), os km rodados e se havia posição.
+ */
+function percorrerCercas(rows, cercas, anterior, aoEvento, aoComecar = null) {
+  const r = new Rastreio();
+  let km = 0;
+  let ant = null;
+  let comeco = null; // Map cercaId → dentro, logo na primeira posição
+  const usar = (p, avisar) => {
+    const lat = Number(p.latitude);
+    const lng = Number(p.longitude);
+    if (!p.gps_valido || (Math.abs(lat) < 0.0001 && Math.abs(lng) < 0.0001)) return;
+    const t = paraMs(p.data_hora);
+    const eventos = r.passo(cercas, lat, lng, t);
+    if (r.rejeitou) return;
+    if (ant && avisar) km += distM(ant.lat, ant.lng, lat, lng) / 1000;
+    ant = { lat, lng };
+    if (!comeco) { comeco = new Map(r.dentro); if (aoComecar) aoComecar(r); }
+    if (avisar) for (const ev of eventos) aoEvento({ ...ev, dataHora: p.data_hora, t, km, rastreio: r });
+  };
+  if (anterior) usar(anterior, false);
+  for (const p of rows) usar(p, true);
+  return { rastreio: r, km, comeco: comeco || new Map(), posicoes: rows.length };
+}
 
 /** Percorre as posições de um veículo (em ordem) e devolve totais, excessos e paradas. */
 function analisar(rows, { limite = 80, paradaMin = 5 } = {}) {
@@ -150,10 +182,11 @@ function analisar(rows, { limite = 80, paradaMin = 5 } = {}) {
 /* ---------- relatórios ---------- */
 
 class Relatorios {
-  constructor({ banco, frota, acesso }) {
+  constructor({ banco, frota, acesso, cercas = null }) {
     this.banco = banco;
     this.frota = frota;
     this.acesso = acesso;
+    this.servCercas = cercas; // (o nome "cercas" é o do relatório)
     this.cache = new Map(); // usuário → { chave, em, resultado }
     this.rodando = new Set(); // usuários com relatório em andamento
   }
@@ -213,7 +246,7 @@ class Relatorios {
   /** Gera (ou reaproveita, se for o mesmo pedido de há pouco) o relatório. */
   async gerar(u, tipo, q) {
     if (!TIPOS[tipo]) throw new HttpErro(404, 'Relatório não encontrado.');
-    const chave = JSON.stringify([tipo, q.de, q.ate, q.empresa || '', q.grupo || '', q.veiculo || '', q.limite || '', q.minutos || '', q.gravidade || '', q.situacao || '']);
+    const chave = JSON.stringify([tipo, q.de, q.ate, q.empresa || '', q.grupo || '', q.veiculo || '', q.limite || '', q.minutos || '', q.gravidade || '', q.situacao || '', q.cerca || '', q.finalidade || '']);
     const c = this.cache.get(u.id);
     if (c && c.chave === chave && Date.now() - c.em < CACHE_MS) return c.resultado;
     if (this.rodando.has(u.id)) throw new HttpErro(429, 'Já há um relatório sendo gerado para você. Aguarde ele terminar.');
@@ -231,6 +264,31 @@ class Relatorios {
     } finally {
       this.rodando.delete(u.id);
     }
+  }
+
+  /** Última posição com GPS antes do período (até 7 dias antes): onde o veículo estava no começo. */
+  async posicaoAntes(v, de) {
+    return this.banco.um(
+      `SELECT data_hora, latitude, longitude, velocidade, ignicao, gps_valido FROM posicoes
+        WHERE veiculo_id = ? AND data_hora < ? AND data_hora >= ? AND gps_valido = 1 ORDER BY data_hora DESC, id DESC LIMIT 1`,
+      [v.id, de, formatar(paraMs(de) - 7 * 86400000)]);
+  }
+
+  /** Cercas do relatório para um veículo (as que valem para ele, filtradas pela finalidade ou pela cerca escolhida). */
+  cercasDoRelatorio(v, filtro) {
+    if (!this.servCercas) return [];
+    return this.servCercas.doVeiculo(v).filter(filtro);
+  }
+
+  filtroCerca(u, q, finalidade) {
+    const id = q.cerca ? V.id(q.cerca, 'a cerca') : null;
+    let escolhida = null;
+    if (id) {
+      escolhida = this.servCercas && this.servCercas.lista.get(id);
+      if (!escolhida || (u.perfil !== 'master' && escolhida.empresaId !== u.empresaId)) throw new HttpErro(404, 'Cerca não encontrada (ou desativada).');
+    }
+    const fin = finalidade || (q.finalidade ? V.opcao(q.finalidade, Object.keys(NOMES_FINALIDADE), 'a finalidade') : null);
+    return { escolhida, fin, filtro: (c) => (!escolhida || c.id === escolhida.id) && (!fin || c.finalidade === fin) };
   }
 
   checarOrcamento(alvo, dias) {
@@ -444,6 +502,149 @@ class Relatorios {
       vazio: 'Nenhum alerta no período.',
     };
   }
+
+  /** Cada saída da garagem com a volta: quando saiu, quando chegou, quanto tempo e quantos km fora. */
+  async garagem(u, q) {
+    const { de, ate, dias } = this.periodo(q, MAX_DIAS);
+    const alvo = this.veiculosAlvo(u, q);
+    this.checarOrcamento(alvo, dias);
+    const { escolhida, filtro } = this.filtroCerca(u, q, 'garagem');
+    const temGaragem = [...((this.servCercas && this.servCercas.lista.values()) || [])].some((c) => c.finalidade === 'garagem' && (u.perfil === 'master' || c.empresaId === u.empresaId));
+    if (!temGaragem) throw new HttpErro(400, 'Nenhuma garagem cadastrada. Desenhe a garagem em Cadastros › Cercas (finalidade "Garagem").');
+    const linhas = [];
+    const saiu = new Set();
+    let semGaragem = 0;
+    let semDados = 0;
+    let comDados = 0;
+    const tot = { fora: 0, km: 0, saidas: 0 };
+    let primeira = null;
+    let ultimaChegada = null;
+    for (const v of alvo.lista) {
+      const garagens = this.cercasDoRelatorio(v, filtro);
+      if (!garagens.length) { semGaragem++; continue; }
+      const ids = new Set(garagens.map((c) => c.id));
+      const emAlguma = (r) => [...r.dentro].some(([id, d]) => d && ids.has(id));
+      let viagem = null;
+      const rows = await this.posicoesDe(v, de, ate);
+      const anterior = await this.posicaoAntes(v, de);
+      const fechar = (chegouEm, chegada, km, t) => {
+        const tempo = viagem.t ? (t - viagem.t) / 1000 : null;
+        linhas.push([...this.celulasVeiculo(alvo, v), viagem.cerca ? viagem.cerca.nome : '', viagem.saida, chegouEm ? chegouEm.nome : '', chegada,
+          tempo, viagem.saida && chegada ? Math.round((km - viagem.km) * 10) / 10 : null]);
+        if (tempo !== null) tot.fora += tempo;
+        if (viagem.saida && chegada) tot.km += km - viagem.km;
+        if (chegada && (!ultimaChegada || chegada > ultimaChegada)) ultimaChegada = chegada;
+        viagem = null;
+      };
+      const res = percorrerCercas(rows, garagens, anterior, (ev) => {
+        if (ev.tipo === 'saida' && !viagem && !emAlguma(ev.rastreio)) {
+          viagem = { cerca: ev.cerca, saida: ev.dataHora, t: ev.t, km: ev.km };
+          saiu.add(v.id);
+          tot.saidas++;
+          if (!primeira || ev.dataHora < primeira) primeira = ev.dataHora;
+        } else if (ev.tipo === 'entrada' && viagem) {
+          fechar(ev.cerca, ev.dataHora, ev.km, ev.t);
+        }
+      }, (r) => {
+        // começou o período fora da garagem: a primeira chegada aparece sem a saída
+        if (!emAlguma(r)) viagem = { cerca: null, saida: null, t: null, km: 0 };
+      });
+      if (res.posicoes) comDados++; else semDados++;
+      if (viagem && viagem.saida) { // ainda fora no fim do período
+        linhas.push([...this.celulasVeiculo(alvo, v), viagem.cerca ? viagem.cerca.nome : '', viagem.saida, '', null, null, Math.round((res.km - viagem.km) * 10) / 10]);
+        tot.km += res.km - viagem.km;
+      }
+    }
+    // em ordem de saída (as viagens sem saída conhecida vão pela chegada)
+    const nV = this.colunasVeiculo(alvo).length;
+    linhas.sort((a, b) => String(a[nV + 1] || a[nV + 3]).localeCompare(String(b[nV + 1] || b[nV + 3])));
+    // tempo total só quando alguma viagem tem saída e chegada (as em aberto ficam em branco)
+    const totais = linhas.length ? (() => { const t = Array(nV + 6).fill(null); t[0] = 'Total'; t[nV + 4] = linhas.some((l) => l[nV + 4] !== null) ? tot.fora : null; t[nV + 5] = Math.round(tot.km * 10) / 10; return t; })() : null;
+    return {
+      titulo: TIPOS.garagem.titulo,
+      subtitulo: this.subtitulo(u, alvo, de, ate, [escolhida ? `Garagem ${escolhida.nome}` : 'Todas as garagens']),
+      colunas: [...this.colunasVeiculo(alvo),
+        { titulo: 'Saiu de', tipo: 'texto', largura: 20, peso: 1.2 },
+        { titulo: 'Saída', tipo: 'dataHora', largura: 19, peso: 1.3 },
+        { titulo: 'Chegou em', tipo: 'texto', largura: 20, peso: 1.2 },
+        { titulo: 'Chegada', tipo: 'dataHora', largura: 19, peso: 1.3 },
+        { titulo: 'Tempo fora', tipo: 'duracao', largura: 12, peso: 0.9, alinhar: 'd' },
+        { titulo: 'Km fora', tipo: 'decimal', largura: 10, peso: 0.8, alinhar: 'd' }],
+      linhas, totais,
+      resumo: [
+        { rotulo: 'Saídas', valor: fmtNum(tot.saidas) },
+        { rotulo: 'Veículos que saíram', valor: `${fmtNum(saiu.size)} de ${fmtNum(comDados)}` },
+        { rotulo: 'Sem saída', valor: fmtNum(Math.max(0, comDados - saiu.size)) },
+        { rotulo: 'Primeira saída', valor: primeira ? fmtDataHora(primeira, false).slice(-5) : '—' },
+        { rotulo: 'Última chegada', valor: ultimaChegada ? fmtDataHora(ultimaChegada, false).slice(-5) : '—' },
+        { rotulo: 'Km fora', valor: `${fmtNum(tot.km, 1)} km` },
+      ],
+      vazio: 'Nenhuma saída da garagem no período.',
+      observacao: `Calculado pelas posições do GPS: para sair o veículo precisa passar ${FOLGA_M} m da borda da garagem. Saída em branco: já estava fora no começo do período; chegada em branco: ainda estava fora no fim.${semDados ? ` ${semDados} veículo(s) sem posição no período.` : ''}${semGaragem ? ` ${semGaragem} veículo(s) sem garagem cadastrada para o grupo deles.` : ''}`,
+    };
+  }
+
+  /** Cada passagem por uma cerca: quando entrou, quando saiu e quanto tempo ficou dentro. */
+  async cercas(u, q) {
+    const { de, ate, dias } = this.periodo(q, MAX_DIAS);
+    const alvo = this.veiculosAlvo(u, q);
+    this.checarOrcamento(alvo, dias);
+    const { escolhida, fin, filtro } = this.filtroCerca(u, q, null);
+    const linhas = [];
+    const porCerca = new Map();
+    const veics = new Set();
+    let total = 0;
+    let algumaCerca = false;
+    for (const v of alvo.lista) {
+      const lista = this.cercasDoRelatorio(v, filtro);
+      if (!lista.length) continue;
+      algumaCerca = true;
+      const abertas = new Map(); // cercaId → { dataHora, t }
+      const rows = await this.posicoesDe(v, de, ate);
+      const anterior = await this.posicaoAntes(v, de);
+      const linha = (c, entrada, saida, tempo) => {
+        linhas.push([...this.celulasVeiculo(alvo, v), c.nome, NOMES_FINALIDADE[c.finalidade], entrada, saida, tempo]);
+        porCerca.set(c.nome, (porCerca.get(c.nome) || 0) + 1);
+        veics.add(v.id);
+        if (tempo !== null) total += tempo;
+      };
+      percorrerCercas(rows, lista, anterior, (ev) => {
+        if (ev.tipo === 'entrada') abertas.set(ev.cerca.id, { dataHora: ev.dataHora, t: ev.t });
+        else {
+          const a = abertas.get(ev.cerca.id);
+          abertas.delete(ev.cerca.id);
+          // saiu sem ter entrado no período: já estava dentro no começo
+          linha(ev.cerca, a ? a.dataHora : null, ev.dataHora, a ? (ev.t - a.t) / 1000 : null);
+        }
+      });
+      for (const [id, a] of abertas) linha(lista.find((c) => c.id === id), a.dataHora, null, null); // ainda dentro no fim
+      if (linhas.length > MAX_LINHAS) throw new HttpErro(400, 'Resultado grande demais: escolha um período menor ou uma cerca.');
+    }
+    if (!algumaCerca) throw new HttpErro(400, escolhida || fin ? 'Nenhuma cerca com esse filtro vale para estes veículos.' : 'Nenhuma cerca cadastrada para estes veículos. Desenhe em Cadastros › Cercas.');
+    const nV = this.colunasVeiculo(alvo).length;
+    linhas.sort((a, b) => String(a[nV + 2] || a[nV + 3]).localeCompare(String(b[nV + 2] || b[nV + 3])));
+    const mais = [...porCerca].sort((a, b) => b[1] - a[1])[0];
+    return {
+      titulo: TIPOS.cercas.titulo,
+      subtitulo: this.subtitulo(u, alvo, de, ate, [escolhida ? `Cerca ${escolhida.nome}` : fin ? NOMES_FINALIDADE[fin] : 'Todas as cercas']),
+      colunas: [...this.colunasVeiculo(alvo),
+        { titulo: 'Cerca', tipo: 'texto', largura: 24, peso: 1.5 },
+        { titulo: 'Tipo', tipo: 'texto', largura: 18, peso: 1.1 },
+        { titulo: 'Entrada', tipo: 'dataHora', largura: 19, peso: 1.3 },
+        { titulo: 'Saída', tipo: 'dataHora', largura: 19, peso: 1.3 },
+        { titulo: 'Tempo dentro', tipo: 'duracao', largura: 13, peso: 0.9, alinhar: 'd' }],
+      linhas,
+      totais: linhas.length ? (() => { const t = Array(nV + 5).fill(null); t[0] = 'Total'; t[nV + 4] = total; return t; })() : null,
+      resumo: [
+        { rotulo: 'Passagens', valor: fmtNum(linhas.length) },
+        { rotulo: 'Veículos', valor: fmtNum(veics.size) },
+        { rotulo: 'Tempo dentro', valor: fmtDuracao(total) },
+        { rotulo: 'Mais visitada', valor: mais ? `${mais[0]} (${fmtNum(mais[1])})` : '—' },
+      ],
+      vazio: 'Nenhuma entrada ou saída de cerca no período.',
+      observacao: 'Calculado pelas posições do GPS. Entrada em branco: o veículo já estava dentro no começo do período; saída em branco: ainda estava dentro no fim.',
+    };
+  }
 }
 
 /** Resultado → abas da planilha e dados do PDF */
@@ -469,4 +670,4 @@ function paraPdf(r) {
   };
 }
 
-module.exports = { Relatorios, TIPOS, analisar, paraXlsx, paraPdf, fmtValor, fmtDuracao, distanciaKm };
+module.exports = { Relatorios, TIPOS, analisar, percorrerCercas, paraXlsx, paraPdf, fmtValor, fmtDuracao, distanciaKm };

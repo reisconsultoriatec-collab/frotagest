@@ -79,6 +79,8 @@ class Firebase {
       email: String(dados.email || '').toLowerCase(),
       emailVerificado: dados.email_verified === true,
       nome: dados.name || '',
+      // hora do login (fica igual quando o token é renovado): identifica a sessão deste aparelho
+      authTime: Number.isFinite(dados.auth_time) ? dados.auth_time : dados.iat,
     };
   }
 

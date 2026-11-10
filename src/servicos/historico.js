@@ -32,6 +32,8 @@ function nomeAlarme(codigo) {
 }
 
 const r6 = (n) => Math.round(Number(n) * 1e6) / 1e6;
+/** Alerta que não vem dos bits de alarme do DVR (cercas: c12e, c12s, c12p). */
+const externo = (codigo) => /^c\d/.test(String(codigo));
 const limita = (n, min, max) => Math.max(min, Math.min(max, Math.round(Number(n) || 0)));
 
 class Historico extends EventEmitter {
@@ -46,6 +48,7 @@ class Historico extends EventEmitter {
     this.sujos = new Set();
     this.abertos = new Map(); // aparelho_id → Map(codigo → { id, promessa, nome, inicio })
     this.recentes = new Map(); // `${aparelho}:${codigo}` → { id, em } (encerrados há pouco)
+    this.pontuais = new Map(); // `${aparelho}:${codigo}` → quando (alertas de um momento só, das cercas)
     this.comandos = new Map(); // `${ident}:${serial}` → { promessa, em }
     this.recusas = new Map();
     this.descartadas = 0;
@@ -73,10 +76,12 @@ class Historico extends EventEmitter {
   }
 
   async carregarAbertos() {
-    const rows = await this.banco.query('SELECT id, aparelho_id, codigo, nome, inicio FROM alertas WHERE fim IS NULL');
+    const rows = await this.banco.query('SELECT id, aparelho_id, codigo, nome, gravidade, inicio FROM alertas WHERE fim IS NULL');
     for (const r of rows) {
       if (!this.abertos.has(r.aparelho_id)) this.abertos.set(r.aparelho_id, new Map());
-      this.abertos.get(r.aparelho_id).set(r.codigo, { id: r.id, promessa: Promise.resolve(r.id), nome: r.nome, inicio: r.inicio });
+      this.abertos.get(r.aparelho_id).set(r.codigo, {
+        id: r.id, promessa: Promise.resolve(r.id), nome: r.nome, inicio: r.inicio, gravidade: r.gravidade, externo: externo(r.codigo),
+      });
     }
   }
 
@@ -167,19 +172,22 @@ class Historico extends EventEmitter {
       this.abertos.set(aparelho.id, abertos);
     }
     for (const c of atuais) if (!abertos.has(c)) this.abrir(info, c, p, dataHora, abertos);
-    for (const [c, entry] of abertos) if (!atuais.has(c)) this.encerrar(info, c, entry, dataHora, abertos);
+    // os alertas das cercas não vêm dos bits de alarme: quem abre e fecha é o serviço das cercas
+    for (const [c, entry] of abertos) if (!atuais.has(c) && !entry.externo) this.encerrar(info, c, entry, dataHora, abertos);
   }
 
-  abrir(info, codigo, p, dataHora, abertos) {
+  /** def: { nome, gravidade } dos alertas que não são bits de alarme do DVR (cercas). */
+  abrir(info, codigo, p, dataHora, abertos, def = null) {
     const { aparelho, veiculo, empresa } = info;
-    const nome = nomeAlarme(codigo);
-    const entry = { id: null, nome, inicio: dataHora, promessa: null };
+    const nome = def ? def.nome : nomeAlarme(codigo);
+    const grav = def ? def.gravidade : gravidade(codigo);
+    const entry = { id: null, nome, inicio: dataHora, promessa: null, gravidade: grav, externo: Boolean(def) };
     abertos.set(codigo, entry);
     const chave = `${aparelho.id}:${codigo}`;
     const rec = this.recentes.get(chave);
     const base = {
       empresaId: empresa.id, aparelhoId: aparelho.id, veiculoId: veiculo ? veiculo.id : null, ident: aparelho.identificador,
-      codigo, nome, gravidade: gravidade(codigo),
+      codigo, nome, gravidade: grav,
     };
     if (rec && Date.now() - rec.em < REABRIR_MS) {
       this.recentes.delete(chave);
@@ -216,7 +224,7 @@ class Historico extends EventEmitter {
       if (this.recentes.size > 5000) this.recentes.delete(this.recentes.keys().next().value);
       this.emit('alerta', {
         acao: 'encerrado',
-        alerta: { id, empresaId: empresa.id, aparelhoId: aparelho.id, veiculoId: veiculo ? veiculo.id : null, ident: aparelho.identificador, codigo, nome: entry.nome, gravidade: gravidade(codigo), fim: dataHora },
+        alerta: { id, empresaId: empresa.id, aparelhoId: aparelho.id, veiculoId: veiculo ? veiculo.id : null, ident: aparelho.identificador, codigo, nome: entry.nome, gravidade: entry.gravidade || gravidade(codigo), fim: dataHora },
       });
     })).catch((e) => this.log('erro', `Falha ao encerrar alerta: ${e.message}`));
   }
@@ -225,7 +233,51 @@ class Historico extends EventEmitter {
   ativos(aparelhoId) {
     const m = this.abertos.get(aparelhoId);
     if (!m || !m.size) return [];
-    return [...m.entries()].map(([codigo, e]) => ({ codigo, nome: e.nome, gravidade: gravidade(codigo), inicio: e.inicio }));
+    return [...m.entries()].map(([codigo, e]) => ({ codigo, nome: e.nome, gravidade: e.gravidade || gravidade(codigo), inicio: e.inicio }));
+  }
+
+  /* ---------- alertas das cercas ---------- */
+
+  /** Abre um alerta que fica aberto até alguém encerrar (ex.: veículo dentro de área proibida). */
+  abrirExterno(info, codigo, { nome, gravidade: grav, dataHora, lat, lng, vel }) {
+    let abertos = this.abertos.get(info.aparelho.id);
+    if (!abertos) { abertos = new Map(); this.abertos.set(info.aparelho.id, abertos); }
+    if (abertos.has(codigo)) return;
+    this.abrir(info, codigo, { lat, lon: lng, speed: vel }, dataHora, abertos, { nome: String(nome).slice(0, 80), gravidade: grav });
+  }
+
+  encerrarExterno(info, codigo, dataHora) {
+    const abertos = this.abertos.get(info.aparelho.id);
+    const entry = abertos && abertos.get(codigo);
+    if (entry) this.encerrar(info, codigo, entry, dataHora, abertos);
+  }
+
+  /** Alerta de um momento só (entrou/saiu da cerca): já nasce com o fim igual ao início. */
+  alertaPontual(info, codigo, { nome, gravidade: grav, dataHora, lat, lng, vel }) {
+    const { aparelho, veiculo, empresa } = info;
+    const chave = `${aparelho.id}:${codigo}`;
+    const rec = this.pontuais.get(chave);
+    if (rec && Date.now() - rec < REABRIR_MS) return null; // o mesmo aviso repetido em seguida: ignora
+    this.pontuais.set(chave, Date.now());
+    if (this.pontuais.size > 5000) this.pontuais.delete(this.pontuais.keys().next().value);
+    const gps = Number.isFinite(lat) && (Math.abs(lat) > 0.0001 || Math.abs(lng) > 0.0001);
+    const v = Math.min(9999.9, Math.max(0, Number(vel) || 0));
+    const n = String(nome).slice(0, 80);
+    return this.banco.query(
+      `INSERT INTO alertas (empresa_id, aparelho_id, veiculo_id, codigo, nome, gravidade, inicio, fim, latitude, longitude, velocidade)
+       VALUES (?)`,
+      [[empresa.id, aparelho.id, veiculo ? veiculo.id : null, codigo, n, grav, dataHora, dataHora, gps ? r6(lat) : null, gps ? r6(lng) : null, v]],
+    ).then((r) => {
+      this.emit('alerta', {
+        acao: 'novo',
+        alerta: {
+          empresaId: empresa.id, aparelhoId: aparelho.id, veiculoId: veiculo ? veiculo.id : null, ident: aparelho.identificador,
+          codigo, nome: n, gravidade: grav, id: r.insertId, inicio: dataHora, fim: dataHora,
+          latitude: gps ? r6(lat) : null, longitude: gps ? r6(lng) : null, velocidade: v, situacao: 'novo',
+        },
+      });
+      return r.insertId;
+    }).catch((e) => this.log('erro', `Falha ao gravar alerta de cerca: ${e.message}`));
   }
 
   /* ---------- comunicações ---------- */

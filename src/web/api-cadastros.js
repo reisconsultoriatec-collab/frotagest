@@ -165,6 +165,8 @@ function registrar(srv) {
     if ((frota.filhos.get(id) || []).length) throw new HttpErro(409, 'Este grupo tem subgrupos. Mova ou exclua os subgrupos antes.');
     const n = await banco.um('SELECT COUNT(*) AS n FROM veiculos WHERE grupo_id = ?', [id]);
     if (n.n > 0) throw new HttpErro(409, `Este grupo tem ${n.n} veículo(s). Mude os veículos de grupo antes de excluir.`);
+    const nc = await banco.um('SELECT COUNT(*) AS n FROM cercas WHERE grupo_id = ?', [id]);
+    if (nc.n > 0) throw new HttpErro(409, `Este grupo é usado em ${nc.n} cerca(s). Troque o grupo das cercas antes de excluir.`);
     await banco.query('DELETE FROM grupos WHERE id = ?', [id]);
     await frotaMudou();
     acesso.invalidar();

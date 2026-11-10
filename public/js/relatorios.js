@@ -8,8 +8,10 @@ PAGINAS.relatorios = (() => {
     { id: 'velocidade', nome: 'Excessos de velocidade', ico: 'gauge', desc: 'Cada trecho acima do limite: início, fim, duração, velocidade máxima e local.' },
     { id: 'paradas', nome: 'Paradas', ico: 'clock-pause', desc: 'Onde e por quanto tempo cada veículo ficou parado, com o motor ligado ou desligado.' },
     { id: 'alertas', nome: 'Alertas', ico: 'bell-ringing', desc: 'Alertas do período com a gravidade, a situação e o tratamento registrado.' },
+    { id: 'garagem', nome: 'Saídas e chegadas na garagem', ico: 'building-warehouse', desc: 'A que horas cada veículo saiu e voltou, quanto tempo e quantos km ficou fora.' },
+    { id: 'cercas', nome: 'Entradas e saídas das cercas', ico: 'fence', desc: 'Cada passagem pelos pontos, terminais e áreas: entrada, saída e tempo dentro.' },
   ];
-  const f = { tipo: 'resumo', de: '', ate: '', grupo: '', veiculo: '', limite: '80', minutos: '5', gravidade: '', situacao: '' };
+  const f = { tipo: 'resumo', de: '', ate: '', grupo: '', veiculo: '', limite: '80', minutos: '5', gravidade: '', situacao: '', cerca: '', finalidade: '' };
   let seq = 0;
   let offs = [];
 
@@ -46,8 +48,24 @@ PAGINAS.relatorios = (() => {
     return `<option value="">Todos os veículos${lista.length ? ` (${lista.length})` : ''}</option>${lista.map((i) => `<option value="${i.veiculoId}">${H(rotulo(i))}</option>`).join('')}`;
   }
 
+  /** Cercas para o filtro (garagem: só as garagens; cercas: todas, ou só do tipo escolhido). */
+  function opcoesCerca() {
+    const l = (S.cercas || []).filter((c) => c.ativo && (f.tipo !== 'garagem' || c.finalidade === 'garagem') && (f.tipo !== 'cercas' || !f.finalidade || c.finalidade === f.finalidade));
+    const todas = f.tipo === 'garagem' ? 'Todas as garagens' : 'Todas as cercas';
+    return `<option value="">${todas}${l.length ? ` (${l.length})` : ''}</option>${l.map((c) => `<option value="${c.id}">${H(c.nome)}</option>`).join('')}`;
+  }
+
+  function preencherCercas() {
+    const sel = $('#rl-cerca');
+    if (!sel) return;
+    sel.innerHTML = opcoesCerca();
+    sel.value = f.cerca;
+    if (sel.value !== String(f.cerca)) { f.cerca = ''; sel.value = ''; }
+  }
+
   function render(c, params) {
     if (params.tipo && TIPOS.some((t) => t.id === params.tipo)) f.tipo = params.tipo;
+    if (params.cerca) { f.cerca = params.cerca; f.finalidade = ''; }
     if (!f.de) {
       f.de = `${textoServidor().slice(0, 10)} 00:00:00`;
       f.ate = `${textoServidor().slice(0, 10)} 23:59:59`;
@@ -68,6 +86,8 @@ PAGINAS.relatorios = (() => {
             <label class="field" data-so="resumo paradas">Parada mínima (min)<input type="number" id="rl-min" min="1" max="720" style="width:130px"></label>
             <label class="field" data-so="alertas">Gravidade<select id="rl-grav"><option value="">Todas</option><option value="alta">Alta</option><option value="media">Média</option><option value="baixa">Baixa</option></select></label>
             <label class="field" data-so="alertas">Situação<select id="rl-sit"><option value="">Todas</option><option value="pendentes">Pendentes</option><option value="tratado">Tratados</option></select></label>
+            <label class="field" data-so="cercas">Tipo de cerca<select id="rl-fin"><option value="">Todos</option>${Object.entries(FINALIDADES_CERCA).map(([id, x]) => `<option value="${id}">${H(x.nome)}</option>`).join('')}</select></label>
+            <label class="field" data-so="garagem cercas">Cerca<select id="rl-cerca"></select></label>
           </div>
           <div class="rel-acoes">
             <p class="hint" id="rl-status">Escolha o período e clique em Gerar. Posições: até 31 dias (com muitos veículos, menos dias). Alertas: até 92 dias.</p>
@@ -95,6 +115,9 @@ PAGINAS.relatorios = (() => {
     $('#rl-min').value = f.minutos;
     $('#rl-grav').value = f.gravidade;
     $('#rl-sit').value = f.situacao;
+    $('#rl-fin').value = f.finalidade;
+    preencherCercas();
+    carregarCercas().then(preencherCercas).catch(() => {});
     mostrarCampos();
 
     $('#rl-tipos').addEventListener('click', (e) => {
@@ -103,8 +126,11 @@ PAGINAS.relatorios = (() => {
       f.tipo = b.dataset.tipo;
       $$('#rl-tipos .rel-tipo').forEach((x) => { x.classList.toggle('active', x === b); x.setAttribute('aria-selected', String(x === b)); });
       mostrarCampos();
+      preencherCercas();
       limpar();
     });
+    $('#rl-fin').addEventListener('change', () => { f.finalidade = $('#rl-fin').value; preencherCercas(); });
+    $('#rl-cerca').addEventListener('change', () => { f.cerca = $('#rl-cerca').value; });
     $('#rl-rapido').addEventListener('click', (e) => {
       const b = e.target.closest('[data-p]');
       if (!b) return;
@@ -126,7 +152,8 @@ PAGINAS.relatorios = (() => {
     $('#rl-xlsx').addEventListener('click', () => baixar('xlsx'));
     $('#rl-pdf').addEventListener('click', () => baixar('pdf'));
     // a empresa escolhida no topo mudou: grupos e veículos mudam junto
-    offs.push(on('empresa', () => { f.grupo = ''; f.veiculo = ''; }));
+    offs.push(on('empresa', () => { f.grupo = ''; f.veiculo = ''; f.cerca = ''; S.cercas = null; }));
+    offs.push(on('cercas', () => carregarCercas().then(preencherCercas).catch(() => {})));
     offs.push(on('frota', () => {
       if (!$('#rl-veic')) return;
       const v = $('#rl-veic').value;
@@ -165,6 +192,8 @@ PAGINAS.relatorios = (() => {
     if (f.tipo === 'resumo' || f.tipo === 'velocidade') q.limite = f.limite;
     if (f.tipo === 'resumo' || f.tipo === 'paradas') q.minutos = f.minutos;
     if (f.tipo === 'alertas') { q.gravidade = f.gravidade; q.situacao = f.situacao; }
+    if (f.tipo === 'garagem' || f.tipo === 'cercas') { f.cerca = $('#rl-cerca').value; q.cerca = f.cerca; }
+    if (f.tipo === 'cercas') { f.finalidade = $('#rl-fin').value; q.finalidade = f.finalidade; }
     return `/api/relatorios/${f.tipo}?${qs(q)}`;
   }
 
@@ -222,5 +251,5 @@ PAGINAS.relatorios = (() => {
     $('#rl-res').hidden = false;
   }
 
-  return { id: 'relatorios', titulo: 'Relatórios', sub: 'Resumo da frota, velocidade, paradas e alertas em Excel e PDF', render, sair };
+  return { id: 'relatorios', titulo: 'Relatórios', sub: 'Resumo da frota, velocidade, paradas, alertas, garagem e cercas em Excel e PDF', render, sair };
 })();

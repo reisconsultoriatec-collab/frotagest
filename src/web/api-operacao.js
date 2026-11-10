@@ -44,7 +44,9 @@ function registrar(srv) {
     };
   });
 
-  r('POST', '/api/ws-ticket', async ({ u }) => ({ ticket: srv.newWsTicket(u), validoSeg: 60 }));
+  r('POST', '/api/ws-ticket', async ({ u, claims, ip, req }) => ({
+    ticket: srv.newWsTicket(u, { uid: claims.uid, authTime: claims.authTime, ip, ua: req.headers['user-agent'] }), validoSeg: 60,
+  }));
 
   r('POST', '/api/sair', async ({ u, ip, body }) => {
     if (body.motivo === 'inatividade') await auditoria.registrar(u, 'sessao_expirada', { descricao: 'sessão encerrada por falta de uso', ip });

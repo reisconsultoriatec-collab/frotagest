@@ -9,10 +9,11 @@ const { formatar, horaDoAparelho } = require('../util/comum');
 const num = (v) => (v === null || v === undefined ? null : Number(v));
 
 class Monitor {
-  constructor({ frota, gateway, historico }) {
+  constructor({ frota, gateway, historico, cercas = null }) {
     this.frota = frota;
     this.gateway = gateway;
     this.historico = historico;
+    this.cercas = cercas;
   }
 
   posicaoDoEstado(e) {
@@ -52,6 +53,7 @@ class Monitor {
       ultimoContato: dev && dev.lastSeen ? formatar(dev.lastSeen) : (e ? e.ultimo_contato : null),
       posicao: this.posicaoDoEstado(e),
       alertas: this.historico.ativos(ap.id),
+      cercas: this.cercas ? this.cercas.dentro(ap.id) : [],
       protocolo: dev && dev.online ? (dev.v2019 ? 'JT/T 808-2019' : 'JT/T 808-2013') : (e ? e.protocolo : null),
     };
   }
@@ -63,7 +65,7 @@ class Monitor {
       chave: `v${v.id}`, aparelhoId: null, ident: null, empresaId: v.empresa_id, empresa: emp ? emp.nome : '',
       veiculoId: v.id, placa: v.placa, prefixo: v.prefixo, descricao: v.descricao, tipo: v.tipo, grupoId: v.grupo_id,
       grupo: v.grupo_id ? this.frota.caminhoGrupo(v.grupo_id) : null, modelo: null, canais: 0, nomesCanais: [],
-      online: false, ultimoContato: null, posicao: null, alertas: [], semAparelho: true,
+      online: false, ultimoContato: null, posicao: null, alertas: [], cercas: [], semAparelho: true,
     };
   }
 
@@ -83,7 +85,7 @@ class Monitor {
       chave: `p${dev.id}`, pendente: true, aparelhoId: null, ident: dev.id, empresaId: null, empresa: '', veiculoId: null,
       placa: null, prefixo: null, descricao: null, tipo: null, grupoId: null, grupo: null,
       modelo: [reg.manufacturer, reg.model].filter(Boolean).join(' ') || null, canais: 4, nomesCanais: [],
-      online: dev.online, ultimoContato: dev.lastSeen ? formatar(dev.lastSeen) : null, posicao, alertas: [],
+      online: dev.online, ultimoContato: dev.lastSeen ? formatar(dev.lastSeen) : null, posicao, alertas: [], cercas: [],
       protocolo: dev.v2019 ? 'JT/T 808-2019' : 'JT/T 808-2013',
     };
   }

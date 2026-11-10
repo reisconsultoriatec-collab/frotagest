@@ -9,7 +9,8 @@ const WS_PROTO = location.protocol === 'https:' ? 'wss' : 'ws';
 /* Ícones usados por nome calculado (para o gerador do sprite): ico('lock') ico('info-circle') ico('user') ico('steering-wheel')
    ico('clock') ico('gauge') ico('route') ico('map-pin') ico('wifi') ico('bus') ico('plug-connected-x') ico('alert-triangle')
    ico('user-plus') ico('user-check') ico('clock-pause') ico('mail') ico('refresh') ico('key') ico('copy')
-   ico('volume-off') ico('volume') ico('sun') ico('moon') ico('antenna-bars-2') ico('camera-off') ico('device-sd-card') ico('gps') ico('plug-x') ico('wifi-off') ico('cpu') ico('wifi') ico('video') ico('check') ico('download') ico('alert-triangle') ico('bell-ringing') */
+   ico('volume-off') ico('volume') ico('sun') ico('moon') ico('antenna-bars-2') ico('camera-off') ico('device-sd-card') ico('gps') ico('plug-x') ico('wifi-off') ico('cpu') ico('wifi') ico('video') ico('check') ico('download') ico('alert-triangle') ico('bell-ringing')
+   ico('building-warehouse') ico('map-pin') ico('shape') ico('ban') ico('device-mobile') ico('device-desktop') ico('device-tv') ico('arrows-minimize') */
 
 /** Estado do painel. */
 const S = {
@@ -125,6 +126,7 @@ async function api(caminho, { metodo, corpo, headers } = {}) {
   if (r.status === 401) r = await enviar(true); // token venceu entre uma chamada e outra
   let j = {};
   try { j = await r.json(); } catch { /* sem corpo */ }
+  if (r.status === 401 && j.codigo === 'sessao_encerrada') sessaoEncerradaPorAdmin();
   if (!r.ok) throw Object.assign(new Error(j.erro || `Erro ${r.status}`), { status: r.status, codigo: j.codigo, dados: j });
   return j;
 }
@@ -243,10 +245,31 @@ function pararEventos() {
   if (eventosWs) { eventosWs.onclose = null; eventosWs.close(); eventosWs = null; }
 }
 
+/** Manda um aviso pelo tempo real (tela atual, uso), se a conexão estiver aberta. */
+function enviarWs(obj) {
+  if (eventosWs && eventosWs.readyState === 1) { try { eventosWs.send(JSON.stringify(obj)); } catch { /* reconecta sozinho */ } }
+}
+
+/** Em que tela esta aba está (aparece para o administrador em "Usuários online"). */
+function avisarTela() {
+  if (S.paginaAtual) enviarWs({ type: 'tela', tela: S.paginaAtual.id });
+}
+
+/** Um administrador encerrou esta sessão: sai e explica na tela de entrada. */
+let encerradaPorAdmin = false;
+async function sessaoEncerradaPorAdmin() {
+  if (encerradaPorAdmin || !S.eu) return;
+  encerradaPorAdmin = true;
+  avisoLogin = { texto: 'Sua sessão foi encerrada por um administrador do sistema. Entre novamente para continuar.', tipo: 'info' };
+  try { await sair('encerrada'); } finally { encerradaPorAdmin = false; }
+}
+
 function tratarEvento(m) {
   switch (m.type) {
     case 'ola':
       verificarVersao(m.versao);
+      S.conexao = m.conexao || null;
+      avisarTela();
       S.streams = new Map((m.streams || []).map((s) => [s.key, s]));
       S.downloads = new Map((m.downloads || []).map((d) => [d.id, d]));
       // reconectou: traz a frota de novo (pode ter mudado enquanto estava fora)
@@ -277,6 +300,17 @@ function tratarEvento(m) {
     case 'pendentes':
       atualizarPendentes();
       break;
+    case 'cerca': // veículo entrou ou saiu de uma cerca
+      atualizarOcupacao(m.evento);
+      emit('cerca', m.evento);
+      break;
+    case 'cercas': // alguém mudou o cadastro das cercas
+      S.cercas = null;
+      emit('cercas');
+      break;
+    case 'sessao_encerrada':
+      sessaoEncerradaPorAdmin();
+      break;
     default:
   }
 }
@@ -294,6 +328,7 @@ const NAV = [
       { id: 'aparelhos', nome: 'Aparelhos (DVR)', ico: 'device-cctv' },
       { id: 'grupos', nome: 'Grupos', ico: 'folders' },
       { id: 'veiculos', nome: 'Veículos', ico: 'bus' },
+      { id: 'cercas', nome: 'Cercas', ico: 'fence' },
       { id: 'usuarios', nome: 'Usuários', ico: 'users', badge: 'nav-pendentes', badgeCls: 'warn' },
     ],
   },
@@ -306,6 +341,7 @@ const NAV = [
       { id: 'historico', nome: 'Histórico', ico: 'route' },
       { id: 'relatorios', nome: 'Relatórios', ico: 'file-analytics' },
       { id: 'gravacoes', nome: 'Gravações', ico: 'video', pode: 'gravacoes' },
+      { id: 'tv', nome: 'Modo TV', ico: 'device-tv' },
     ],
   },
   {
@@ -313,6 +349,7 @@ const NAV = [
     itens: [
       { id: 'saude', nome: 'Saúde dos aparelhos', ico: 'heartbeat', pode: 'cadastros', badge: 'nav-saude', badgeCls: 'err' },
       { id: 'comunicacoes', nome: 'Comunicações', ico: 'antenna', pode: 'cadastros' },
+      { id: 'online', nome: 'Usuários online', ico: 'users-group', pode: 'cadastros' },
       { id: 'auditoria', nome: 'Auditoria', ico: 'shield-check', pode: 'auditoria' },
       { id: 'sistema', nome: 'Sistema', ico: 'server', pode: 'sistema' },
     ],
@@ -427,6 +464,7 @@ function abrirRota() {
   c.innerHTML = '';
   window.scrollTo(0, 0);
   pag.render(c, paramsDaRota());
+  avisarTela();
 }
 
 /* ---------- componentes ---------- */

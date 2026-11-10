@@ -51,6 +51,8 @@ function marcarUso(forcar = false) {
   const t = Date.now();
   SESSAO.local = t;
   if (forcar || t - SESSAO.gravado > 15000) { SESSAO.gravado = t; gravarValor('fg:ultimoUso', t); }
+  // "Usuários online" mostra há quanto tempo cada um não mexe no painel (aviso no máximo 1 vez por minuto)
+  if (t - (SESSAO.avisadoWs || 0) > 60000 && typeof enviarWs === 'function') { SESSAO.avisadoWs = t; enviarWs({ type: 'uso' }); }
 }
 
 const ultimoUso = () => Math.max(SESSAO.local, lerNumero('fg:ultimoUso'));
@@ -93,6 +95,8 @@ function tickSessao() {
   if (tickN++ % 15 === 0) atualizarTempoConectado();
   const min = S.eu.sessaoMin;
   if (!min) return;
+  // no modo TV ninguém mexe no painel: a sessão não encerra por falta de uso
+  if (S.paginaAtual && S.paginaAtual.id === 'tv') { marcarUso(); fecharAvisoSessao(); return; }
   const resta = ultimoUso() + min * 60000 - Date.now();
   if (resta <= 0) { encerrarPorInatividade(); return; }
   if (resta <= Math.min(60000, min * 30000)) mostrarAvisoSessao(resta); // avisa no último minuto (na metade, se o limite for 1 min)

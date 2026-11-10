@@ -49,7 +49,9 @@ Grupos podem ter subgrupos (ex.: Garagem › Linha 10); liberar um grupo libera 
 | `aparelhos_estado` | Último estado de cada aparelho (posição, online, sinal) | sempre |
 | `aparelhos_pendentes` | DVRs que se conectaram sem cadastro | 30 dias sem contato |
 | `posicoes` | Todas as posições recebidas | 90 dias |
-| `alertas` | Alarmes (início, fim, gravidade) e o tratamento (quem, quando, o quê) | 365 dias |
+| `alertas` | Alarmes do DVR e das cercas (início, fim, gravidade) e o tratamento (quem, quando, o quê) | 365 dias |
+| `cercas` | Garagens, pontos/terminais e áreas desenhados no mapa (círculo ou área livre) e os avisos de cada uma | sempre |
+| `sessoes_encerradas` | Logins encerrados por um administrador em “Usuários online” (só aquele aparelho) | 90 dias |
 | `eventos_aparelho`, `comandos` | Comunicações: conexões/desconexões e comandos enviados com a resposta | 180 dias |
 | `auditoria` | Acessos, cadastros, câmeras abertas, gravações vistas e baixadas, relatórios exportados, tratamento de alertas | 730 dias (mínimo 180) |
 
@@ -65,8 +67,12 @@ Em **Operação › Relatórios**, na tela, em **Excel (.xlsx)** e em **PDF** (g
 | Excessos de velocidade | Cada trecho acima do limite escolhido: início, fim, duração, máxima, média e local | até 31 dias* |
 | Paradas | Onde e por quanto tempo ficou parado (a partir de N minutos), com o motor ligado ou desligado | até 31 dias* |
 | Alertas | Alertas do período com gravidade, situação e tratamento | até 92 dias |
+| Saídas e chegadas na garagem | A que horas cada veículo saiu e voltou, de qual garagem, tempo e km fora | até 31 dias* |
+| Entradas e saídas das cercas | Cada passagem por ponto, terminal ou área: entrada, saída e tempo dentro | até 31 dias* |
 
 \* Para não pesar o servidor, veículos × dias fica em até 400 (ex.: 363 veículos por 1 dia, ou 1 veículo por 31 dias); com mais veículos, filtre por grupo. Cada exportação fica na auditoria.
+
+Os relatórios de garagem e de cercas são calculados pelas posições guardadas: uma cerca desenhada hoje já mostra as saídas da semana passada.
 
 ## 3.2 Mapa, histórico e saúde dos aparelhos
 
@@ -74,7 +80,16 @@ Em **Operação › Relatórios**, na tela, em **Excel (.xlsx)** e em **PDF** (g
 - **Reproduzir o trajeto** (Histórico): play/pausa, velocidade de 1× a 300×, linha do tempo com os alarmes marcados, seguir o veículo e pular as paradas. Clicar numa posição da tabela leva a reprodução até ela; a barra de espaço reproduz e pausa.
 - **Saúde dos aparelhos** (Controle, para administrador e master): aparelhos offline há mais de 1 dia (grave depois de 3), que nunca conectaram, com falha de câmera ou de vídeo, de cartão/HD, de GPS, de alimentação ou com sinal fraco do chip. Lista com filtros, atalhos para mapa, histórico e comunicações, e exportação em Excel e PDF para a manutenção. O Início avisa e o menu mostra quantos estão graves.
 
-## 3.3 Sessão e avisos
+## 3.3 Cercas, modo TV e usuários online
+
+- **Cercas virtuais** (Cadastros › Cercas, depois de Veículos): desenhe no mapa a **garagem**, os **pontos/terminais**, **áreas de interesse** e **áreas proibidas**, em círculo (centro + raio, com alças para mover e aumentar) ou em área livre (clique nos cantos; arraste para ajustar; clique no meio de um lado para criar canto). Cada cerca vale para todos os veículos da empresa ou só para um grupo.
+  - Avisos: na entrada e/ou na saída, sempre ou só **fora do horário permitido** (ex.: garagem das 04:00 às 23:00 avisa o ônibus que sai de madrugada). A área proibida abre um alerta grave enquanto o veículo estiver dentro e fecha quando ele sai. Os avisos entram em Alertas, com som e notificação.
+  - Para não avisar à toa: para sair é preciso passar 25 m da borda (GPS oscilando com o ônibus parado no portão) e saltos impossíveis do GPS são ignorados.
+  - A lista mostra quantos veículos estão dentro de cada cerca agora; o Monitoramento desenha as cercas (botão “Cercas”) e o detalhe do veículo diz em que garagem ou área ele está.
+- **Modo TV** (Operação › Modo TV): tela para o monitor da parede da central, sempre escura, sem menu. Mapa grande, frota agora (em movimento, parados, offline, com alerta), garagens com quantos veículos estão dentro e os alertas pendentes; alerta novo faz a tela piscar (vermelho se for grave). Troca sozinha entre toda a frota e os grupos (a cada 30 s a 5 min, ou parado), tecla F para tela cheia e ← → para trocar o grupo. No modo TV a sessão não encerra por falta de uso e a tela não apaga (nos navegadores que permitem).
+- **Usuários online** (Controle, para administrador e master): quem está com o painel aberto, desde quando, de qual aparelho e navegador, em qual tela e há quanto tempo não mexe. **Encerrar** desconecta só aquele aparelho (a pessoa entra de novo com a senha; as outras sessões dela continuam) e fica na auditoria. O administrador vê só a própria empresa e não vê nem encerra o master. Para bloquear de vez, desative o usuário.
+
+## 3.4 Sessão e avisos
 
 - **Sessão encerrada por falta de uso** depois do tempo de **Sistema › Configurações › Segurança** (padrão 60 min; 0 = nunca, só para telas de central/TV). Um minuto antes aparece “Você ainda está aí?”. Vale também se a janela foi fechada sem clicar em Sair.
 - **Tema claro ou escuro:** botão da lua/sol no topo; a escolha fica no navegador (sem escolha, segue o tema do sistema). No escuro, o mapa de ruas também escurece; o satélite fica como está.

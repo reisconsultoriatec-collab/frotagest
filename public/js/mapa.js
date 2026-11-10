@@ -77,6 +77,7 @@ PAGINAS.mapa = (() => {
   let camadaGrupos = null; // bolinhas com o número de veículos próximos
   let gruposAtuais = new Map(); // membros → marcador da bolinha (reaproveitado entre atualizações)
   let agrupaTimer = null;
+  let camadaCercas = null; // garagens, pontos e áreas (botão "Cercas")
   const filtros = { busca: '', status: 'todos', grupo: '' };
   const ZOOM_PERTO = 17; // daqui para dentro só junta quem está praticamente no mesmo lugar
 
@@ -159,7 +160,9 @@ PAGINAS.mapa = (() => {
       gruposAtuais = new Map();
       mapa.on('zoomend', () => agrupar());
       botaoAgrupar();
+      botaoCercas();
       rotulos();
+      desenharCercas();
     }
     ajustou = false;
     desenharTudo();
@@ -169,6 +172,8 @@ PAGINAS.mapa = (() => {
       if (it.chave === selecionado) { desenharDetalhe(); estenderRastro(it); }
       agendarLista();
     }));
+    offs.push(on('cercas', desenharCercas));
+    offs.push(on('empresa', () => { S.cercas = null; }));
     relogio = setInterval(() => { agendarLista(); if (selecionado) desenharDetalhe(); }, 15000);
     if (params.v) selecionar(params.v, true);
   }
@@ -184,6 +189,7 @@ PAGINAS.mapa = (() => {
     if (mapa) mapa.remove();
     mapa = null;
     camadaGrupos = null;
+    camadaCercas = null;
     gruposAtuais = new Map();
     marcadores = new Map();
     rastro = null;
@@ -436,6 +442,41 @@ PAGINAS.mapa = (() => {
     new Botao().addTo(mapa);
   }
 
+  /* ---------- cercas no mapa ---------- */
+
+  const mostrandoCercas = () => pref('cercasMapa', true);
+
+  async function desenharCercas() {
+    if (!mapa) return;
+    if (camadaCercas) { camadaCercas.remove(); camadaCercas = null; }
+    if (!mostrandoCercas()) return;
+    let lista = [];
+    try { lista = await carregarCercas(); } catch { return; }
+    if (!mapa || !mostrandoCercas()) return;
+    if (camadaCercas) camadaCercas.remove();
+    camadaCercas = L.layerGroup(lista.filter((c) => c.ativo).map((c) => camadaCerca(c, { fraco: true }))).addTo(mapa);
+  }
+
+  function botaoCercas() {
+    const Botao = L.Control.extend({
+      options: { position: 'topleft' },
+      onAdd() {
+        const b = L.DomUtil.create('button', 'map-tool');
+        b.type = 'button';
+        const pintar = () => {
+          b.classList.toggle('ativo', mostrandoCercas());
+          b.title = mostrandoCercas() ? 'Mostrando garagens, pontos e áreas (clique para esconder)' : 'Mostrar as cercas (garagens, pontos e áreas)';
+          b.innerHTML = `${ico('fence', 'i-sm')}<span>Cercas</span>`;
+        };
+        pintar();
+        L.DomEvent.disableClickPropagation(b);
+        L.DomEvent.on(b, 'click', () => { salvarPref('cercasMapa', !mostrandoCercas()); pintar(); desenharCercas(); });
+        return b;
+      },
+    });
+    new Botao().addTo(mapa);
+  }
+
   /* ---------- seleção e detalhes ---------- */
 
   async function selecionar(chave, centralizar) {
@@ -496,6 +537,9 @@ PAGINAS.mapa = (() => {
       dado('Odômetro', p.odometro === null || p.odometro === undefined ? '—' : `${fmtNum(p.odometro, 1)} km`),
       dado('Posição de', H(fmtCurto(p.hora))),
     ].join('') : '';
+    const naCerca = (i.cercas || []).length
+      ? `<div class="ce-chips">${i.cercas.map((c) => `<span class="ce-chip ${c.finalidade}">${ico((FINALIDADES_CERCA[c.finalidade] || FINALIDADES_CERCA.area).ico, 'i-xs')} ${H(c.finalidade === 'garagem' && !/^garagem/i.test(c.nome) ? `Na garagem ${c.nome}` : c.finalidade === 'proibida' ? `Em área proibida: ${c.nome}` : c.nome)}</span>`).join('')}</div>`
+      : '';
     const alertas = i.alertas.length
       ? `<div class="alarms">${i.alertas.map((a) => `<div class="alarm">${ico('alert-triangle')} ${H(a.nome)} <span class="muted small" style="margin-left:auto">${H(fmtCurto(a.inicio))}</span></div>`).join('')}</div>`
       : '';
@@ -523,6 +567,7 @@ PAGINAS.mapa = (() => {
         <button class="det-close" type="button" data-fechar-det aria-label="Fechar">${ico('x', 'i-sm')}</button>
       </div>
       <div class="det-status">${status}</div>
+      ${naCerca}
       ${p ? `<div class="det-grid">${grid}</div>` : '<p class="small muted" style="margin:0">Sem posição registrada ainda.</p>'}
       ${alertas}
       ${cams}

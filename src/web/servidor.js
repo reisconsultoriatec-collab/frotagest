@@ -187,11 +187,12 @@ class Servidor {
     return this.publicHosts.includes(host) && origin === `https://${host}`;
   }
 
-  newWsTicket(u) {
+  /** sessao: { uid, authTime, ip, ua } do login que pediu o bilhete (para a lista de usuários online). */
+  newWsTicket(u, sessao = null) {
     const now = Date.now();
     for (const [k, v] of this.wsTickets) if (v.until < now) this.wsTickets.delete(k);
     const t = crypto.randomBytes(18).toString('base64url');
-    this.wsTickets.set(t, { u, until: now + WS_TICKET_MS });
+    this.wsTickets.set(t, { u, sessao, until: now + WS_TICKET_MS });
     return t;
   }
 
@@ -199,7 +200,7 @@ class Servidor {
     if (typeof t !== 'string' || !this.wsTickets.has(t)) return null;
     const v = this.wsTickets.get(t);
     this.wsTickets.delete(t);
-    return v.until >= Date.now() ? v.u : null;
+    return v.until >= Date.now() ? v : null;
   }
 
   publicUrl() {
@@ -319,9 +320,11 @@ class Servidor {
         const m = /^Bearer\s+(.+)$/i.exec(String(req.headers.authorization || ''));
         if (!m) throw new HttpErro(401, 'Entre com seu login para continuar.', 'sem_token');
         try {
-          u = await this.acesso.doToken(m[1].trim());
+          claims = await this.acesso.claims(m[1].trim());
+          u = await this.acesso.doClaims(claims);
         } catch (e) {
-          if (e.status === 401) this.fail(ip);
+          // sessão encerrada pelo administrador não conta como tentativa inválida (o painel sai sozinho)
+          if (e.status === 401 && e.codigo !== 'sessao_encerrada') this.fail(ip);
           throw e;
         }
         if (rota.pode && !u.pode[rota.pode]) throw new HttpErro(403, 'Seu perfil não tem acesso a esta função.', 'perfil');
@@ -410,7 +413,8 @@ class Servidor {
     try { url = new URL(req.url, 'http://local'); } catch { return ws.reject(socket, 400, 'Bad Request'); }
     const ip = this.clientIp(req);
     if (this.blocked(ip)) return ws.reject(socket, 429, 'Too Many Requests');
-    const u = this.takeWsTicket(url.searchParams.get('k'));
+    const bilhete = this.takeWsTicket(url.searchParams.get('k'));
+    const u = bilhete ? bilhete.u : null;
     if (!u) {
       this.fail(ip);
       return ws.reject(socket, 401, 'Unauthorized');
@@ -420,9 +424,15 @@ class Servidor {
       const conn = ws.accept(req, socket);
       if (!conn) return;
       conn.u = u;
+      const s = bilhete.sessao || {};
+      conn.sessao = {
+        id: crypto.randomBytes(9).toString('base64url'), uid: s.uid || u.uid, authTime: s.authTime || 0, ip: s.ip || ip,
+        ua: String(s.ua || req.headers['user-agent'] || '').slice(0, 300), desde: Date.now(), ativoEm: Date.now(), tela: null, tv: false,
+      };
       this.eventos.add(conn);
       conn.on('close', () => this.eventos.delete(conn));
-      conn.sendJson({ type: 'ola', versao: this.versao, streams: this.streamsVisiveis(u), downloads: this.downloadsVisiveis(u) });
+      conn.on('message', (txt) => this.mensagemDoPainel(conn, txt));
+      conn.sendJson({ type: 'ola', versao: this.versao, streams: this.streamsVisiveis(u), downloads: this.downloadsVisiveis(u), conexao: conn.sessao.id });
       return;
     }
 
@@ -564,6 +574,34 @@ class Servidor {
     });
   }
 
+  /** O painel avisa em que tela está e quando houve uso (para a lista de usuários online). */
+  mensagemDoPainel(conn, txt) {
+    if (typeof txt !== 'string' || txt.length > 500) return;
+    let m;
+    try { m = JSON.parse(txt); } catch { return; }
+    if (!m || typeof m !== 'object') return;
+    const s = conn.sessao;
+    if (m.type === 'tela') {
+      if (typeof m.tela === 'string' && /^[a-z]{1,30}$/.test(m.tela)) s.tela = m.tela;
+      s.tv = m.tela === 'tv';
+      s.ativoEm = Date.now();
+    } else if (m.type === 'uso') {
+      s.ativoEm = Date.now();
+    }
+  }
+
+  /** Fecha as conexões em tempo real de um login (depois de encerrado por um administrador). */
+  derrubarSessao(uid, authTime) {
+    let n = 0;
+    for (const c of this.eventos) {
+      if (!c.sessao || c.sessao.uid !== uid || c.sessao.authTime !== authTime) continue;
+      n++;
+      c.sendJson({ type: 'sessao_encerrada' });
+      setTimeout(() => { try { c.close(); } catch { /* já fechou */ } }, 300);
+    }
+    return n;
+  }
+
   /* ---------- envio de eventos (cada usuário só recebe o que pode ver) ---------- */
 
   paraTodos(obj, filtro) {
@@ -588,6 +626,15 @@ class Servidor {
       if (a.veiculoId) return this.acesso.veVeiculo(u, this.frota.veiculos.get(a.veiculoId));
       return u.perfil === 'admin';
     });
+  }
+
+  /** Veículo entrou ou saiu de uma cerca (a ocupação das telas abertas acompanha). */
+  enviarCerca(ev) {
+    const v = ev.info.veiculo;
+    this.paraTodos({
+      type: 'cerca',
+      evento: { cercaId: ev.cerca.id, tipo: ev.tipo, chave: `a${ev.info.aparelho.id}`, veiculoId: v ? v.id : null, dataHora: ev.dataHora },
+    }, (u) => v && this.acesso.veVeiculo(u, v));
   }
 
   enviarStream(info) {
