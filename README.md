@@ -68,7 +68,13 @@ Em **Operação › Relatórios**, na tela, em **Excel (.xlsx)** e em **PDF** (g
 
 \* Para não pesar o servidor, veículos × dias fica em até 400 (ex.: 363 veículos por 1 dia, ou 1 veículo por 31 dias); com mais veículos, filtre por grupo. Cada exportação fica na auditoria.
 
-## 3.2 Sessão e avisos
+## 3.2 Mapa, histórico e saúde dos aparelhos
+
+- **Veículos próximos agrupados no mapa:** viram uma bolinha com o número (vermelha se algum tem alerta, verde se algum anda, azul parado, cinza offline). Clicar aproxima; se estão todos no mesmo lugar (garagem), abre a lista para escolher. O botão “Agrupado” no mapa liga e desliga.
+- **Reproduzir o trajeto** (Histórico): play/pausa, velocidade de 1× a 300×, linha do tempo com os alarmes marcados, seguir o veículo e pular as paradas. Clicar numa posição da tabela leva a reprodução até ela; a barra de espaço reproduz e pausa.
+- **Saúde dos aparelhos** (Controle, para administrador e master): aparelhos offline há mais de 1 dia (grave depois de 3), que nunca conectaram, com falha de câmera ou de vídeo, de cartão/HD, de GPS, de alimentação ou com sinal fraco do chip. Lista com filtros, atalhos para mapa, histórico e comunicações, e exportação em Excel e PDF para a manutenção. O Início avisa e o menu mostra quantos estão graves.
+
+## 3.3 Sessão e avisos
 
 - **Sessão encerrada por falta de uso** depois do tempo de **Sistema › Configurações › Segurança** (padrão 60 min; 0 = nunca, só para telas de central/TV). Um minuto antes aparece “Você ainda está aí?”. Vale também se a janela foi fechada sem clicar em Sair.
 - **Tema claro ou escuro:** botão da lua/sol no topo; a escolha fica no navegador (sem escolha, segue o tema do sistema). No escuro, o mapa de ruas também escurece; o satélite fica como está.

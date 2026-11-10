@@ -20,7 +20,7 @@ PAGINAS.inicio = (() => {
             <div class="list" id="ini-offline"></div>
           </section>
         </div>
-        ${S.eu.pode.cadastros ? '<section class="card" id="ini-cad" hidden></section>' : ''}
+        ${S.eu.pode.cadastros ? '<section class="card" id="ini-cad" hidden></section><section class="card" id="ini-saude" hidden></section>' : ''}
         ${S.eu.perfil === 'master' ? '<section class="card" id="ini-pend" hidden></section>' : ''}
       </div>`;
     c.querySelector('.page').addEventListener('click', (e) => {
@@ -36,7 +36,9 @@ PAGINAS.inicio = (() => {
     offs.push(on('alerta', () => { clearTimeout(timer); timer = setTimeout(() => { desenhar(); carregarAlertas(); }, 800); }));
     offs.push(on('resumo-alertas', desenharKpis));
     offs.push(on('pendentes', desenharCadastros));
+    offs.push(on('saude', desenharSaude));
     desenharCadastros();
+    desenharSaude();
   }
 
   function sair() {
@@ -120,6 +122,19 @@ PAGINAS.inicio = (() => {
     box.querySelectorAll('[data-cad]').forEach((b) => {
       b.onclick = (e) => { e.stopPropagation(); const it = S.itens.get(`p${b.dataset.cad}`); abrirCadastroAparelho({ identificador: b.dataset.cad, modelo: it ? it.modelo : '' }); };
     });
+  }
+
+  function desenharSaude() {
+    const box = $('#ini-saude');
+    if (!box) return;
+    const sd = S.saude;
+    box.hidden = !sd || !sd.comProblema;
+    if (box.hidden) return;
+    const partes = [['offline', 'offline'], ['camera', 'com câmera ou vídeo'], ['armazenamento', 'com cartão ou HD'], ['gps', 'com GPS'], ['energiaSinal', 'com alimentação ou sinal']]
+      .filter(([k]) => sd[k]).map(([k, t]) => `${sd[k]} ${t}`);
+    box.innerHTML = `<div class="card-head"><h2>${ico('heartbeat')} ${sd.comProblema === 1 ? '1 aparelho precisa' : `${sd.comProblema} aparelhos precisam`} de atenção${sd.graves ? ` <span class="pill err">${sd.graves} grave${sd.graves > 1 ? 's' : ''}</span>` : ''}</h2>
+      <button class="btn btn-sm" type="button" data-ir="saude">${ico('heartbeat', 'i-sm')} Ver a saúde dos aparelhos</button></div>
+      <p class="hint">${H(partes.join(' · '))}. A lista pode ser baixada em PDF para a manutenção.</p>`;
   }
 
   function desenharCadastros() {

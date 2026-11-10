@@ -24,8 +24,13 @@ PAGINAS.comunicacoes = (() => {
   let dados = [];
   const f = { veiculo: '', tipo: '', de: '', ate: '' };
 
-  function render(c) {
+  function render(c, params = {}) {
     if (!f.de) { f.de = `${textoServidor().slice(0, 10)} 00:00:00`; f.ate = `${textoServidor().slice(0, 10)} 23:59:59`; }
+    if (params.v) { // vindo da saúde dos aparelhos: os últimos 7 dias do aparelho
+      f.veiculo = params.v;
+      f.de = `${textoServidor(Date.now() - 6 * 86400000).slice(0, 10)} 00:00:00`;
+      f.ate = `${textoServidor().slice(0, 10)} 23:59:59`;
+    }
     c.innerHTML = `
       <div class="page"><section class="card">
         <div class="toolbar">

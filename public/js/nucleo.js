@@ -9,7 +9,7 @@ const WS_PROTO = location.protocol === 'https:' ? 'wss' : 'ws';
 /* Ícones usados por nome calculado (para o gerador do sprite): ico('lock') ico('info-circle') ico('user') ico('steering-wheel')
    ico('clock') ico('gauge') ico('route') ico('map-pin') ico('wifi') ico('bus') ico('plug-connected-x') ico('alert-triangle')
    ico('user-plus') ico('user-check') ico('clock-pause') ico('mail') ico('refresh') ico('key') ico('copy')
-   ico('volume-off') ico('volume') ico('sun') ico('moon') ico('wifi') ico('video') ico('check') ico('download') ico('alert-triangle') ico('bell-ringing') */
+   ico('volume-off') ico('volume') ico('sun') ico('moon') ico('antenna-bars-2') ico('camera-off') ico('device-sd-card') ico('gps') ico('plug-x') ico('wifi-off') ico('cpu') ico('wifi') ico('video') ico('check') ico('download') ico('alert-triangle') ico('bell-ringing') */
 
 /** Estado do painel. */
 const S = {
@@ -311,6 +311,7 @@ const NAV = [
   {
     grupo: 'Controle',
     itens: [
+      { id: 'saude', nome: 'Saúde dos aparelhos', ico: 'heartbeat', pode: 'cadastros', badge: 'nav-saude', badgeCls: 'err' },
       { id: 'comunicacoes', nome: 'Comunicações', ico: 'antenna', pode: 'cadastros' },
       { id: 'auditoria', nome: 'Auditoria', ico: 'shield-check', pode: 'auditoria' },
       { id: 'sistema', nome: 'Sistema', ico: 'server', pode: 'sistema' },

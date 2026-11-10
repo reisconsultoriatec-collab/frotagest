@@ -296,6 +296,7 @@ async function abrirApp() {
   atualizarSeletorEmpresa();
   atualizarResumoAlertas();
   atualizarPendentes();
+  atualizarSaude();
   conectarEventos();
   iniciarSessao();
   atualizarBotaoSom();
@@ -366,6 +367,7 @@ async function iniciar() {
     salvarPref('empresa', S.empresa);
     atualizarStatusFrota();
     atualizarPendentes();
+    atualizarSaude();
     emit('empresa');
     abrirRota();
   });

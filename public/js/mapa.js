@@ -74,7 +74,11 @@ PAGINAS.mapa = (() => {
   let relogio = null;
   let ajustou = false;
   let redesenho = null;
+  let camadaGrupos = null; // bolinhas com o número de veículos próximos
+  let gruposAtuais = new Map(); // membros → marcador da bolinha (reaproveitado entre atualizações)
+  let agrupaTimer = null;
   const filtros = { busca: '', status: 'todos', grupo: '' };
+  const ZOOM_PERTO = 17; // daqui para dentro só junta quem está praticamente no mesmo lugar
 
   function filtrados() {
     const q = norm(filtros.busca);
@@ -151,7 +155,10 @@ PAGINAS.mapa = (() => {
 
     mapa = criarMapa($('#map'));
     if (mapa) {
-      mapa.on('zoomend', rotulos);
+      camadaGrupos = L.layerGroup().addTo(mapa);
+      gruposAtuais = new Map();
+      mapa.on('zoomend', () => agrupar());
+      botaoAgrupar();
       rotulos();
     }
     ajustou = false;
@@ -172,8 +179,12 @@ PAGINAS.mapa = (() => {
     clearInterval(relogio);
     clearTimeout(redesenho);
     if (mosaico) mosaico.fecharTodos();
+    clearTimeout(agrupaTimer);
+    agrupaTimer = null;
     if (mapa) mapa.remove();
     mapa = null;
+    camadaGrupos = null;
+    gruposAtuais = new Map();
     marcadores = new Map();
     rastro = null;
     selecionado = null;
@@ -261,6 +272,7 @@ PAGINAS.mapa = (() => {
       atualizarMarcador(i, true);
     }
     for (const [k, m] of marcadores) if (!visiveis.has(k)) { m.remove(); marcadores.delete(k); }
+    agrupar();
     if (!ajustou && pontos.length) {
       ajustou = true;
       if (pontos.length === 1) mapa.setView(pontos[0], 15);
@@ -273,25 +285,155 @@ PAGINAS.mapa = (() => {
     let m = marcadores.get(i.chave);
     const mostra = temPosicao(i) && (jaFiltrado || filtrados().some((x) => x.chave === i.chave));
     if (!mostra) {
-      if (m) { m.remove(); marcadores.delete(i.chave); }
+      if (m) { m.remove(); marcadores.delete(i.chave); agendarAgrupar(); }
       return;
     }
     const ll = [i.posicao.lat, i.posicao.lng];
     if (!m) {
-      m = L.marker(ll, { icon: iconeDe(i), title: rotulo(i), zIndexOffset: i.alertas.length ? 1000 : 0 }).addTo(mapa);
+      // o marcador só entra no mapa pelo agrupar() (pode ficar dentro de uma bolinha)
+      m = L.marker(ll, { icon: iconeDe(i), title: rotulo(i), zIndexOffset: i.alertas.length ? 1000 : 0 });
       m.bindTooltip(H(rotuloCurto(i)), { permanent: true, direction: 'bottom', offset: [0, 13], className: 'vlabel' });
       m.on('click', () => selecionar(i.chave, false));
       marcadores.set(i.chave, m);
+      if (!jaFiltrado) agrupar();
     } else {
       m.setLatLng(ll);
       m.setIcon(iconeDe(i));
       m.setZIndexOffset(i.alertas.length ? 1000 : 0);
+      if (!jaFiltrado) agendarAgrupar();
     }
   }
 
   function rotulos() {
     const card = $('#map-card');
-    if (card && mapa) card.classList.toggle('sem-rotulos', mapa.getZoom() < 11 || marcadores.size > 150 && mapa.getZoom() < 13);
+    if (!card || !mapa) return;
+    let naTela = 0;
+    marcadores.forEach((m) => { if (mapa.hasLayer(m)) naTela++; });
+    card.classList.toggle('sem-rotulos', mapa.getZoom() < 11 || (naTela > 150 && mapa.getZoom() < 13));
+  }
+
+  /* ---------- veículos próximos agrupados ---------- */
+  // Com centenas de veículos, os que estão perto uns dos outros na tela viram uma bolinha com o
+  // número (cor pela situação: alerta, em movimento, parado, offline). Clicar aproxima; se estão
+  // todos no mesmo lugar (garagem), abre a lista para escolher. O veículo selecionado nunca entra.
+
+  const agrupando = () => pref('agruparMapa', true);
+
+  function agendarAgrupar() {
+    if (agrupaTimer) return;
+    agrupaTimer = setTimeout(() => { agrupaTimer = null; agrupar(); }, 1500);
+  }
+
+  function agrupar() {
+    clearTimeout(agrupaTimer);
+    agrupaTimer = null;
+    if (!mapa || !camadaGrupos) return;
+    const z = mapa.getZoom();
+    const raio = z >= ZOOM_PERTO ? 14 : 56;
+    const lista = [];
+    for (const [k, m] of marcadores) lista.push({ k, m, i: S.itens.get(k), p: mapa.project(m.getLatLng(), z) });
+    // alertas primeiro: a bolinha nasce em cima de quem precisa de atenção
+    lista.sort((a, b) => ((b.i && b.i.alertas.length) ? 1 : 0) - ((a.i && a.i.alertas.length) ? 1 : 0));
+    const usados = new Set();
+    const grupos = [];
+    if (agrupando()) {
+      for (const a of lista) {
+        if (usados.has(a.k) || a.k === selecionado) continue;
+        const membros = [a];
+        for (const b of lista) {
+          if (b === a || usados.has(b.k) || b.k === selecionado) continue;
+          if (Math.abs(b.p.x - a.p.x) <= raio && Math.abs(b.p.y - a.p.y) <= raio) membros.push(b);
+        }
+        if (membros.length < 2) continue;
+        membros.forEach((x) => usados.add(x.k));
+        grupos.push(membros);
+      }
+    }
+    for (const a of lista) {
+      const dentro = usados.has(a.k);
+      if (dentro && mapa.hasLayer(a.m)) a.m.remove();
+      if (!dentro && !mapa.hasLayer(a.m)) a.m.addTo(mapa);
+    }
+    const novos = new Map();
+    for (const g of grupos) {
+      const chave = g.map((x) => x.k).sort().join(',');
+      const lat = g.reduce((t, x) => t + x.m.getLatLng().lat, 0) / g.length;
+      const lng = g.reduce((t, x) => t + x.m.getLatLng().lng, 0) / g.length;
+      const html = htmlGrupo(g);
+      let mk = gruposAtuais.get(chave);
+      if (mk) {
+        gruposAtuais.delete(chave);
+        mk.setLatLng([lat, lng]);
+        if (mk._fgHtml !== html.html) { mk.setIcon(html.icone); mk._fgHtml = html.html; mk.setTooltipContent(html.dica); }
+      } else {
+        mk = L.marker([lat, lng], { icon: html.icone, zIndexOffset: html.alerta ? 900 : 500, keyboard: true, title: html.dica });
+        mk._fgHtml = html.html;
+        mk.bindTooltip(html.dica, { direction: 'top', offset: [0, -html.tam / 2] });
+        mk.on('click', () => abrirGrupo(chave, mk));
+        camadaGrupos.addLayer(mk);
+      }
+      mk._fgMembros = g.map((x) => x.k);
+      novos.set(chave, mk);
+    }
+    for (const mk of gruposAtuais.values()) camadaGrupos.removeLayer(mk);
+    gruposAtuais = novos;
+    rotulos();
+  }
+
+  function htmlGrupo(g) {
+    const itens = g.map((x) => x.i).filter(Boolean);
+    const al = itens.filter((i) => i.alertas.length).length;
+    const on = itens.filter((i) => i.online).length;
+    const mov = itens.filter((i) => i.online && i.posicao && i.posicao.vel > 3).length;
+    const cls = al ? 'alerta' : mov ? 'mov' : on ? 'on' : 'off';
+    const n = g.length;
+    const tam = n < 10 ? 36 : n < 50 ? 42 : n < 200 ? 50 : 58;
+    const html = `<div class="vclu ${cls}" style="--t:${tam}px"><b>${n}</b>${al ? `<i>${al}</i>` : ''}</div>`;
+    const dica = `${n} veículos · ${on} online · ${mov} em movimento${al ? ` · ${al} com alerta` : ''}`;
+    return { html, dica, tam, alerta: al, icone: L.divIcon({ className: '', html, iconSize: [tam, tam], iconAnchor: [tam / 2, tam / 2] }) };
+  }
+
+  function abrirGrupo(chave, mk) {
+    const membros = (mk._fgMembros || []).map((k) => marcadores.get(k)).filter(Boolean);
+    if (!membros.length) return;
+    const b = L.latLngBounds(membros.map((m) => m.getLatLng()));
+    if (mapa.getZoom() < ZOOM_PERTO) {
+      mapa.fitBounds(b, { padding: [70, 70], maxZoom: 18 });
+      return;
+    }
+    // praticamente no mesmo lugar: lista para escolher
+    const box = document.createElement('div');
+    box.className = 'vclu-lista';
+    const itens = (mk._fgMembros || []).map((k) => S.itens.get(k)).filter(Boolean)
+      .sort((x, y) => rotulo(x).localeCompare(rotulo(y), 'pt-BR', { numeric: true }));
+    box.innerHTML = `<div class="vclu-tit">${itens.length} veículos neste ponto</div>${itens.map((i) => `<button type="button" data-k="${H(i.chave)}"><span class="dot ${i.alertas.length ? 'off' : i.online ? 'on' : ''}"></span>${H(rotulo(i))}<small>${H(i.online ? (i.posicao ? `${Math.round(i.posicao.vel)} km/h` : 'online') : 'offline')}</small></button>`).join('')}`;
+    box.addEventListener('click', (e) => {
+      const bt = e.target.closest('[data-k]');
+      if (!bt) return;
+      mapa.closePopup();
+      selecionar(bt.dataset.k, true);
+    });
+    L.popup({ maxWidth: 280, className: 'vclu-pop' }).setLatLng(mk.getLatLng()).setContent(box).openOn(mapa);
+  }
+
+  function botaoAgrupar() {
+    const Botao = L.Control.extend({
+      options: { position: 'topleft' },
+      onAdd() {
+        const b = L.DomUtil.create('button', 'map-tool');
+        b.type = 'button';
+        const pintar = () => {
+          b.classList.toggle('ativo', agrupando());
+          b.title = agrupando() ? 'Veículos próximos agrupados (clique para mostrar todos separados)' : 'Mostrando todos os veículos (clique para agrupar os próximos)';
+          b.innerHTML = `${ico('chart-bubble', 'i-sm')}<span>${agrupando() ? 'Agrupado' : 'Agrupar'}</span>`;
+        };
+        pintar();
+        L.DomEvent.disableClickPropagation(b);
+        L.DomEvent.on(b, 'click', () => { salvarPref('agruparMapa', !agrupando()); pintar(); agrupar(); });
+        return b;
+      },
+    });
+    new Botao().addTo(mapa);
   }
 
   /* ---------- seleção e detalhes ---------- */
@@ -302,6 +444,7 @@ PAGINAS.mapa = (() => {
     const i = S.itens.get(chave);
     if (ant && marcadores.get(ant)) atualizarMarcador(S.itens.get(ant) || { chave: ant });
     if (i) atualizarMarcador(i);
+    agrupar();
     $$('#f-lista .fi').forEach((b) => b.classList.toggle('sel', b.dataset.k === chave));
     desenharDetalhe();
     if (centralizar && mapa && temPosicao(i)) mapa.setView([i.posicao.lat, i.posicao.lng], Math.max(mapa.getZoom(), 15));
@@ -329,6 +472,7 @@ PAGINAS.mapa = (() => {
     $('#detalhe').hidden = true;
     if (rastro) { rastro.remove(); rastro = null; }
     if (ant && S.itens.get(ant)) atualizarMarcador(S.itens.get(ant));
+    agrupar();
     $$('#f-lista .fi').forEach((b) => b.classList.remove('sel'));
   }
 

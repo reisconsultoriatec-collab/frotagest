@@ -661,3 +661,66 @@ tr.hexrow pre { margin: 0; font-family: var(--mono); font-size: 11.5px; white-sp
 body.trocando-tema, body.trocando-tema * { transition: background-color .25s ease, border-color .25s ease, color .25s ease !important; }
 :root[data-tema="escuro"] .legend-map { background: rgba(21, 32, 58, .94); box-shadow: 0 0 0 1px var(--line); }
 :root[data-tema="escuro"] input::placeholder { color: var(--ink-3); }
+
+/* ---------- saúde dos aparelhos ---------- */
+.saude-kpis { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.saude-kpis .kpi-value { font-size: 24px; }
+.sa-sit { display: inline-flex; align-items: center; gap: 7px; }
+.sa-probs { display: flex; flex-wrap: wrap; gap: 5px; max-width: 520px; }
+.sa-probs .tag { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.sa-probs .tag small { font-weight: 500; opacity: .8; }
+.i-xs { width: 13px; height: 13px; }
+.sa-acoes { display: flex; gap: 4px; justify-content: flex-end; }
+.sa-acoes .btn { padding: 6px 8px; }
+.tbl tr.sa-grave td:first-child { box-shadow: inset 3px 0 0 var(--err); }
+.sa-sinal { display: inline-flex; align-items: flex-end; gap: 2px; height: 14px; }
+.sa-sinal i { width: 4px; border-radius: 1px; background: var(--line); }
+.sa-sinal i:nth-child(1) { height: 25%; } .sa-sinal i:nth-child(2) { height: 50%; } .sa-sinal i:nth-child(3) { height: 75%; } .sa-sinal i:nth-child(4) { height: 100%; }
+.sa-sinal.n1 i:nth-child(-n+1) { background: var(--err); }
+.sa-sinal.n2 i:nth-child(-n+2) { background: var(--amber); }
+.sa-sinal.n3 i:nth-child(-n+3), .sa-sinal.n4 i { background: var(--ok); }
+@media (max-width: 1280px) { .saude-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .saude-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* ---------- mapa: veículos próximos agrupados ---------- */
+.vclu { --c: #64748B; width: var(--t); height: var(--t); border-radius: 50%; display: grid; place-items: center; position: relative; cursor: pointer;
+  background: var(--c); color: #fff; font-weight: 700; font-size: 13px; font-family: var(--sans);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--c) 28%, transparent), 0 0 0 1px rgba(255, 255, 255, .9) inset, 0 3px 10px rgba(0, 0, 0, .3); transition: transform .15s; }
+.vclu:hover { transform: scale(1.08); }
+.vclu.on { --c: var(--info); }
+.vclu.mov { --c: var(--ok); }
+.vclu.alerta { --c: var(--err); }
+.vclu i { position: absolute; top: -5px; right: -5px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 999px; background: #fff; color: var(--err); font-style: normal; font-size: 10.5px; display: grid; place-items: center; box-shadow: 0 0 0 2px var(--err); }
+.map-tool { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; border-radius: 8px; border: 2px solid rgba(0, 0, 0, .2); background: var(--card); color: var(--ink-2); font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; background-clip: padding-box; }
+.map-tool:hover { color: var(--ink); }
+.map-tool.ativo { color: var(--amber-ink); }
+.map-tool.ativo .i { color: var(--amber-600); }
+.vclu-pop .leaflet-popup-content { margin: 10px 8px; }
+.vclu-lista { display: flex; flex-direction: column; gap: 2px; max-height: 260px; overflow: auto; min-width: 210px; }
+.vclu-tit { font-weight: 700; font-size: 12.5px; padding: 0 8px 6px; color: var(--ink-2); }
+.vclu-lista button { display: grid; grid-template-columns: 10px 1fr auto; align-items: center; gap: 8px; text-align: left; border: 0; background: none; padding: 7px 8px; border-radius: 7px; cursor: pointer; font: inherit; font-size: 13px; color: inherit; }
+.vclu-lista button:hover { background: var(--fundo-hover); }
+.vclu-lista small { color: var(--ink-3); font-size: 11.5px; }
+
+/* ---------- histórico: reprodução do trajeto ---------- */
+.hist-map { display: flex; flex-direction: column; }
+.hist-map #hmap { position: relative; inset: auto; flex: 1; min-height: 400px; }
+.player { display: grid; grid-template-columns: auto auto minmax(0, 1fr); grid-template-areas: "play inicio linha" "info info opcoes"; align-items: center; gap: 8px 10px; padding: 10px 14px 12px; border-top: 1px solid var(--line-2); background: var(--card); }
+.player .pl-play { grid-area: play; }
+.player .pl-btn { grid-area: inicio; }
+.player .pl-linha { grid-area: linha; }
+.player .pl-info { grid-area: info; }
+.pl-opcoes { grid-area: opcoes; display: flex; align-items: center; justify-content: flex-end; gap: 14px; flex-wrap: wrap; }
+.pl-sel { display: inline-flex; align-items: center; gap: 6px; color: var(--ink-2); }
+.player .pl-play { width: 40px; height: 40px; padding: 0; justify-content: center; border-radius: 50%; }
+.player .pl-btn { width: 34px; height: 34px; padding: 0; justify-content: center; }
+.pl-linha { position: relative; min-width: 0; height: 26px; display: flex; align-items: center; }
+.pl-linha input { width: 100%; accent-color: var(--amber-600); margin: 0; cursor: pointer; position: relative; z-index: 1; }
+.pl-marcas { position: absolute; left: 8px; right: 8px; top: 2px; height: 6px; pointer-events: none; }
+.pl-marcas i { position: absolute; top: 0; width: 2px; height: 6px; margin-left: -1px; border-radius: 1px; background: var(--err); }
+.pl-info { display: flex; flex-direction: column; line-height: 1.25; min-width: 150px; }
+.pl-info b { font-size: 13px; font-variant-numeric: tabular-nums; }
+.pl-info span { font-size: 11.5px; color: var(--ink-2); }
+.player select { font: inherit; font-size: 13px; font-weight: 600; border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; background: var(--card); color: var(--ink); }
+.pl-veiculo .seta { transition: background .2s; }
+.pl-veiculo .seta svg { transition: transform .25s linear; }

@@ -29,6 +29,7 @@ const apiCadastros = require('./src/web/api-cadastros');
 const apiOperacao = require('./src/web/api-operacao');
 const apiConta = require('./src/web/api-conta');
 const apiRelatorios = require('./src/web/api-relatorios');
+const apiSaude = require('./src/web/api-saude');
 const { Relatorios } = require('./src/relatorios/relatorios');
 const { definirFuso, gerarCodigo } = require('./src/util/comum');
 const { version } = require('./package.json');
@@ -184,6 +185,7 @@ async function main() {
   apiConta.registrar(srv);
   apiCadastros.registrar(srv);
   apiRelatorios.registrar(srv);
+  apiSaude.registrar(srv);
   srv.onLog = (e) => log(e.level, e.text, { source: 'painel' });
 
   // atualizações do mapa: junta várias posições do mesmo aparelho (ex.: lote de área sem sinal) num envio só
