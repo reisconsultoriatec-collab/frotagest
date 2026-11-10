@@ -34,6 +34,10 @@ function montarEstaticos() {
     '/': path.join(PUBLIC, 'index.html'),
     '/termos': path.join(PUBLIC, 'termos.html'),
     '/privacidade': path.join(PUBLIC, 'privacidade.html'),
+    // aplicativo instalável (celular e computador): manifesto e service worker na raiz (escopo do site todo)
+    '/manifest.webmanifest': path.join(PUBLIC, 'manifest.webmanifest'),
+    '/sw.js': path.join(PUBLIC, 'sw.js'),
+    '/favicon.ico': path.join(PUBLIC, 'img', 'icone-32.png'),
     '/vendor/leaflet.js': path.join(MODULES, 'leaflet', 'dist', 'leaflet.js'),
     '/vendor/leaflet.css': path.join(MODULES, 'leaflet', 'dist', 'leaflet.css'),
     '/vendor/jmuxer.min.js': path.join(MODULES, 'jmuxer', 'dist', 'jmuxer.min.js'),
@@ -125,7 +129,7 @@ class Servidor {
 
   /* ---------- rotas da API ---------- */
 
-  /** caminho como '/api/empresas/:id'; opcoes: { publica, conta, pode: 'cadastros', limite, livre2fa } */
+  /** caminho como '/api/empresas/:id'; opcoes: { publica, conta, pode: 'cadastros', limite, livre2fa, corpoMax } */
   rota(metodo, caminho, handler, opcoes = {}) {
     const nomes = [];
     const re = new RegExp(`^${caminho.replace(/:(\w+)/g, (_, n) => { nomes.push(n); return '([^/]+)'; })}$`);
@@ -239,7 +243,9 @@ class Servidor {
         const vendor = arquivo.startsWith(MODULES);
         return this.send(res, 404, { erro: 'arquivo não encontrado', dica: vendor ? 'rode "npm install" na pasta do FrotaGest' : undefined });
       }
-      const etag = `"${st.size.toString(16)}-${Math.floor(st.mtimeMs).toString(16)}"`;
+      // a página e o service worker levam a versão dentro: ela entra na etiqueta (atualizar troca a etiqueta)
+      const comVersao = arquivo.endsWith('index.html') || arquivo.endsWith(`${path.sep}sw.js`);
+      const etag = `"${st.size.toString(16)}-${Math.floor(st.mtimeMs).toString(16)}${comVersao ? `-${this.versao}` : ''}"`;
       const tipo = TIPOS[path.extname(arquivo)] || 'application/octet-stream';
       const cache = { 'Cache-Control': 'no-cache', ETag: etag };
       if (req.headers['if-none-match'] === etag) {
@@ -250,7 +256,8 @@ class Servidor {
       fs.readFile(arquivo, (e2, data) => {
         if (e2) return this.send(res, 404, { erro: 'arquivo não encontrado' });
         let corpo = data;
-        if (arquivo.endsWith('index.html')) corpo = data.toString('utf8').replace(/__VERSAO__/g, this.versao);
+        // a versão entra no HTML (arquivos com ?v=) e no service worker (cada versão limpa o que guardou antes)
+        if (comVersao) corpo = data.toString('utf8').replace(/__VERSAO__/g, this.versao);
         if (req.method === 'HEAD') {
           res.writeHead(200, this.cabecalhos({ 'Content-Type': tipo, 'Content-Length': Buffer.byteLength(corpo), ...cache }));
           res.end();
@@ -261,7 +268,7 @@ class Servidor {
     });
   }
 
-  readJson(req) {
+  readJson(req, max = MAX_BODY) {
     return new Promise((resolve, reject) => {
       if (req.method === 'GET' || req.method === 'HEAD') { resolve({}); return; }
       const ct = String(req.headers['content-type'] || '');
@@ -269,7 +276,7 @@ class Servidor {
       const chunks = [];
       req.on('data', (c) => {
         size += c.length;
-        if (size > MAX_BODY) { reject(new HttpErro(413, 'Dados grandes demais')); req.destroy(); return; }
+        if (size > max) { reject(new HttpErro(413, 'Dados grandes demais')); req.destroy(); return; }
         chunks.push(c);
       });
       req.on('end', () => {
@@ -334,7 +341,7 @@ class Servidor {
         }
         if (rota.pode && !u.pode[rota.pode]) throw new HttpErro(403, 'Seu perfil não tem acesso a esta função.', 'perfil');
       }
-      const body = await this.readJson(req);
+      const body = await this.readJson(req, rota.corpoMax || MAX_BODY);
       const query = Object.fromEntries(url.searchParams.entries());
       const r = await rota.handler({ req, res, u, claims, params, body, query, ip });
       if (!res.headersSent) this.send(res, 200, r === undefined ? { ok: true } : r);

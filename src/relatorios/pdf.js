@@ -89,6 +89,9 @@ class Pagina {
       + `${n2(x)} ${n2(y + r)} l ${n2(x)} ${n2(y + r - k)} ${n2(x + r - k)} ${n2(y)} ${n2(x + r)} ${n2(y)} c ${contorno ? 'B' : 'f'}`);
   }
 
+  /** Imagem (o logotipo da empresa cliente) já registrada como /Im1. */
+  imagem(x, y, w, h) { this.ops.push(`q ${n2(w)} 0 0 ${n2(h)} ${n2(x)} ${n2(y)} cm /Im1 Do Q`); }
+
   circulo(cx, cy, r, c) {
     const k = r * 0.5523;
     this.ops.push(`${cor(c, true)} ${n2(cx + r)} ${n2(cy)} m ${n2(cx + r)} ${n2(cy + k)} ${n2(cx + k)} ${n2(cy + r)} ${n2(cx)} ${n2(cy + r)} c `
@@ -115,7 +118,8 @@ class Pagina {
 
 /**
  * rel: { titulo, subtitulo: [linhas], resumo: [{ rotulo, valor }], colunas: [{ titulo, peso, alinhar: 'e'|'d'|'c' }],
- *        linhas: [[textos]], totais: [textos] | null, rodape: 'texto', vazio: 'texto' }
+ *        linhas: [[textos]], totais: [textos] | null, rodape: 'texto', vazio: 'texto',
+ *        logo: { jpeg: Buffer, largura, altura } (logotipo da empresa cliente, opcional) }
  * Os valores já chegam formatados (texto).
  */
 function gerarPdf(rel) {
@@ -131,14 +135,27 @@ function gerarPdf(rel) {
   const ALT_CAB = 18;
   const LIMITE = M + 24; // acima do rodapé
 
+  // logotipo da empresa cliente ao lado da marca do FrotaGest (até 34 pt de altura e 150 de largura)
+  let logo = null;
+  if (rel.logo && rel.logo.jpeg && rel.logo.largura && rel.logo.altura) {
+    const esc = Math.min(34 / rel.logo.altura, 150 / rel.logo.largura);
+    logo = { ...rel.logo, w: rel.logo.largura * esc, h: rel.logo.altura * esc };
+  }
+  const espacoMarca = 200 + (logo ? logo.w + 22 : 0);
+
   const cabecalho = (p) => {
     p.marca(M, A - M - 30, 30);
     p.texto(M + 38, A - M - 13, 'FrotaGest', { tam: 15, negrito: true, c: COR.navy });
     p.texto(M + 38, A - M - 25, 'Reis Tecnologia', { tam: 8, c: COR.cinza });
-    p.texto(L - M, A - M - 12, rel.titulo, { tam: 13, negrito: true, c: COR.navy, alinhar: 'd', max: larguraUtil - 200 });
+    if (logo) {
+      const x = M + 142;
+      p.linha(x, A - M - 32, x, A - M + 2, COR.linha, 0.8);
+      p.imagem(x + 12, A - M - 15 - logo.h / 2, logo.w, logo.h);
+    }
+    p.texto(L - M, A - M - 12, rel.titulo, { tam: 13, negrito: true, c: COR.navy, alinhar: 'd', max: larguraUtil - espacoMarca });
     let y = A - M - 24;
     for (const s of (rel.subtitulo || []).slice(0, 3)) {
-      p.texto(L - M, y, s, { tam: 8, c: COR.cinza, alinhar: 'd', max: larguraUtil - 200 });
+      p.texto(L - M, y, s, { tam: 8, c: COR.cinza, alinhar: 'd', max: larguraUtil - espacoMarca });
       y -= 10.5;
     }
     const base = Math.min(A - M - 40, y - 2);
@@ -226,11 +243,16 @@ function gerarPdf(rel) {
   const raiz = add(null);
   const f1 = add(Buffer.from('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>'));
   const f2 = add(Buffer.from('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>'));
+  // o JPEG entra como está (DCTDecode): uma vez só no arquivo, usado por todas as páginas
+  const im = logo ? add(Buffer.concat([
+    Buffer.from(`<< /Type /XObject /Subtype /Image /Width ${logo.largura} /Height ${logo.altura} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${logo.jpeg.length} >>\nstream\n`),
+    logo.jpeg, Buffer.from('\nendstream')])) : null;
+  const recursos = `/Font << /F1 ${f1} 0 R /F2 ${f2} 0 R >>${im ? ` /XObject << /Im1 ${im} 0 R >>` : ''}`;
   const kids = [];
   for (const pg of paginas) {
     const dados = zlib.deflateSync(Buffer.from(pg.ops.join('\n'), 'latin1'));
     const conteudo = add(Buffer.concat([Buffer.from(`<< /Length ${dados.length} /Filter /FlateDecode >>\nstream\n`), dados, Buffer.from('\nendstream')]));
-    kids.push(add(Buffer.from(`<< /Type /Page /Parent ${raiz} 0 R /MediaBox [0 0 ${L} ${A}] /Resources << /Font << /F1 ${f1} 0 R /F2 ${f2} 0 R >> >> /Contents ${conteudo} 0 R >>`)));
+    kids.push(add(Buffer.from(`<< /Type /Page /Parent ${raiz} 0 R /MediaBox [0 0 ${L} ${A}] /Resources << ${recursos} >> /Contents ${conteudo} 0 R >>`)));
   }
   objs[catalogo - 1] = Buffer.from(`<< /Type /Catalog /Pages ${raiz} 0 R >>`);
   objs[raiz - 1] = Buffer.from(`<< /Type /Pages /Kids [${kids.map((k) => `${k} 0 R`).join(' ')}] /Count ${kids.length} >>`);

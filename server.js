@@ -36,6 +36,7 @@ const apiCercas = require('./src/web/api-cercas');
 const apiOnline = require('./src/web/api-online');
 const apiDoisFatores = require('./src/web/api-2fa');
 const { Relatorios } = require('./src/relatorios/relatorios');
+const { Logotipos } = require('./src/servicos/logotipos');
 const { definirFuso, gerarCodigo } = require('./src/util/comum');
 const { version } = require('./package.json');
 
@@ -189,7 +190,7 @@ async function main() {
 
   srv = new Servidor({
     cfg: cfg.web, versao: version, gateway, media, mediaCfg: cfg.media, recorder, transcoders, frota, historico, monitor, acesso,
-    firebase, banco, config, auditoria, retencao, logs: ring, mensagens, iniciadoEm: Date.now(), cercas, doisFatores,
+    firebase, banco, config, auditoria, retencao, logs: ring, mensagens, iniciadoEm: Date.now(), cercas, doisFatores, logotipos: new Logotipos(banco),
     relatorios: new Relatorios({ banco, frota, acesso, cercas }),
   });
   apiOperacao.registrar(srv);

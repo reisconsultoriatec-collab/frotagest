@@ -27,7 +27,7 @@ PAGINAS.tv = (() => {
     c.innerHTML = `
       <div class="tv" id="tv">
         <header class="tv-topo">
-          <div class="tv-marca"><span class="tv-logo">${ico('bus')}</span><div><b>FrotaGest</b><small id="tv-empresa"></small></div></div>
+          <div class="tv-marca"><span class="tv-logo">${ico('bus')}</span><div><b>FrotaGest</b><small id="tv-empresa"></small></div><span class="tv-cliente" id="tv-cliente" hidden><img alt=""></span></div>
           <div class="tv-visao"><span class="tv-visao-nome" id="tv-visao"></span><span class="tv-pontos" id="tv-pontos"></span><span class="tv-barra"><i id="tv-barra"></i></span></div>
           <div class="tv-status"><span class="dot" id="tv-dot"></span><span id="tv-dot-txt"></span></div>
           <div class="tv-relogio"><b id="tv-hora"></b><small id="tv-data"></small></div>
@@ -55,6 +55,13 @@ PAGINAS.tv = (() => {
       if (at) at.setPrefix(false);
     }
     $('#tv-empresa').textContent = S.eu.empresaNome || (S.empresa ? (S.empresas.find((e) => String(e.id) === String(S.empresa)) || {}).nome : 'Todas as empresas') || '';
+    // logotipo da empresa cliente ao lado da marca
+    logoDaEmpresa(empresaDoLogo()).then((l) => {
+      const box = $('#tv-cliente');
+      if (!box || !l) return;
+      box.querySelector('img').src = l.png;
+      box.hidden = false;
+    });
     $('#tv-sair').addEventListener('click', () => { if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); navegar('inicio'); });
     $('#tv-cheia').addEventListener('click', telaCheia);
     $('#tv-ajustes').addEventListener('click', ajustes);

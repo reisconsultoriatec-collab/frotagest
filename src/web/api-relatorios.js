@@ -3,7 +3,8 @@
  * FrotaGest — API dos relatórios: na tela (JSON), em Excel (.xlsx) e em PDF.
  * Reis Tecnologia
  */
-const { HttpErro } = require('../util/comum');
+const { HttpErro, validar: V } = require('../util/comum');
+const { empresaAlvo } = require('../auth/acesso');
 const { TIPOS, paraXlsx, paraPdf } = require('../relatorios/relatorios');
 const { gerarXlsx } = require('../relatorios/xlsx');
 const { gerarPdf } = require('../relatorios/pdf');
@@ -26,7 +27,10 @@ function registrar(srv) {
     }
     const dia = String(query.de || '').slice(0, 10);
     const nome = `frotagest-${rel.arquivo}-${dia}.${formato}`;
-    const corpo = formato === 'xlsx' ? gerarXlsx(paraXlsx(rel), { titulo: rel.titulo }) : gerarPdf(paraPdf(rel));
+    // logotipo da empresa do relatório (a do usuário; para o master, a escolhida no topo)
+    const emp = empresaAlvo(u, query.empresa ? V.id(query.empresa, 'a empresa') : null);
+    const corpo = formato === 'xlsx' ? gerarXlsx(paraXlsx(rel), { titulo: rel.titulo })
+      : gerarPdf({ ...paraPdf(rel), logo: await srv.logotipos.paraPdf(emp) });
     await auditoria.registrar(u, 'exportar_relatorio', {
       descricao: `${rel.titulo} (${formato === 'xlsx' ? 'Excel' : 'PDF'}) · ${rel.subtitulo.join(' · ')} · ${rel.linhas.length} linha(s)`,
       ip, empresaId: query.empresa ? Number(query.empresa) || null : undefined,

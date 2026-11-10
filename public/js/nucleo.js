@@ -11,7 +11,8 @@ const WS_PROTO = location.protocol === 'https:' ? 'wss' : 'ws';
    ico('user-plus') ico('user-check') ico('clock-pause') ico('mail') ico('refresh') ico('key') ico('copy')
    ico('volume-off') ico('volume') ico('sun') ico('moon') ico('antenna-bars-2') ico('camera-off') ico('device-sd-card') ico('gps') ico('plug-x') ico('wifi-off') ico('cpu') ico('wifi') ico('video') ico('check') ico('download') ico('alert-triangle') ico('bell-ringing')
    ico('building-warehouse') ico('map-pin') ico('shape') ico('ban') ico('device-mobile') ico('device-desktop') ico('device-tv') ico('arrows-minimize')
-   ico('shield-lock') ico('shield-check') ico('lifebuoy') ico('device-mobile') ico('file-download') ico('copy') ico('login-2') */
+   ico('shield-lock') ico('shield-check') ico('lifebuoy') ico('device-mobile') ico('file-download') ico('copy') ico('login-2')
+   ico('dots-vertical') ico('photo') ico('upload') */
 
 /** Estado do painel. */
 const S = {

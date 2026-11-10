@@ -299,6 +299,8 @@ async function abrirApp() {
     toast(`Não foi possível carregar a frota: ${e.message}`, 'err');
   }
   atualizarSeletorEmpresa();
+  atualizarLogoTopo();
+  mostrarBotaoInstalar();
   atualizarResumoAlertas();
   atualizarPendentes();
   atualizarSaude();
@@ -324,6 +326,7 @@ async function sair(motivo) {
   limparSessaoLocal();
   $('#nova-versao').hidden = true;
   $('#tb-som-pop').hidden = true;
+  $('#tb-logo').hidden = true;
   $$('.modal-back').forEach((m) => m.remove());
   pararEventos();
   if (S.paginaAtual && S.paginaAtual.sair) { try { S.paginaAtual.sair(); } catch { /* ok */ } }
@@ -333,6 +336,7 @@ async function sair(motivo) {
 }
 
 async function iniciar() {
+  registrarAplicativo();
   try {
     S.config = await fetch('/api/publica/config').then((r) => r.json());
   } catch {
@@ -358,6 +362,17 @@ async function iniciar() {
   });
 
   // cabeçalho
+  $('#tb-instalar').addEventListener('click', instalarAplicativo);
+  // celular: os botões menos usados do topo ficam no "⋮"
+  const fecharMais = () => { $('.tb').classList.remove('mais-aberto'); $('#tb-mais').setAttribute('aria-expanded', 'false'); };
+  $('#tb-mais').addEventListener('click', (e) => {
+    e.stopPropagation();
+    const aberto = $('.tb').classList.toggle('mais-aberto');
+    $('#tb-mais').setAttribute('aria-expanded', String(aberto));
+  });
+  $('#tb-extras').addEventListener('click', (e) => { if (e.target.closest('.tb-btn') && !e.target.closest('#tb-som')) fecharMais(); });
+  document.addEventListener('click', (e) => { if (!e.target.closest('#tb-extras, #tb-mais, #tb-som-pop')) fecharMais(); });
+  $('#tb-sair-cel').addEventListener('click', () => sair());
   $('#tb-sair').addEventListener('click', () => sair());
   $('#tb-atualizar').addEventListener('click', atualizarTela);
   $('#tb-tema').addEventListener('click', trocarTema);
@@ -373,6 +388,7 @@ async function iniciar() {
     atualizarStatusFrota();
     atualizarPendentes();
     atualizarSaude();
+    atualizarLogoTopo();
     emit('empresa');
     abrirRota();
   });

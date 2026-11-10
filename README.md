@@ -52,6 +52,7 @@ Grupos podem ter subgrupos (ex.: Garagem › Linha 10); liberar um grupo libera 
 | `alertas` | Alarmes do DVR e das cercas (início, fim, gravidade) e o tratamento (quem, quando, o quê) | 365 dias |
 | `cercas` | Garagens, pontos/terminais e áreas desenhados no mapa (círculo ou área livre) e os avisos de cada uma | sempre |
 | `sessoes_encerradas` | Logins encerrados por um administrador em “Usuários online” (só aquele aparelho) | 90 dias |
+| `empresas_logo` | Logotipo de cada empresa cliente (PNG para a tela, JPEG para os PDFs) | sempre |
 | `codigos_recuperacao`, `sessoes_2fa` | Verificação em duas etapas: códigos de recuperação (só o resumo SHA-256) e os logins que já passaram pela segunda etapa | até zerar / 90 dias |
 | `eventos_aparelho`, `comandos` | Comunicações: conexões/desconexões e comandos enviados com a resposta | 180 dias |
 | `auditoria` | Acessos, cadastros, câmeras abertas, gravações vistas e baixadas, relatórios exportados, tratamento de alertas | 730 dias (mínimo 180) |
@@ -102,7 +103,15 @@ Feita no próprio FrotaGest: o Firebase continua só com o e-mail e a senha, **n
 - **Se o próprio master perder o celular e os códigos**, no servidor: `cd ~/frotagest && node tools/zerar-2fa.js email@do.master && pm2 restart frotagest`.
 - A chave de cada pessoa fica cifrada no banco; a chave da cifra fica em `data/chave-2fa.key` (criada sozinha, fora do banco e do GitHub). **Guarde esse arquivo junto com o backup do banco:** sem ele, quem usa duas etapas precisa ser zerado.
 
-## 3.5 Sessão e avisos
+## 3.5 Aplicativo no celular e logotipo da empresa
+
+- **Instalar como aplicativo:** no Android (Chrome) e no computador (Chrome/Edge) aparece o botão **Instalar** no topo; no iPhone/iPad o botão explica o caminho pelo Safari (Compartilhar › Adicionar à Tela de Início). Abre em tela cheia, com o ícone do FrotaGest e atalhos para Monitoramento, Alertas e Modo TV.
+- O aplicativo guarda só os arquivos do painel (abre mais rápido no 4G) e **nunca guarda dados** (nada de /api, tempo real, vídeo ou downloads). Sem internet, mostra um aviso em vez de uma tela quebrada. Cada versão nova limpa o que a anterior guardou.
+- No celular, o topo mostra o menu, o título, os alertas e o botão **⋮** com o resto (instalar, tema, atualizar, som, sair).
+- Base pronta para gerar o APK (Bubblewrap/TWA), como no OdontoWorld.
+- **Logotipo da empresa cliente:** o master envia em **Cadastros › Empresas** (PNG, JPG ou WebP; o painel reduz e corta as bordas vazias). Aparece no topo do painel para quem é daquela empresa (e para o master com a empresa escolhida), no modo TV e no cabeçalho dos PDFs. Fica guardado no banco.
+
+## 3.6 Sessão e avisos
 
 - **Sessão encerrada por falta de uso** depois do tempo de **Sistema › Configurações › Segurança** (padrão 60 min; 0 = nunca, só para telas de central/TV). Um minuto antes aparece “Você ainda está aí?”. Vale também se a janela foi fechada sem clicar em Sair.
 - **Tema claro ou escuro:** botão da lua/sol no topo; a escolha fica no navegador (sem escolha, segue o tema do sistema). No escuro, o mapa de ruas também escurece; o satélite fica como está.

@@ -83,6 +83,7 @@ function registrar(srv) {
         titulo, subtitulo, resumo: rel.resumo, colunas: colunas.map((c) => ({ titulo: c.titulo, peso: c.peso, alinhar: c.alinhar })),
         linhas: linhas.map((l) => l.map((v, i) => fmtValor(v, colunas[i].tipo))), totais: null,
         vazio: 'Nenhum aparelho com problema agora.', rodape: `FrotaGest · Reis Tecnologia · Gerado em ${fmtValor(r.geradoEm, 'dataHora').slice(0, 16)} por ${u.nome}`,
+        logo: await srv.logotipos.paraPdf(emp),
       });
     await auditoria.registrar(u, 'exportar_relatorio', { descricao: `${titulo} (${formato === 'xlsx' ? 'Excel' : 'PDF'}) · ${subtitulo[0]}`, ip });
     srv.send(res, 200, corpo, formato === 'xlsx' ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' : 'application/pdf', {

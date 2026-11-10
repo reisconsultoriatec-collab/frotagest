@@ -517,6 +517,7 @@ PAGINAS.empresas = paginaLista({
   ativo: (e) => !!e.ativo,
   colunas: [
     { t: 'Empresa', v: (e) => `<b>${H(e.nome)}</b><span class="sub">${H(e.documento ? fmtDoc(e.documento) : '')}</span>` },
+    { t: 'Logotipo', v: (e) => (e.logo_em ? `<span class="tag ok">${ico('photo', 'i-xs')} Enviado</span>` : '<span class="muted">—</span>') },
     { t: 'Código de cadastro', cls: 'mono', v: (e) => H(e.codigo_convite || '—') },
     { t: 'Cidade', v: (e) => H([e.cidade, e.uf].filter(Boolean).join(' / ') || '—') },
     { t: 'Contato', v: (e) => `${H(e.contato || '—')}<span class="sub">${H([e.telefone, e.email].filter(Boolean).join(' · '))}</span>` },
@@ -536,7 +537,7 @@ function fmtDoc(d) {
 }
 
 function editarEmpresa(e, aposSalvar) {
-  formulario({
+  const j = formulario({
     titulo: e ? e.nome : 'Nova empresa',
     icone: 'building',
     campos: [
@@ -551,6 +552,7 @@ function editarEmpresa(e, aposSalvar) {
       ...(e ? [{ nome: 'ativo', rotulo: 'Empresa ativa (desativada: ninguém dela entra e os aparelhos são recusados)', tipo: 'check', cheio: true }] : []),
     ],
     valores: e ? { ...e, documento: fmtDoc(e.documento), ativo: !!e.ativo } : {},
+    extras: blocoLogoEmpresa(e),
     salvar: async (d) => {
       if (e) await api(`/api/empresas/${e.id}`, { metodo: 'PUT', corpo: d });
       else await api('/api/empresas', { corpo: d });
@@ -560,4 +562,5 @@ function editarEmpresa(e, aposSalvar) {
       aposSalvar && aposSalvar();
     },
   });
+  ligarLogoEmpresa(j.el, e, aposSalvar).catch(() => {});
 }

@@ -886,3 +886,44 @@ body.modo-tv .content { padding: 0; }
 .usr-2fa.pendente { background: var(--amber-50); color: var(--amber-ink); }
 .cf-2fa-perfis { display: flex; flex-wrap: wrap; gap: 8px 22px; margin: 4px 0 2px; }
 .cf-2fa-perfis .field-check { padding-top: 0; }
+
+/* ---------- logotipo da empresa cliente ---------- */
+.tb-logo { flex: none; height: 40px; max-width: 150px; padding: 4px 8px; border-radius: 9px; background: #fff; box-shadow: inset 0 0 0 1px var(--line); display: flex; align-items: center; justify-content: center; }
+.tb-logo img { display: block; max-height: 32px; max-width: 134px; width: auto; height: auto; object-fit: contain; }
+.logo-emp { display: flex; gap: 14px; align-items: flex-start; margin-top: 16px; padding: 14px; border-radius: 12px; background: var(--fundo-suave); }
+.logo-emp-prev { width: 168px; height: 72px; flex: none; border-radius: 10px; background: #fff; box-shadow: inset 0 0 0 1px var(--line); display: grid; place-items: center; padding: 8px; }
+.logo-emp-prev img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
+.logo-emp-txt { min-width: 0; display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.logo-emp-txt small { color: var(--ink-2); line-height: 1.45; }
+.logo-emp-acoes { display: flex; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
+.logo-emp-acoes label.btn { cursor: pointer; }
+.tv-cliente { margin-left: 10px; height: 40px; max-width: 150px; padding: 4px 9px; border-radius: 10px; background: #fff; display: flex; align-items: center; }
+.tv-cliente img { max-height: 32px; max-width: 132px; object-fit: contain; display: block; }
+@media (max-width: 560px) { .tb-logo { height: 34px; max-width: 96px; padding: 3px 6px; } .tb-logo img { max-height: 26px; max-width: 84px; } .logo-emp { flex-direction: column; } }
+
+/* ---------- aplicativo instalável ---------- */
+.tb-btn.tb-instalar { display: inline-flex; align-items: center; width: auto; padding: 0 12px; gap: 6px; font: inherit; font-size: 13px; font-weight: 600; color: var(--amber-700); background: var(--amber-50); border-color: transparent; }
+.tb-btn.tb-instalar:hover { background: var(--amber-100); }
+.instalar-ios { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; line-height: 1.5; }
+@media (max-width: 560px) { .tb-btn.tb-instalar span { display: none; } .tb-btn.tb-instalar { width: 40px; padding: 0; } }
+
+/* ---------- topo no celular: os botões menos usados ficam no "⋮" ---------- */
+.tb-extras { display: contents; }
+.tb-mais, .tb-so-celular { display: none !important; }
+@media (max-width: 560px) {
+  .tb-mais { display: grid !important; }
+  #tb-sair, .tb-logo { display: none !important; }
+  .tb-extras { display: none; position: absolute; top: calc(100% + 6px); right: 12px; z-index: 40; min-width: 250px; flex-direction: column; gap: 2px; padding: 6px;
+    background: var(--card); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 18px 40px rgba(15, 23, 42, .2); }
+  .tb.mais-aberto .tb-extras { display: flex; }
+  .tb.mais-aberto .tb-mais { color: var(--ink); border-color: var(--linha-forte); }
+  .tb-extras .tb-btn, .tb-extras .tb-so-celular { display: flex !important; align-items: center; width: 100%; height: 46px; justify-content: flex-start; gap: 12px; padding: 0 12px;
+    border: 0; border-radius: 10px; background: none; font: inherit; font-size: 14.5px; font-weight: 500; color: var(--ink); }
+  .tb-extras .tb-btn:hover { background: var(--fundo-hover); }
+  .tb-extras .tb-btn::after { content: attr(aria-label); }
+  .tb-extras .tb-btn[hidden] { display: none !important; }
+  .tb-extras .tb-som-box { width: 100%; }
+  .tb-extras .tb-btn.tb-instalar { color: var(--amber-700); background: var(--amber-50); }
+  .tb-extras .tb-btn.tb-instalar span { display: none; }
+  .tb-extras #tb-sair-cel { color: var(--err); }
+}

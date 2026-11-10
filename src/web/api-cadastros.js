@@ -51,16 +51,46 @@ function registrar(srv) {
 
   r('GET', '/api/empresas', async ({ u }) => {
     if (u.perfil !== 'master') {
-      const e = await banco.um('SELECT id, nome, documento, contato, telefone, email, cidade, uf, ativo, codigo_convite FROM empresas WHERE id = ?', [u.empresaId]);
+      const e = await banco.um(`SELECT id, nome, documento, contato, telefone, email, cidade, uf, ativo, codigo_convite,
+        (SELECT atualizado_em FROM empresas_logo l WHERE l.empresa_id = empresas.id) AS logo_em FROM empresas WHERE id = ?`, [u.empresaId]);
       return { empresas: e ? [e] : [] };
     }
     const empresas = await banco.query(`
       SELECT e.*,
         (SELECT COUNT(*) FROM veiculos v WHERE v.empresa_id = e.id AND v.ativo = 1) AS veiculos,
         (SELECT COUNT(*) FROM aparelhos a WHERE a.empresa_id = e.id AND a.ativo = 1) AS aparelhos,
-        (SELECT COUNT(*) FROM usuarios s WHERE s.empresa_id = e.id AND s.ativo = 1) AS usuarios
+        (SELECT COUNT(*) FROM usuarios s WHERE s.empresa_id = e.id AND s.ativo = 1) AS usuarios,
+        (SELECT atualizado_em FROM empresas_logo l WHERE l.empresa_id = e.id) AS logo_em
       FROM empresas e ORDER BY e.nome`);
     return { empresas };
+  });
+
+  /* logotipo da empresa: quem é da empresa vê; só o master troca */
+  r('GET', '/api/empresas/:id/logo', async ({ u, params }) => {
+    const id = V.id(params.id);
+    if (u.perfil !== 'master' && id !== u.empresaId) throw new HttpErro(404, 'Empresa não encontrada.');
+    const l = await srv.logotipos.de(id);
+    return l ? { png: `data:image/png;base64,${l.png.toString('base64')}`, largura: l.largura, altura: l.altura, em: l.em } : { png: null };
+  });
+
+  r('PUT', '/api/empresas/:id/logo', async ({ u, params, body, ip }) => {
+    if (u.perfil !== 'master') throw new HttpErro(403, 'Só o master troca o logotipo da empresa.');
+    const id = V.id(params.id);
+    const e = frota.empresas.get(id);
+    if (!e) throw new HttpErro(404, 'Empresa não encontrada.');
+    const m = await srv.logotipos.salvar(id, body, u.id);
+    await auditoria.registrar(u, 'editar', { entidade: 'empresa', entidadeId: id, descricao: `${e.nome}: logotipo novo (${m.largura} x ${m.altura})`, ip, empresaId: id });
+    return { ok: true };
+  }, { corpoMax: 1600 * 1024 });
+
+  r('DELETE', '/api/empresas/:id/logo', async ({ u, params, ip }) => {
+    if (u.perfil !== 'master') throw new HttpErro(403, 'Só o master troca o logotipo da empresa.');
+    const id = V.id(params.id);
+    const e = frota.empresas.get(id);
+    if (!e) throw new HttpErro(404, 'Empresa não encontrada.');
+    await srv.logotipos.remover(id);
+    await auditoria.registrar(u, 'editar', { entidade: 'empresa', entidadeId: id, descricao: `${e.nome}: logotipo removido`, ip, empresaId: id });
+    return { ok: true };
   });
 
   r('POST', '/api/empresas', async ({ u, body, ip }) => {
