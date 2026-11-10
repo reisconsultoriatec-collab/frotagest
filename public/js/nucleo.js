@@ -335,6 +335,7 @@ const NAV = [
   // Cadastros primeiro: é por onde a empresa começa (quem não cadastra não vê este grupo)
   {
     grupo: 'Cadastros',
+    ico: 'clipboard-list',
     itens: [
       // na ordem em que se monta uma empresa: empresa → DVRs → grupos → veículos → pessoas
       { id: 'empresas', nome: 'Empresas', ico: 'building', master: true },
@@ -347,6 +348,7 @@ const NAV = [
   },
   {
     grupo: 'Operação',
+    ico: 'radar-2',
     itens: [
       { id: 'inicio', nome: 'Início', ico: 'layout-dashboard', todos: true },
       { id: 'mapa', nome: 'Monitoramento', ico: 'map-2' },
@@ -359,6 +361,7 @@ const NAV = [
   },
   {
     grupo: 'Controle',
+    ico: 'adjustments-horizontal',
     itens: [
       { id: 'saude', nome: 'Saúde dos aparelhos', ico: 'heartbeat', badge: 'nav-saude', badgeCls: 'err' },
       { id: 'comunicacoes', nome: 'Comunicações', ico: 'antenna' },
@@ -416,9 +419,13 @@ function montarNav() {
     const itens = g.itens.filter(podeVer);
     if (!itens.length) return;
     const links = itens.map((it) => `<a class="sb-item" href="#/${it.id}" data-nav="${it.id}">${ico(it.ico)}<span>${H(it.nome)}</span>${it.badge ? `<span class="sb-badge ${it.badgeCls || 'err'}" id="${it.badge}" hidden></span>` : ''}</a>`).join('');
+    // cada grupo é um bloco próprio: ícone, nome e uma prévia do que tem dentro (só o que a pessoa pode ver)
+    const previa = itens.map((it) => it.nome.replace(/\s*\(.*\)$/, '')).join(' · ');
     html += `<div class="sb-grp" data-grupo="${n}">
       <button type="button" class="sb-grp-tit" aria-expanded="false" aria-controls="sb-grp-${n}">
-        <span class="sb-grp-nome">${H(g.grupo)}</span><span class="sb-badge sb-grp-selo" hidden></span>${ico('chevron-right', 'sb-grp-seta')}
+        <span class="sb-grp-ico">${ico(g.ico)}</span>
+        <span class="sb-grp-txt"><span class="sb-grp-nome">${H(g.grupo)}</span><small class="sb-grp-previa">${H(previa)}</small></span>
+        <span class="sb-badge sb-grp-selo" hidden></span>${ico('chevron-right', 'sb-grp-seta')}
       </button>
       <div class="sb-grp-itens" id="sb-grp-${n}"><div>${links}</div></div>
     </div>`;
