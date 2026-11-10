@@ -220,6 +220,10 @@ O Nginx e o certificado da Cloudflare que já publicam o laboratório continuam 
 
 Baixa a versão nova do GitHub, roda `npm install` só se as dependências mudaram, reinicia no PM2 e confere a saúde. As mudanças de banco são aplicadas sozinhas ao iniciar (tabela `migracoes`). `config.json`, `data/` e as senhas nunca são tocados.
 
+Depois da atualização:
+- Quem está com o **painel aberto** vê o aviso “Nova versão disponível” e clica em Atualizar quando puder (o painel não recarrega sozinho no meio do trabalho).
+- Uma **tela de entrada que ficou aberta** (ou uma aba do celular restaurada da memória) recarrega sozinha antes de entrar ou quando volta a aparecer — a partir da 1.7.1. Páginas abertas antes da 1.7.1 precisam de um F5 (ou fechar e abrir de novo) uma única vez.
+
 ## 6. Portas e protocolos
 
 Em **Sistema › Portas e protocolos** o master cria perfis com outras portas (e, no futuro, outros protocolos). Cada aparelho usa um perfil; o padrão é **JT/T 808 + JT/T 1078 nas portas 6608/6602**. As portas abrem e fecham na hora, sem reiniciar. Porta nova precisa ser liberada também na **Lista de Segurança da Oracle** e no **iptables** (`sudo iptables -I INPUT <n> -p tcp --dport <porta> -j ACCEPT` antes da regra REJECT, depois `sudo netfilter-persistent save`).

@@ -261,7 +261,37 @@ async function concluirCadastro(nome, codigo) {
   await entrar();
 }
 
+/* ---------- página antiga ainda aberta ----------
+ * Uma aba esquecida na tela de entrada (ou restaurada da memória no celular) continua com o código da
+ * versão em que foi aberta e não entende as telas novas (ex.: duas etapas). Antes de entrar, e quando a
+ * aba volta a aparecer, confere a versão do servidor e recarrega sozinha se mudou — uma vez por versão,
+ * para nunca ficar em laço. Com o painel aberto quem avisa é o "Nova versão disponível". */
+async function recarregarSeVersaoNova() {
+  if (!S.config || !S.config.versao) return false;
+  let nova;
+  try { nova = (await fetch('/api/publica/config', { cache: 'no-store' }).then((r) => r.json())).versao; } catch { return false; }
+  if (!nova || nova === S.config.versao) return false;
+  let ja = null;
+  try { ja = sessionStorage.getItem('fg:recarregou'); } catch { /* sem armazenamento */ }
+  if (ja === nova) return false; // já recarregou para esta versão e ela não veio: não insiste
+  try { sessionStorage.setItem('fg:recarregou', nova); } catch { /* ok */ }
+  location.reload();
+  return true;
+}
+
+/** Fora do painel e sem ninguém digitando na tela de entrada: pode recarregar sem perder nada. */
+function conferirVersaoForaDoPainel() {
+  if (S.eu || document.hidden) return;
+  if ($$('#gate-box input, #login-form input').some((i) => i.type !== 'checkbox' && i.value)) return;
+  recarregarSeVersaoNova();
+}
+document.addEventListener('visibilitychange', conferirVersaoForaDoPainel);
+window.addEventListener('pageshow', (e) => { if (e.persisted) conferirVersaoForaDoPainel(); });
+setInterval(conferirVersaoForaDoPainel, 10 * 60000);
+
 async function entrar() {
+  // a página ficou aberta desde antes de uma atualização: recarrega com a versão nova (o login continua)
+  if (Date.now() - (S.configEm || 0) > 10000 && await recarregarSeVersaoNova()) return;
   // ficou sem uso além do limite (mesmo com a janela fechada): encerra antes de abrir o painel
   if (sessaoVencida(lerNumero('fg:sessaoMin'))) { await encerrarPorInatividade(lerNumero('fg:sessaoMin')); return; }
   try {
@@ -338,7 +368,8 @@ async function sair(motivo) {
 async function iniciar() {
   registrarAplicativo();
   try {
-    S.config = await fetch('/api/publica/config').then((r) => r.json());
+    S.config = await fetch('/api/publica/config', { cache: 'no-store' }).then((r) => r.json());
+    S.configEm = Date.now();
   } catch {
     mostrarGate('erro', 'O servidor não respondeu. Verifique a conexão e tente de novo.');
     return;

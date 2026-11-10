@@ -112,9 +112,11 @@ class DoisFatores {
   /** Antes de liberar qualquer coisa: precisa cadastrar o aplicativo ou digitar o código? (null = liberado) */
   bloqueio(u, claims) {
     if (!this.exige(u) || this.sessaoVerificada(claims)) return null;
+    // o painel atual troca a mensagem pela tela certa; a dica do F5 é para uma página antiga ainda aberta
+    // (anterior à 1.5), que só sabe mostrar o texto
     return u.doisFatoresAtivo
-      ? { codigo: 'dois_fatores', mensagem: 'Digite o código do aplicativo autenticador para continuar.' }
-      : { codigo: 'dois_fatores_cadastro', mensagem: 'Ative a verificação em duas etapas para continuar.' };
+      ? { codigo: 'dois_fatores', mensagem: 'Digite o código do aplicativo autenticador para continuar. Se esta tela não mostrar o campo do código, atualize a página (tecla F5) ou feche e abra o FrotaGest de novo.' }
+      : { codigo: 'dois_fatores_cadastro', mensagem: 'Ative a verificação em duas etapas para continuar. Se esta tela não mostrar o QR Code, atualize a página (tecla F5) ou feche e abra o FrotaGest de novo.' };
   }
 
   async marcarSessao(claims, usuarioId) {
