@@ -15,6 +15,8 @@ const ACOES = ['ver', 'incluir', 'alterar', 'excluir'];
 
 /** Telas na ordem do menu. acoes: só as que existem naquela tela, com o que cada uma libera. */
 const TELAS = [
+  // o Dashboard fica à parte dos grupos: é a primeira tela de quem tem acesso a ele
+  { id: 'dashboard', grupo: 'Dashboard', nome: 'Dashboard', acoes: { ver: 'Tela inicial com a frota ao vivo, km do dia, gráficos e alertas' } },
   { id: 'aparelhos', grupo: 'Cadastros', nome: 'Aparelhos (DVR)', acoes: {
     ver: 'Ver os aparelhos da empresa e a situação de cada um (o cadastro é feito pelo master)' } },
   { id: 'grupos', grupo: 'Cadastros', nome: 'Grupos', acoes: {
@@ -47,8 +49,8 @@ const tudo = (filtro = () => true) => Object.fromEntries(TELAS.filter(filtro).ma
 /** Padrão de cada perfil = o que ele já tinha antes do controle de acesso. */
 const PADRAO = {
   admin: tudo((t) => !t.soMaster),
-  operador: { mapa: ['ver'], cameras: ['ver'], alertas: ['ver', 'alterar'], historico: ['ver'], relatorios: ['ver'], gravacoes: ['ver', 'incluir'], tv: ['ver'] },
-  visualizador: { mapa: ['ver'], cameras: ['ver'], alertas: ['ver'], historico: ['ver'], relatorios: ['ver'], tv: ['ver'] },
+  operador: { dashboard: ['ver'], mapa: ['ver'], cameras: ['ver'], alertas: ['ver', 'alterar'], historico: ['ver'], relatorios: ['ver'], gravacoes: ['ver', 'incluir'], tv: ['ver'] },
+  visualizador: { dashboard: ['ver'], mapa: ['ver'], cameras: ['ver'], alertas: ['ver'], historico: ['ver'], relatorios: ['ver'], tv: ['ver'] },
 };
 
 /** Ações válidas de uma tela, na ordem, com "ver" sempre junto (sem ver não há como fazer o resto). */

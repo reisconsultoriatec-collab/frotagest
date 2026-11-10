@@ -62,7 +62,7 @@ PAGINAS.tv = (() => {
       box.querySelector('img').src = l.png;
       box.hidden = false;
     });
-    $('#tv-sair').addEventListener('click', () => { if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); navegar('inicio'); });
+    $('#tv-sair').addEventListener('click', () => { if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); navegar(telaInicial()); });
     $('#tv-cheia').addEventListener('click', telaCheia);
     $('#tv-ajustes').addEventListener('click', ajustes);
     const teclas = (e) => {

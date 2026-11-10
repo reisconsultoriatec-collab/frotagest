@@ -14,7 +14,7 @@ function registrar(srv) {
     const emp = empresaAlvo(u, query.empresa ? V.id(query.empresa, 'a empresa') : null);
     const veiculos = [...frota.veiculos.values()].filter((v) => v.ativo && (!emp || v.empresa_id === emp) && acesso.veVeiculo(u, v));
     return painel.resumo(veiculos, { alertas: permite(u, 'alertas') });
-  }, { limite: { chave: 'painel', max: 1500, minutos: 10 } }); // uma central com várias telas sai pelo mesmo IP
+  }, { acesso: 'dashboard.ver', limite: { chave: 'painel', max: 1500, minutos: 10 } }); // uma central com várias telas sai pelo mesmo IP
 }
 
 module.exports = { registrar };

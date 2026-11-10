@@ -330,7 +330,12 @@ function tratarEvento(m) {
 
 /* ---------- navegação ---------- */
 
-/* Cada item é uma tela do Controle de acesso (mesmo id); "master" = só o master; Início é de todos. */
+/* O Dashboard fica à parte, no alto do menu, fora dos grupos (tela do Controle de acesso "dashboard"). */
+const NAV_TOPO = { id: 'dashboard', nome: 'Dashboard', ico: 'layout-dashboard', previa: 'A frota ao vivo, em números' };
+/* Endereços antigos que continuam funcionando. */
+const ROTAS_ANTIGAS = { inicio: 'dashboard' };
+
+/* Cada item é uma tela do Controle de acesso (mesmo id); "master" = só o master. */
 const NAV = [
   // Cadastros primeiro: é por onde a empresa começa (quem não cadastra não vê este grupo)
   {
@@ -350,7 +355,6 @@ const NAV = [
     grupo: 'Operação',
     ico: 'radar-2',
     itens: [
-      { id: 'inicio', nome: 'Início', ico: 'layout-dashboard', todos: true },
       { id: 'mapa', nome: 'Monitoramento', ico: 'map-2' },
       { id: 'alertas', nome: 'Alertas', ico: 'bell-ringing', badge: 'nav-alertas' },
       { id: 'historico', nome: 'Histórico', ico: 'route' },
@@ -384,6 +388,17 @@ function podeTela(tela, acao = 'ver') {
   return Boolean(a && a.includes(acao));
 }
 
+/**
+ * Primeira tela ao entrar: o Dashboard para quem tem acesso a ele; senão a primeira tela liberada
+ * (as de operação primeiro); sem nenhuma, a tela que explica que falta liberar o acesso.
+ */
+function telaInicial() {
+  if (podeTela('dashboard')) return 'dashboard';
+  const liberadas = NAV.flatMap((g) => g.itens).filter(podeVer).map((i) => i.id);
+  const preferidas = ['mapa', 'alertas', 'historico', 'relatorios', 'gravacoes', 'tv'];
+  return preferidas.find((x) => liberadas.includes(x)) || liberadas[0] || 'sem-acesso';
+}
+
 function podeVer(item) {
   if (!S.eu) return false;
   if (item.todos) return true;
@@ -414,7 +429,11 @@ async function recarregarAcessos() {
  * fechado, os selos dos itens (alertas, cadastros pendentes) somam no título
  * para o aviso não sumir. */
 function montarNav() {
-  let html = '';
+  // Dashboard: bloco próprio no alto, separado dos grupos
+  let html = podeTela(NAV_TOPO.id) ? `<a class="sb-solo" href="#/${NAV_TOPO.id}" data-nav="${NAV_TOPO.id}">
+      <span class="sb-grp-ico">${ico(NAV_TOPO.ico)}</span>
+      <span class="sb-grp-txt"><span class="sb-grp-nome">${H(NAV_TOPO.nome)}</span><small class="sb-grp-previa">${H(NAV_TOPO.previa)}</small></span>
+    </a><div class="sb-sep" role="separator"></div>` : '';
   NAV.forEach((g, n) => {
     const itens = g.itens.filter(podeVer);
     if (!itens.length) return;
@@ -439,8 +458,9 @@ function montarNav() {
       if (tit) abrirGrupo(tit.closest('.sb-grp'), true);
     });
   }
-  const atual = (location.hash.replace(/^#\/?/, '').split('?')[0]) || 'inicio';
+  const atual = (location.hash.replace(/^#\/?/, '').split('?')[0]) || telaInicial();
   marcarGrupo(atual);
+  $$('.sb-solo').forEach((a) => a.classList.toggle('active', a.dataset.nav === atual));
   atualizarSelosGrupos();
 }
 
@@ -490,19 +510,26 @@ function paramsDaRota() {
 
 function abrirRota() {
   if (!S.eu) return;
-  const id = (location.hash.replace(/^#\/?/, '').split('?')[0]) || 'inicio';
+  let id = (location.hash.replace(/^#\/?/, '').split('?')[0]) || telaInicial();
+  if (ROTAS_ANTIGAS[id]) {
+    id = ROTAS_ANTIGAS[id];
+    history.replaceState(null, '', `#/${id}${location.hash.includes('?') ? location.hash.slice(location.hash.indexOf('?')) : ''}`);
+  }
   let pag = PAGINAS[id];
-  const nav = NAV.flatMap((g) => g.itens).find((i) => i.id === id);
-  // tela que não está no menu (ex.: alguma interna) segue a regra da própria página, se tiver
-  if (!pag || (nav ? !podeVer(nav) : (pag.tela && !podeTela(pag.tela)))) {
-    pag = PAGINAS.inicio;
-    if (id !== 'inicio') { history.replaceState(null, '', '#/inicio'); }
+  const nav = [NAV_TOPO, ...NAV.flatMap((g) => g.itens)].find((i) => i.id === id);
+  // tela que não está no menu (ex.: "sem acesso") segue a regra da própria página, se tiver
+  const semAcessoAtoa = id === 'sem-acesso' && telaInicial() !== 'sem-acesso'; // já liberaram alguma tela
+  if (!pag || semAcessoAtoa || (nav ? !podeVer(nav) : (pag.tela && !podeTela(pag.tela)))) {
+    const inicial = telaInicial();
+    pag = PAGINAS[inicial];
+    id = inicial;
+    history.replaceState(null, '', `#/${inicial}`);
   }
   if (S.paginaAtual && S.paginaAtual.sair) {
     try { S.paginaAtual.sair(); } catch { /* página já desmontada */ }
   }
   S.paginaAtual = pag;
-  $$('.sb-item').forEach((a) => a.classList.toggle('active', a.dataset.nav === (pag.id || id)));
+  $$('.sb-item, .sb-solo').forEach((a) => a.classList.toggle('active', a.dataset.nav === (pag.id || id)));
   marcarGrupo(pag.id || id);
   document.body.classList.remove('sb-open');
   $('#tb-titulo').textContent = pag.titulo;

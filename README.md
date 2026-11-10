@@ -128,9 +128,11 @@ Em **Controle › Controle de acesso**: escolha a pessoa na lista e marque, menu
 - Trocar o perfil de alguém (em Usuários) volta os menus dele ao padrão do perfil novo (o Controle de acesso dado pelo master continua).
 - Cada alteração fica na auditoria com o que entrou e o que saiu (“+ Veículos (ver, incluir); − Câmeras ao vivo (ver)”).
 
-## 3.7 Dashboard (Início)
+## 3.7 Dashboard
 
-A tela inicial é um dashboard da frota que se atualiza sozinho:
+O **Dashboard** é o primeiro item do menu, à parte dos grupos, e é a **primeira tela ao entrar** para quem tem acesso a ele (no Controle de acesso ele aparece em primeiro, sozinho, e vem liberado para todos os perfis; o master pode tirar de quem quiser). Quem não tem o Dashboard entra direto na primeira tela liberada para ele (Monitoramento, Alertas, Histórico… nessa ordem); quem ainda não tem nenhuma tela vê um aviso para pedir o acesso ao administrador, e sai dele sozinho quando liberarem. Recarregar a página mantém a tela em que a pessoa estava; sair (ou a sessão expirar) e entrar de novo volta à tela inicial. Um link para uma tela específica (`#/relatorios`, por exemplo) abre essa tela depois do login, se a pessoa tiver acesso a ela. O endereço antigo `#/inicio` continua funcionando.
+
+O Dashboard se atualiza sozinho:
 
 - **Km rodados hoje** em destaque, comparado com **ontem até a mesma hora** (comparar meio dia com o dia inteiro de ontem não diria nada), com o minigráfico das horas.
 - **Online agora, em movimento, alertas de hoje e na garagem** (a garagem vem das cercas com finalidade Garagem).

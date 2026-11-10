@@ -337,6 +337,12 @@ async function abrirApp() {
   conectarEventos();
   iniciarSessao();
   atualizarBotaoSom();
+  // ao entrar (ou abrir o sistema sem uma tela no endereço) vai para a tela inicial da pessoa:
+  // o Dashboard, se ela tiver acesso; senão a primeira tela liberada. Recarregar a página mantém a tela atual.
+  // sem tela no endereço (entrou agora, ou saiu e entrou de novo): abre na tela inicial dele.
+  // Um link para uma tela específica é respeitado se a pessoa tiver acesso a ela.
+  if (!location.hash.replace(/^#\/?/, '')) history.replaceState(null, '', `#/${telaInicial()}`);
+  montarNav();
   abrirRota();
 }
 
@@ -362,6 +368,8 @@ async function sair(motivo) {
   if (S.paginaAtual && S.paginaAtual.sair) { try { S.paginaAtual.sair(); } catch { /* ok */ } }
   S.paginaAtual = null;
   $('#conteudo').innerHTML = '';
+  // tira a tela do endereço: quem entrar de novo começa pela tela inicial dele
+  history.replaceState(null, '', location.pathname + location.search);
   await firebase.auth().signOut();
 }
 

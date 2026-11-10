@@ -1,9 +1,9 @@
 'use strict';
-/* FrotaGest — Início: dashboard da frota ao vivo. Situação agora (tempo real), km de hoje comparado com
+/* FrotaGest — Dashboard (primeira tela de quem tem acesso a ele): a frota ao vivo. Situação agora (tempo real), km de hoje comparado com
  * ontem, últimos 14 dias, alertas do dia, garagens, ranking e quem está sem comunicação. Tudo filtrável
  * por grupo e com atalhos para as telas de cada assunto (respeitando o Controle de acesso). Reis Tecnologia */
 
-PAGINAS.inicio = (() => {
+PAGINAS.dashboard = (() => {
   let offs = [];
   let timers = {};
   let dados = null; // /api/painel
@@ -708,5 +708,19 @@ PAGINAS.inicio = (() => {
     const e = S.empresa && (S.empresas || []).find((x) => String(x.id) === String(S.empresa));
     return e ? e.nome : 'Visão geral de todas as empresas';
   };
-  return { id: 'inicio', titulo: 'Início', sub: nomeEmpresa, render, sair };
+  return { id: 'dashboard', titulo: 'Dashboard', sub: nomeEmpresa, render, sair };
 })();
+
+/* Quem ainda não tem nenhuma tela liberada no Controle de acesso cai aqui (e sai sozinho quando liberarem). */
+PAGINAS['sem-acesso'] = {
+  id: 'sem-acesso',
+  titulo: 'Sem acesso',
+  sub: '',
+  render(c) {
+    c.innerHTML = `<div class="page"><section class="card db-sem">
+      <div class="db-sem-ico">${ico('lock-access')}</div>
+      <h2>Você ainda não tem acesso a nenhuma tela</h2>
+      <p>Quem define os menus de cada pessoa é o administrador do FrotaGest, em <b>Controle de acesso</b>. Peça para ele liberar o que você precisa: assim que ele salvar, o menu aparece aqui sozinho.</p>
+    </section></div>`;
+  },
+};
