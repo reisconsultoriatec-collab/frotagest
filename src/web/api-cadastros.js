@@ -181,13 +181,17 @@ function registrar(srv) {
     const where = emp ? 'WHERE s.empresa_id = ?' : (u.perfil === 'master' ? '' : 'WHERE 1 = 0');
     const usuarios = await banco.query(`
       SELECT s.id, s.empresa_id, e.nome AS empresa, s.email, s.nome, s.perfil, s.todos_grupos, s.ativo, s.pendente, s.ultimo_acesso, s.criado_em,
-             (s.firebase_uid IS NOT NULL) AS conta_ligada
+             (s.firebase_uid IS NOT NULL) AS conta_ligada, (s.totp_segredo IS NOT NULL) AS dois_fatores_ativo, s.totp_ativado_em, s.exigir_2fa
         FROM usuarios s LEFT JOIN empresas e ON e.id = s.empresa_id ${where}
        ORDER BY s.ativo DESC, s.nome`, emp ? [emp] : []);
     const ids = usuarios.map((x) => x.id);
     const vinc = ids.length ? await banco.query('SELECT usuario_id, grupo_id FROM usuario_grupos WHERE usuario_id IN (?)', [ids]) : [];
-    for (const x of usuarios) x.grupos = vinc.filter((g) => g.usuario_id === x.id).map((g) => g.grupo_id);
-    return { usuarios };
+    const perfis2fa = srv.doisFatores ? srv.doisFatores.perfisExigidos() : new Set();
+    for (const x of usuarios) {
+      x.grupos = vinc.filter((g) => g.usuario_id === x.id).map((g) => g.grupo_id);
+      x.dois_fatores_exigido = Boolean(x.exigir_2fa) || perfis2fa.has(x.perfil);
+    }
+    return { usuarios, perfis2fa: [...perfis2fa] };
   }, { pode: 'cadastros' });
 
   r('GET', '/api/usuarios/pendentes', async ({ u, query }) => {
@@ -253,8 +257,9 @@ function registrar(srv) {
   r('POST', '/api/usuarios', async ({ u, body, ip }) => {
     const email = V.email(body.email);
     const d = dadosUsuario(u, body);
-    const x = await banco.query('INSERT INTO usuarios (empresa_id, email, nome, perfil, todos_grupos, ativo) VALUES (?, ?, ?, ?, ?, 1)',
-      [d.empresaId, email, d.nome, d.perfil, d.todosGrupos ? 1 : 0]);
+    const exigir2fa = u.perfil === 'master' ? V.booleano(body.exigir2fa, false) : false;
+    const x = await banco.query('INSERT INTO usuarios (empresa_id, email, nome, perfil, todos_grupos, ativo, exigir_2fa) VALUES (?, ?, ?, ?, ?, 1, ?)',
+      [d.empresaId, email, d.nome, d.perfil, d.todosGrupos ? 1 : 0, exigir2fa ? 1 : 0]);
     await gravarGrupos(x.insertId, d.grupos);
     await auditoria.registrar(u, 'criar', { entidade: 'usuario', entidadeId: x.insertId, descricao: `${d.nome} <${email}> (${d.perfil})`, ip, empresaId: d.empresaId });
     // convite: conta no Firebase + e-mail para a pessoa criar a senha
@@ -288,11 +293,15 @@ function registrar(srv) {
     if ((atual.perfil === 'master') !== (d.perfil === 'master')) throw new HttpErro(400, 'Não é possível transformar master em usuário de empresa (ou o contrário). Cadastre outro usuário.');
     const ativo = V.booleano(body.ativo, !!atual.ativo);
     if (id === u.id && (!ativo || d.perfil !== atual.perfil)) throw new HttpErro(400, 'Você não pode desativar nem mudar o perfil do seu próprio usuário.');
-    await banco.query('UPDATE usuarios SET nome = ?, perfil = ?, todos_grupos = ?, ativo = ? WHERE id = ?', [d.nome, d.perfil, d.todosGrupos ? 1 : 0, ativo ? 1 : 0, id]);
+    // exigir a verificação em duas etapas deste usuário: só o master decide (o administrador não mexe)
+    const exigir2fa = u.perfil === 'master' && body.exigir2fa !== undefined ? V.booleano(body.exigir2fa) : !!atual.exigir_2fa;
+    await banco.query('UPDATE usuarios SET nome = ?, perfil = ?, todos_grupos = ?, ativo = ?, exigir_2fa = ? WHERE id = ?', [d.nome, d.perfil, d.todosGrupos ? 1 : 0, ativo ? 1 : 0, exigir2fa ? 1 : 0, id]);
     await gravarGrupos(id, d.grupos);
     acesso.invalidar();
     const acao = !!atual.ativo !== ativo ? (ativo ? 'reativar' : 'desativar') : 'editar';
-    await auditoria.registrar(u, acao, { entidade: 'usuario', entidadeId: id, descricao: `${d.nome} <${atual.email}> (${d.perfil})`, ip, empresaId: atual.empresa_id });
+    const mudou2fa = exigir2fa !== !!atual.exigir_2fa ? (exigir2fa ? ' · passou a exigir a verificação em duas etapas' : ' · deixou de exigir a verificação em duas etapas') : '';
+    if (mudou2fa) srv.revalidarSegundaEtapa();
+    await auditoria.registrar(u, acao, { entidade: 'usuario', entidadeId: id, descricao: `${d.nome} <${atual.email}> (${d.perfil})${mudou2fa}`, ip, empresaId: atual.empresa_id });
     return { ok: true };
   }, { pode: 'cadastros' });
 
@@ -553,8 +562,10 @@ function registrar(srv) {
   r('GET', '/api/configuracoes', async () => ({ configuracoes: config.lista() }), { pode: 'sistema' });
 
   r('PUT', '/api/configuracoes', async ({ u, body, ip }) => {
+    const antes = config.get('dois_fatores_perfis');
     const mudou = await config.salvar(body, u.id);
     if (mudou.includes('aparelhos_nao_cadastrados')) gateway.reavaliar();
+    if (config.get('dois_fatores_perfis') !== antes) srv.revalidarSegundaEtapa();
     await auditoria.registrar(u, 'editar', { entidade: 'configuracoes', descricao: mudou.map((k) => `${k}=${config.get(k)}`).join(', '), ip, empresaId: null });
     return { ok: true, configuracoes: config.lista() };
   }, { pode: 'sistema' });

@@ -45,6 +45,9 @@ function mostrarGate(estado, extra = {}) {
   const icone = (n, cls = '') => `<div class="gate-ico ${cls}">${ico(n)}</div>`;
   const cabecalho = (sub) => `<div class="auth-card-marca">${MARCA_CARTAO}<p id="gate-saudacao">${sub}</p></div>`;
 
+  // verificação em duas etapas (código do aplicativo, cadastro com QR Code, códigos de recuperação)
+  if (String(estado).startsWith('2fa')) { montarSegundaEtapa(box, estado, extra, rodape); return; }
+
   if (estado === 'login' || estado === 'cadastro') {
     const abas = `<div class="login-tabs gate-abas" role="tablist">
       <button class="login-tab${estado === 'login' ? ' active' : ''}" type="button" role="tab" aria-selected="${estado === 'login'}" data-aba="login">Entrar</button>
@@ -269,6 +272,8 @@ async function entrar() {
     if (e.codigo === 'email_nao_verificado') { mostrarGate('verificar', e.message); return; }
     if (e.codigo === 'pendente') { mostrarGate('pendente', { empresa: e.dados && e.dados.empresa }); return; }
     if (e.codigo === 'sem_cadastro') { mostrarGate('completar'); return; }
+    if (e.codigo === 'dois_fatores_cadastro') { mostrarGate('2fa-cadastro', e.dados || {}); return; }
+    if (e.codigo === 'dois_fatores') { mostrarGate('2fa', e.dados || {}); return; }
     if (e.status === 403) { mostrarGate('bloqueado', e.message); return; }
     if (e.status === 401) { await firebase.auth().signOut(); mostrarGate('login', 'Sua sessão expirou. Entre novamente.'); return; }
     mostrarGate('erro', e.message);

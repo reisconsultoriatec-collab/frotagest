@@ -41,6 +41,7 @@ function registrar(srv) {
       id: u.id, nome: u.nome, email: u.email, perfil: u.perfil, perfilNome: u.perfilNome,
       empresaId: u.empresaId, empresaNome: u.empresaNome, todosGrupos: u.todosGrupos, pode: u.pode,
       sessaoMin: config.numeroOuZero('sessao_inatividade_min'),
+      doisFatores: { ativo: u.doisFatoresAtivo, exigido: srv.doisFatores ? srv.doisFatores.exige(u) : false },
     };
   });
 
@@ -52,7 +53,7 @@ function registrar(srv) {
     if (body.motivo === 'inatividade') await auditoria.registrar(u, 'sessao_expirada', { descricao: 'sessão encerrada por falta de uso', ip });
     else await auditoria.registrar(u, 'saida', { descricao: 'saiu do painel', ip });
     return { ok: true };
-  });
+  }, { livre2fa: true });
 
   /* ---------------- frota ao vivo ---------------- */
 

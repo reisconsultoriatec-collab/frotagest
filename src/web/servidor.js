@@ -125,7 +125,7 @@ class Servidor {
 
   /* ---------- rotas da API ---------- */
 
-  /** caminho como '/api/empresas/:id'; opcoes: { publica, pode: 'cadastros' } */
+  /** caminho como '/api/empresas/:id'; opcoes: { publica, conta, pode: 'cadastros', limite, livre2fa } */
   rota(metodo, caminho, handler, opcoes = {}) {
     const nomes = [];
     const re = new RegExp(`^${caminho.replace(/:(\w+)/g, (_, n) => { nomes.push(n); return '([^/]+)'; })}$`);
@@ -326,6 +326,11 @@ class Servidor {
           // sessão encerrada pelo administrador não conta como tentativa inválida (o painel sai sozinho)
           if (e.status === 401 && e.codigo !== 'sessao_encerrada') this.fail(ip);
           throw e;
+        }
+        // verificação em duas etapas: até digitar o código do aplicativo, só as rotas da própria verificação
+        if (!rota.livre2fa && this.doisFatores) {
+          const b = this.doisFatores.bloqueio(u, claims);
+          if (b) throw new HttpErro(403, b.mensagem, b.codigo, { nome: u.nome, email: u.email });
         }
         if (rota.pode && !u.pode[rota.pode]) throw new HttpErro(403, 'Seu perfil não tem acesso a esta função.', 'perfil');
       }
@@ -600,6 +605,16 @@ class Servidor {
       setTimeout(() => { try { c.close(); } catch { /* já fechou */ } }, 300);
     }
     return n;
+  }
+
+  /** A regra das duas etapas mudou: quem ainda não passou pela segunda etapa perde o tempo real na hora
+   * (o painel reconecta e, se precisar, pede o código; quem não precisa nem percebe). */
+  revalidarSegundaEtapa() {
+    if (!this.doisFatores) return;
+    for (const c of this.eventos) {
+      if (!c.sessao || this.doisFatores.sessaoVerificada({ uid: c.sessao.uid, authTime: c.sessao.authTime })) continue;
+      try { c.close(); } catch { /* já fechou */ }
+    }
   }
 
   /* ---------- envio de eventos (cada usuário só recebe o que pode ver) ---------- */

@@ -244,10 +244,18 @@ PAGINAS.usuarios = paginaLista({
     { t: 'Perfil', v: (u) => `${H(NOMES_PERFIL[u.perfil])}${u.perfil === 'operador' || u.perfil === 'visualizador' ? `<span class="sub">${u.todos_grupos ? 'todos os grupos' : `${u.grupos.length} grupo(s)`}</span>` : ''}` },
     { t: 'Empresa', v: (u) => H(u.empresa || 'Reis Tecnologia') },
     { t: 'Último acesso', cls: 'nw', v: (u) => (u.ultimo_acesso ? H(fmtDataHora(u.ultimo_acesso).slice(0, 16)) : `<span class="muted">${u.conta_ligada ? 'nunca entrou' : 'convite pendente'}</span>`) },
+    { t: '2 etapas', cls: 'nw', v: situacao2fa },
     { t: 'Situação', v: (u) => sim(u.ativo) },
   ],
   editar: editarUsuario,
 });
+
+/** Verificação em duas etapas do usuário: ativa, pendente (exigida e ainda não cadastrada) ou não exigida. */
+function situacao2fa(u) {
+  if (u.dois_fatores_ativo) return `<span class="tag ok" title="Ativada em ${H(fmtDataHora(u.totp_ativado_em || '').slice(0, 16))}">${ico('shield-check', 'i-xs')} Ativa</span>`;
+  if (u.dois_fatores_exigido) return '<span class="tag wait" title="Exigida: a pessoa cadastra o aplicativo no próximo acesso">Pendente</span>';
+  return '<span class="muted">—</span>';
+}
 
 let usuariosPendentes = [];
 
@@ -364,11 +372,15 @@ async function editarUsuario(u, aposSalvar) {
       { nome: 'todosGrupos', rotulo: 'Pode ver todos os grupos', tipo: 'check', se: 'perfil=operador|visualizador' },
       { nome: 'grupos', rotulo: 'Grupos liberados', tipo: 'multi', opcoes: grupos.map((x) => ({ v: x.id, t: x.caminho })), se: 'perfil=operador|visualizador&todosGrupos=false', ajuda: 'Inclui os subgrupos de cada grupo marcado.' },
       ...(u && !eu ? [{ nome: 'ativo', rotulo: 'Acesso ativo', tipo: 'check' }] : []),
+      // só o master decide quem precisa da verificação em duas etapas
+      ...(S.eu.perfil === 'master' ? [{ nome: 'exigir2fa', rotulo: 'Exigir verificação em duas etapas (código do celular) deste usuário', tipo: 'check', cheio: true }] : []),
     ],
-    valores: u ? { ...u, todosGrupos: !!u.todos_grupos, ativo: !!u.ativo, grupos: u.grupos } : { perfil: master ? 'master' : 'operador', todosGrupos: true },
-    extras: u && u.ativo ? `<p style="margin:14px 0 0" class="small muted">${u.conta_ligada ? 'Login já criado.' : 'A pessoa ainda não criou a senha.'} <button class="link" type="button" data-convite>${ico('mail', 'i-sm')} Reenviar e-mail para criar/redefinir a senha</button></p>` : '',
+    valores: u ? { ...u, todosGrupos: !!u.todos_grupos, ativo: !!u.ativo, grupos: u.grupos, exigir2fa: !!u.exigir_2fa } : { perfil: master ? 'master' : 'operador', todosGrupos: true, exigir2fa: false },
+    extras: (u && u.ativo ? `<p style="margin:14px 0 0" class="small muted">${u.conta_ligada ? 'Login já criado.' : 'A pessoa ainda não criou a senha.'} <button class="link" type="button" data-convite>${ico('mail', 'i-sm')} Reenviar e-mail para criar/redefinir a senha</button></p>` : '')
+      + (u && S.eu.perfil === 'master' ? blocoUsuario2fa(u) : ''),
     salvar: async (d) => {
       const corpo = { nome: d.nome, perfil: master ? 'master' : d.perfil, todosGrupos: d.todosGrupos, grupos: d.grupos.map(Number), empresaId };
+      if (S.eu.perfil === 'master') corpo.exigir2fa = d.exigir2fa;
       if (!['operador', 'visualizador'].includes(corpo.perfil)) { corpo.todosGrupos = true; corpo.grupos = []; }
       if (u) {
         if (!eu) corpo.ativo = d.ativo;
@@ -383,6 +395,19 @@ async function editarUsuario(u, aposSalvar) {
       aposSalvar && aposSalvar();
     },
   });
+  const zerar = j.el.querySelector('[data-zerar-2fa]');
+  if (zerar) {
+    zerar.addEventListener('click', async () => {
+      const okz = await confirmar(`Zerar a verificação em duas etapas de ${u.nome}? Use quando a pessoa perdeu ou trocou o celular: no próximo acesso ela lê um QR Code novo. Os códigos de recuperação antigos deixam de valer.`, { titulo: 'Zerar verificação em duas etapas', ok: 'Zerar', perigo: true });
+      if (!okz) return;
+      try {
+        await api(`/api/usuarios/${u.id}/2fa/zerar`, { corpo: {} });
+        toast(`Verificação de ${u.nome} zerada: no próximo acesso a pessoa cadastra o aplicativo de novo.`, 'ok');
+        j.fechar();
+        aposSalvar && aposSalvar();
+      } catch (e) { toast(e.message, 'err'); }
+    });
+  }
   const conv = j.el.querySelector('[data-convite]');
   if (conv) {
     conv.addEventListener('click', async () => {
@@ -393,6 +418,18 @@ async function editarUsuario(u, aposSalvar) {
       } catch (e) { toast(e.message, 'err'); } finally { conv.disabled = false; }
     });
   }
+}
+
+/** No formulário do usuário (master): situação da verificação em duas etapas e o botão de zerar. */
+function blocoUsuario2fa(u) {
+  // de onde vem a exigência: marcada neste usuário ou pela regra do perfil (Sistema › Configurações)
+  const porPerfil = u.dois_fatores_exigido && !u.exigir_2fa ? ` Exigida pelo perfil (${H(NOMES_PERFIL[u.perfil] || u.perfil)}) em Sistema › Configurações.` : '';
+  if (u.dois_fatores_ativo) {
+    return `<div class="usr-2fa">${ico('shield-check', 'i-sm')}<span>Verificação em duas etapas <b>ativa</b> desde ${H(fmtDataHora(u.totp_ativado_em || '').slice(0, 10))}.${porPerfil}</span>
+      <button class="link" type="button" data-zerar-2fa>Zerar (perdeu o celular)</button></div>`;
+  }
+  if (u.dois_fatores_exigido) return `<div class="usr-2fa pendente">${ico('shield-lock', 'i-sm')}<span>Exigida: a pessoa cadastra o aplicativo no próximo acesso.${porPerfil}</span></div>`;
+  return '';
 }
 
 /* ---------------- aparelhos (DVR) ---------------- */

@@ -52,6 +52,7 @@ Grupos podem ter subgrupos (ex.: Garagem › Linha 10); liberar um grupo libera 
 | `alertas` | Alarmes do DVR e das cercas (início, fim, gravidade) e o tratamento (quem, quando, o quê) | 365 dias |
 | `cercas` | Garagens, pontos/terminais e áreas desenhados no mapa (círculo ou área livre) e os avisos de cada uma | sempre |
 | `sessoes_encerradas` | Logins encerrados por um administrador em “Usuários online” (só aquele aparelho) | 90 dias |
+| `codigos_recuperacao`, `sessoes_2fa` | Verificação em duas etapas: códigos de recuperação (só o resumo SHA-256) e os logins que já passaram pela segunda etapa | até zerar / 90 dias |
 | `eventos_aparelho`, `comandos` | Comunicações: conexões/desconexões e comandos enviados com a resposta | 180 dias |
 | `auditoria` | Acessos, cadastros, câmeras abertas, gravações vistas e baixadas, relatórios exportados, tratamento de alertas | 730 dias (mínimo 180) |
 
@@ -89,7 +90,19 @@ Os relatórios de garagem e de cercas são calculados pelas posições guardadas
 - **Modo TV** (Operação › Modo TV): tela para o monitor da parede da central, sempre escura, sem menu. Mapa grande, frota agora (em movimento, parados, offline, com alerta), garagens com quantos veículos estão dentro e os alertas pendentes; alerta novo faz a tela piscar (vermelho se for grave). Troca sozinha entre toda a frota e os grupos (a cada 30 s a 5 min, ou parado), tecla F para tela cheia e ← → para trocar o grupo. No modo TV a sessão não encerra por falta de uso e a tela não apaga (nos navegadores que permitem).
 - **Usuários online** (Controle, para administrador e master): quem está com o painel aberto, desde quando, de qual aparelho e navegador, em qual tela e há quanto tempo não mexe. **Encerrar** desconecta só aquele aparelho (a pessoa entra de novo com a senha; as outras sessões dela continuam) e fica na auditoria. O administrador vê só a própria empresa e não vê nem encerra o master. Para bloquear de vez, desative o usuário.
 
-## 3.4 Sessão e avisos
+## 3.4 Verificação em duas etapas (Google Authenticator)
+
+Feita no próprio FrotaGest: o Firebase continua só com o e-mail e a senha, **não muda nada no projeto do Firebase e não tem custo** (não usa o Identity Platform nem SMS).
+
+- **Quem ativa é o master**: em **Sistema › Configurações › Segurança**, marca para quais perfis é obrigatória (master, administradores, operadores, visualizadores) e, em **Cadastros › Usuários**, pode exigir de uma pessoa específica. O administrador da empresa não muda essa regra.
+- **No próximo acesso** a pessoa lê um QR Code com o Google Authenticator (ou Microsoft Authenticator, Authy), digita o primeiro código e recebe **10 códigos de recuperação** (cada um vale uma vez; dá para copiar ou baixar em .txt). Depois disso, a cada login pede o código de 6 dígitos.
+- Cada login (aparelho/navegador) passa uma vez pela segunda etapa e não pede de novo até sair ou a sessão encerrar. Enquanto o código não é confirmado, nada do painel é liberado (nem mapa, nem vídeo, nem tempo real). Ligar a regra vale na hora, também para quem já está conectado.
+- O mesmo código não vale duas vezes e 6 códigos errados seguidos bloqueiam por 10 minutos. Tudo fica na auditoria.
+- **Perdeu o celular:** entra com um código de recuperação, ou o master abre o usuário e clica em **Zerar** (a pessoa lê um QR Code novo no próximo acesso).
+- **Se o próprio master perder o celular e os códigos**, no servidor: `cd ~/frotagest && node tools/zerar-2fa.js email@do.master && pm2 restart frotagest`.
+- A chave de cada pessoa fica cifrada no banco; a chave da cifra fica em `data/chave-2fa.key` (criada sozinha, fora do banco e do GitHub). **Guarde esse arquivo junto com o backup do banco:** sem ele, quem usa duas etapas precisa ser zerado.
+
+## 3.5 Sessão e avisos
 
 - **Sessão encerrada por falta de uso** depois do tempo de **Sistema › Configurações › Segurança** (padrão 60 min; 0 = nunca, só para telas de central/TV). Um minuto antes aparece “Você ainda está aí?”. Vale também se a janela foi fechada sem clicar em Sair.
 - **Tema claro ou escuro:** botão da lua/sol no topo; a escolha fica no navegador (sem escolha, segue o tema do sistema). No escuro, o mapa de ruas também escurece; o satélite fica como está.

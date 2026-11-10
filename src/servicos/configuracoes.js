@@ -12,6 +12,8 @@ const CHAVES = {
   retencao_alertas_dias: { padrao: '365', min: 30, max: 3650, titulo: 'Guardar alertas por (dias)' },
   retencao_auditoria_dias: { padrao: '730', min: 180, max: 3650, titulo: 'Guardar auditoria por (dias)' },
   sessao_inatividade_min: { padrao: '60', min: 0, max: 1440, titulo: 'Encerrar a sessão sem uso após (minutos)' },
+  // perfis que precisam da verificação em duas etapas (vazio = ninguém, além de quem o master marcar no usuário)
+  dois_fatores_perfis: { padrao: '', lista: ['master', 'admin', 'operador', 'visualizador'], titulo: 'Verificação em duas etapas obrigatória para' },
 };
 
 class Configuracoes {
@@ -47,6 +49,11 @@ class Configuracoes {
     const d = CHAVES[chave];
     if (!d) throw new HttpErro(400, `Configuração desconhecida: ${chave}`);
     const v = String(valor ?? '').trim();
+    if (d.lista) {
+      const itens = [...new Set(v.split(',').map((x) => x.trim()).filter(Boolean))];
+      if (itens.some((x) => !d.lista.includes(x))) throw new HttpErro(400, `${d.titulo}: valor inválido.`);
+      return d.lista.filter((x) => itens.includes(x)).join(',');
+    }
     if (d.opcoes) {
       if (!d.opcoes.includes(v)) throw new HttpErro(400, `${d.titulo}: valor inválido.`);
       return v;

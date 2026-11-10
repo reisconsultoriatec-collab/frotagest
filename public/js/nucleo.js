@@ -10,7 +10,8 @@ const WS_PROTO = location.protocol === 'https:' ? 'wss' : 'ws';
    ico('clock') ico('gauge') ico('route') ico('map-pin') ico('wifi') ico('bus') ico('plug-connected-x') ico('alert-triangle')
    ico('user-plus') ico('user-check') ico('clock-pause') ico('mail') ico('refresh') ico('key') ico('copy')
    ico('volume-off') ico('volume') ico('sun') ico('moon') ico('antenna-bars-2') ico('camera-off') ico('device-sd-card') ico('gps') ico('plug-x') ico('wifi-off') ico('cpu') ico('wifi') ico('video') ico('check') ico('download') ico('alert-triangle') ico('bell-ringing')
-   ico('building-warehouse') ico('map-pin') ico('shape') ico('ban') ico('device-mobile') ico('device-desktop') ico('device-tv') ico('arrows-minimize') */
+   ico('building-warehouse') ico('map-pin') ico('shape') ico('ban') ico('device-mobile') ico('device-desktop') ico('device-tv') ico('arrows-minimize')
+   ico('shield-lock') ico('shield-check') ico('lifebuoy') ico('device-mobile') ico('file-download') ico('copy') ico('login-2') */
 
 /** Estado do painel. */
 const S = {
@@ -127,6 +128,8 @@ async function api(caminho, { metodo, corpo, headers } = {}) {
   let j = {};
   try { j = await r.json(); } catch { /* sem corpo */ }
   if (r.status === 401 && j.codigo === 'sessao_encerrada') sessaoEncerradaPorAdmin();
+  // o master passou a exigir a verificação em duas etapas (ou zerou o cadastro) com o painel aberto
+  if (r.status === 403 && (j.codigo === 'dois_fatores' || j.codigo === 'dois_fatores_cadastro')) pedirSegundaEtapa(j);
   if (!r.ok) throw Object.assign(new Error(j.erro || `Erro ${r.status}`), { status: r.status, codigo: j.codigo, dados: j });
   return j;
 }
@@ -528,9 +531,9 @@ function formulario({ titulo, icone, campos, valores = {}, salvar, textoSalvar =
       case 'check': return `<label class="field field-check${c.cheio ? ' full' : ''}"${se}><input type="checkbox" name="${c.nome}" ${v(c.nome) === true || v(c.nome) === 1 ? 'checked' : ''}${dis}> ${H(c.rotulo)}</label>`;
       case 'select': {
         const ops = (c.opcoes || []).map((o) => `<option value="${H(o.v)}" ${String(o.v) === String(v(c.nome)) ? 'selected' : ''}>${H(o.t)}</option>`).join('');
-        return `<label class="${cls}"${se}>${H(c.rotulo)}${req}<select name="${c.nome}" id="${id}"${dis}>${ops}</select>${ajuda}</label>`;
+        return `<label class="${cls}"${se}><span>${H(c.rotulo)}${req}</span><select name="${c.nome}" id="${id}"${dis}>${ops}</select>${ajuda}</label>`;
       }
-      case 'textarea': return `<label class="${cls}"${se}>${H(c.rotulo)}${req}<textarea name="${c.nome}" id="${id}" maxlength="${c.max || 500}"${dis}>${H(v(c.nome))}</textarea>${ajuda}</label>`;
+      case 'textarea': return `<label class="${cls}"${se}><span>${H(c.rotulo)}${req}</span><textarea name="${c.nome}" id="${id}" maxlength="${c.max || 500}"${dis}>${H(v(c.nome))}</textarea>${ajuda}</label>`;
       case 'multi': {
         const sel = new Set((valores[c.nome] || []).map(String));
         const ops = (c.opcoes || []).map((o) => `<label><input type="checkbox" name="${c.nome}" value="${H(o.v)}" ${sel.has(String(o.v)) ? 'checked' : ''}> ${H(o.t)}</label>`).join('') || '<span class="none">Nenhuma opção cadastrada.</span>';
@@ -545,7 +548,7 @@ function formulario({ titulo, icone, campos, valores = {}, salvar, textoSalvar =
       default: {
         const tipo = { email: 'email', numero: 'number', senha: 'password', data: 'datetime-local' }[c.tipo] || 'text';
         const extra = [c.min !== undefined ? `min="${c.min}"` : '', c.max !== undefined && c.tipo === 'numero' ? `max="${c.max}"` : '', c.maxlength ? `maxlength="${c.maxlength}"` : '', c.placeholder ? `placeholder="${H(c.placeholder)}"` : ''].join(' ');
-        return `<label class="${cls}"${se}>${H(c.rotulo)}${req}<input type="${tipo}" name="${c.nome}" id="${id}" value="${H(v(c.nome))}" ${extra}${dis}${c.tipo === 'email' ? ' autocomplete="off"' : ''}>${ajuda}</label>`;
+        return `<label class="${cls}"${se}><span>${H(c.rotulo)}${req}</span><input type="${tipo}" name="${c.nome}" id="${id}" value="${H(v(c.nome))}" ${extra}${dis}${c.tipo === 'email' ? ' autocomplete="off"' : ''}>${ajuda}</label>`;
       }
     }
   }).join('');

@@ -147,6 +147,8 @@ class Acesso {
       todosGrupos: todos,
       grupos,
       pode: PERFIS[row.perfil],
+      doisFatoresAtivo: Boolean(row.totp_segredo), // aplicativo autenticador já cadastrado
+      exigir2fa: Boolean(row.exigir_2fa), // o master exige deste usuário (além da regra por perfil)
     };
   }
 

@@ -877,3 +877,12 @@ body.modo-tv .content { padding: 0; }
   .tv-mapa { height: 55vh; }
   .tv-lado { border-left: 0; border-top: 1px solid var(--tv-line); overflow: visible; }
 }
+
+/* ---------- verificação em duas etapas (cadastros e configurações) ---------- */
+.tag .i-xs { vertical-align: -2px; margin-right: 2px; }
+.usr-2fa { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: var(--ok-50); color: var(--ok-700); font-size: 13px; }
+.usr-2fa span { flex: 1; min-width: 200px; }
+.usr-2fa .link { color: var(--err); }
+.usr-2fa.pendente { background: var(--amber-50); color: var(--amber-ink); }
+.cf-2fa-perfis { display: flex; flex-wrap: wrap; gap: 8px 22px; margin: 4px 0 2px; }
+.cf-2fa-perfis .field-check { padding-top: 0; }

@@ -25,6 +25,7 @@ const { Auditoria } = require('./src/servicos/auditoria');
 const { Retencao } = require('./src/servicos/retencao');
 const { Firebase } = require('./src/auth/firebase');
 const { Acesso } = require('./src/auth/acesso');
+const { DoisFatores } = require('./src/auth/dois-fatores');
 const { Servidor } = require('./src/web/servidor');
 const apiCadastros = require('./src/web/api-cadastros');
 const apiOperacao = require('./src/web/api-operacao');
@@ -33,6 +34,7 @@ const apiRelatorios = require('./src/web/api-relatorios');
 const apiSaude = require('./src/web/api-saude');
 const apiCercas = require('./src/web/api-cercas');
 const apiOnline = require('./src/web/api-online');
+const apiDoisFatores = require('./src/web/api-2fa');
 const { Relatorios } = require('./src/relatorios/relatorios');
 const { definirFuso, gerarCodigo } = require('./src/util/comum');
 const { version } = require('./package.json');
@@ -182,10 +184,12 @@ async function main() {
   const firebase = new Firebase(cfg.firebase, fbOpcoes);
   const acesso = new Acesso({ banco, firebase, frota, proprietarios: cfg.proprietarios, log: (level, text) => log(level, text) });
   await acesso.carregarEncerradas();
+  const doisFatores = new DoisFatores({ banco, config, dados: DATA, log: (level, text) => log(level, text) });
+  await doisFatores.carregar();
 
   srv = new Servidor({
     cfg: cfg.web, versao: version, gateway, media, mediaCfg: cfg.media, recorder, transcoders, frota, historico, monitor, acesso,
-    firebase, banco, config, auditoria, retencao, logs: ring, mensagens, iniciadoEm: Date.now(), cercas,
+    firebase, banco, config, auditoria, retencao, logs: ring, mensagens, iniciadoEm: Date.now(), cercas, doisFatores,
     relatorios: new Relatorios({ banco, frota, acesso, cercas }),
   });
   apiOperacao.registrar(srv);
@@ -195,6 +199,7 @@ async function main() {
   apiSaude.registrar(srv);
   apiCercas.registrar(srv);
   apiOnline.registrar(srv);
+  apiDoisFatores.registrar(srv);
   srv.onLog = (e) => log(e.level, e.text, { source: 'painel' });
 
   // atualizações do mapa: junta várias posições do mesmo aparelho (ex.: lote de área sem sinal) num envio só

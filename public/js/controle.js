@@ -11,7 +11,9 @@ const NOMES_ACAO = {
   baixar_gravacao: 'Baixou gravação', salvar_gravacao: 'Salvou gravação', limpeza: 'Limpeza do histórico',
   cadastro: 'Criou a conta', cadastro_recusado: 'Código de empresa inválido', aprovar: 'Aprovou cadastro', recusar: 'Recusou cadastro',
   novo_codigo: 'Gerou código de cadastro', falha_login: 'Senha errada', ver_ao_vivo: 'Abriu câmera ao vivo',
-  exportar_relatorio: 'Exportou relatório', sessao_expirada: 'Sessão encerrada por inatividade',
+  exportar_relatorio: 'Exportou relatório', sessao_expirada: 'Sessão encerrada por inatividade', encerrar_sessao: 'Encerrou sessão de outro usuário',
+  '2fa_ativada': 'Ativou a verificação em 2 etapas', '2fa_falha': 'Código de 2 etapas errado', '2fa_recuperacao': 'Entrou com código de recuperação',
+  '2fa_zerada': 'Zerou a verificação em 2 etapas',
 };
 const NOMES_ENTIDADE = {
   empresa: 'Empresa', usuario: 'Usuário', grupo: 'Grupo', veiculo: 'Veículo', aparelho: 'Aparelho', aparelho_pendente: 'Aparelho pendente',
@@ -375,12 +377,28 @@ PAGINAS.sistema = (() => {
         <div class="form-sep">Segurança</div>
         ${num('sessao_inatividade_min')}
         <div class="field full"><small>Depois desse tempo sem mexer no painel, a pessoa precisa entrar de novo (um minuto antes aparece um aviso para continuar). Vale também se a janela foi fechada sem clicar em Sair. Use 0 só em telas de central ou TV que precisam ficar sempre abertas.</small></div>
+        <div class="field full cf-2fa">${H(c.dois_fatores_perfis.titulo)}
+          <input type="hidden" name="dois_fatores_perfis">
+          <div class="cf-2fa-perfis">${[['master', 'Master (Reis Tecnologia)'], ['admin', 'Administradores das empresas'], ['operador', 'Operadores'], ['visualizador', 'Visualizadores']]
+            .map(([v, t]) => `<label class="field-check"><input type="checkbox" data-2fa="${v}"> ${H(t)}</label>`).join('')}</div>
+          <small>Quem estiver marcado precisa de um aplicativo autenticador no celular (Google Authenticator, Microsoft Authenticator ou Authy). No próximo acesso, cada pessoa lê um QR Code e passa a digitar o código de 6 dígitos ao entrar. Funciona só no FrotaGest: não muda nada no Firebase e não tem custo. Para exigir de uma pessoa específica, abra o usuário em Cadastros › Usuários.</small>
+          <div class="form-aviso" id="cf-2fa-voce" hidden style="margin:6px 0 0">Você também vai precisar ativar: ao salvar, o FrotaGest pede para ler o QR Code com o seu celular.</div>
+        </div>
       </div>
       <p class="form-erro" hidden></p>
       <div style="margin-top:16px"><button class="btn btn-primary" type="submit">${ico('check', 'i-sm')} Salvar configurações</button></div>
     </form>`;
     const form = $('#cf-form');
     form.aparelhos_nao_cadastrados.value = c.aparelhos_nao_cadastrados.valor;
+    const perfis2fa = new Set(String(c.dois_fatores_perfis.valor || '').split(',').filter(Boolean));
+    $$('[data-2fa]', form).forEach((x) => { x.checked = perfis2fa.has(x.dataset['2fa']); });
+    const sincronizar2fa = () => {
+      form.dois_fatores_perfis.value = $$('[data-2fa]:checked', form).map((x) => x.dataset['2fa']).join(',');
+      // o master está entrando na regra agora e ainda não tem o aplicativo
+      $('#cf-2fa-voce').hidden = !(S.eu.perfil === 'master' && form.dois_fatores_perfis.value.split(',').includes('master') && !(S.eu.doisFatores && S.eu.doisFatores.ativo));
+    };
+    $$('[data-2fa]', form).forEach((x) => x.addEventListener('change', sincronizar2fa));
+    sincronizar2fa();
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const erro = form.querySelector('.form-erro');
