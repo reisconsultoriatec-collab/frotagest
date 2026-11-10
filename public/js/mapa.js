@@ -112,8 +112,8 @@ PAGINAS.mapa = (() => {
           <div class="fleet-list" id="f-lista"></div>
         </section>
         <section class="card map-card" id="map-card">
-          <div id="map"></div>
-          <div class="legend-map"><span><i style="background:var(--ok)"></i>Em movimento</span><span><i style="background:var(--info)"></i>Parado</span><span><i style="background:#64748B"></i>Offline</span><span><i style="background:var(--err)"></i>Alerta</span></div>
+          <div class="map-area"><div id="map"></div>
+            <div class="legend-map"><span><i style="background:var(--ok)"></i>Em movimento</span><span><i style="background:var(--info)"></i>Parado</span><span><i style="background:#64748B"></i>Offline</span><span><i style="background:var(--err)"></i>Alerta</span></div></div>
           <div class="card map-detail" id="detalhe" hidden></div>
         </section>
       </div>
@@ -142,7 +142,10 @@ PAGINAS.mapa = (() => {
     $('#f-grupo').addEventListener('change', (e) => { filtros.grupo = e.target.value; desenharTudo(); });
     $('#f-lista').addEventListener('click', (e) => {
       const b = e.target.closest('[data-k]');
-      if (b) selecionar(b.dataset.k, true);
+      if (!b) return;
+      selecionar(b.dataset.k, true);
+      // celular: a lista fica acima do mapa; leva até o mapa (o detalhe e as câmeras ficam logo abaixo dele)
+      if (telaEstreita()) $('#map-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
 
     mosaico = new Mosaico($('#cams-tiles'), atualizarCams);
@@ -589,8 +592,10 @@ PAGINAS.mapa = (() => {
   function abrirCanal(i, ch) {
     const nome = (i.nomesCanais && i.nomesCanais[ch - 1]) || `CH ${ch}`;
     if (!mosaico.aberto(i.ident, ch) && mosaico.tamanho >= 9) { toast('Feche alguma câmera antes de abrir outra (máximo de 9 ao mesmo tempo).'); return; }
-    mosaico.alternar({ ident: i.ident, canal: ch, titulo: `${rotuloCurto(i)} · ${nome}`, fluxo: pref('fluxo', 1), conv: pref('conv', '1') });
+    const abriu = mosaico.alternar({ ident: i.ident, canal: ch, titulo: `${rotuloCurto(i)} · ${nome}`, fluxo: pref('fluxo', 1), conv: pref('conv', '1') });
     desenharDetalhe();
+    // celular: as câmeras abrem abaixo do mapa e do detalhe, fora da tela; leva até elas
+    if (abriu && telaEstreita()) setTimeout(() => { const c = $('#cams'); if (c && !c.hidden) c.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 80);
   }
 
   function atualizarCams() {

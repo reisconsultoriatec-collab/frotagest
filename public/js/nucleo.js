@@ -370,6 +370,9 @@ const NAV = [
   },
 ];
 
+/** Celular ou tablet em pé: o mapa e o painel de detalhes ficam um embaixo do outro. */
+const telaEstreita = () => window.matchMedia('(max-width: 1080px)').matches;
+
 /** Controle de acesso: a pessoa entra nesta tela (e pode fazer esta ação)? O master pode tudo. */
 function podeTela(tela, acao = 'ver') {
   if (!S.eu) return false;

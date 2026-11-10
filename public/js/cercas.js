@@ -80,9 +80,9 @@ PAGINAS.cercas = (() => {
       <div class="mon cer">
         <section class="card fleet" id="ce-painel"></section>
         <section class="card map-card" id="ce-mapcard">
-          <div id="ce-map"></div>
-          <div class="ce-dica" id="ce-dica" hidden></div>
-          <div class="legend-map">${Object.values(FINALIDADES_CERCA).map((x) => `<span><i style="background:${x.cor}"></i>${H(x.nome)}</span>`).join('')}</div>
+          <div class="map-area"><div id="ce-map"></div>
+            <div class="ce-dica" id="ce-dica" hidden></div>
+            <div class="legend-map">${Object.values(FINALIDADES_CERCA).map((x) => `<span><i style="background:${x.cor}"></i>${H(x.nome)}</span>`).join('')}</div></div>
           <div class="card map-detail" id="ce-det" hidden></div>
         </section>
       </div>`;
