@@ -11,16 +11,16 @@ PAGINAS.inicio = (() => {
       <div class="page">
         <div class="kpis k5" id="ini-kpis"></div>
         <div class="grid-2">
-          <section class="card">
+          ${podeTela('alertas') ? `<section class="card">
             <div class="card-head"><h2>${ico('bell-ringing')} Alertas pendentes</h2><button class="link" type="button" data-ir="alertas">Ver todos ${ico('chevron-right', 'i-sm')}</button></div>
             <div class="list" id="ini-alertas"><div class="list-empty">Carregando…</div></div>
-          </section>
+          </section>` : ''}
           <section class="card">
-            <div class="card-head"><h2>${ico('plug-connected-x')} Sem comunicação há mais tempo</h2><button class="link" type="button" data-ir="mapa">Abrir mapa ${ico('chevron-right', 'i-sm')}</button></div>
+            <div class="card-head"><h2>${ico('plug-connected-x')} Sem comunicação há mais tempo</h2>${podeTela('mapa') ? `<button class="link" type="button" data-ir="mapa">Abrir mapa ${ico('chevron-right', 'i-sm')}</button>` : ''}</div>
             <div class="list" id="ini-offline"></div>
           </section>
         </div>
-        ${S.eu.pode.cadastros ? '<section class="card" id="ini-cad" hidden></section><section class="card" id="ini-saude" hidden></section>' : ''}
+        ${podeTela('usuarios') ? '<section class="card" id="ini-cad" hidden></section>' : ''}${podeTela('saude') ? '<section class="card" id="ini-saude" hidden></section>' : ''}
         ${S.eu.perfil === 'master' ? '<section class="card" id="ini-pend" hidden></section>' : ''}
       </div>`;
     c.querySelector('.page').addEventListener('click', (e) => {
@@ -48,6 +48,7 @@ PAGINAS.inicio = (() => {
   }
 
   async function carregarAlertas() {
+    if (!podeTela('alertas')) return;
     try {
       const r = await api(`/api/alertas?${qs({ situacao: 'pendentes', limite: 8, empresa: S.empresa })}`);
       alertas = r.alertas;
@@ -72,12 +73,16 @@ PAGINAS.inicio = (() => {
     const mov = on.filter((i) => i.posicao && i.posicao.vel > 3);
     const off = comAp.length - on.length;
     const comAlerta = l.filter((i) => i.alertas.length).length;
+    // os cartões só levam para as telas que a pessoa tem no Controle de acesso
+    const mapa = podeTela('mapa') ? ['mapa'] : null;
     box.innerHTML = [
-      kpi('k-total', 'neutral', 'bus', 'Veículos', fmtNum(l.length), `${comAp.length} com aparelho instalado`, ['mapa']),
-      kpi('k-on', 'ok', 'wifi', 'Online agora', fmtNum(on.length), comAp.length ? `${Math.round((on.length / comAp.length) * 100)}% da frota` : 'nenhum aparelho', ['mapa']),
-      kpi('k-mov', 'ok', 'steering-wheel', 'Em movimento', fmtNum(mov.length), `${on.length - mov.length} parados com aparelho online`, ['mapa']),
-      kpi('k-off', off ? 'err' : 'neutral', 'plug-connected-x', 'Offline', fmtNum(off), 'sem conexão com o servidor', ['mapa']),
-      kpi('k-alertas', S.alertas.pendentes ? 'warn' : 'neutral', 'alert-triangle', 'Alertas pendentes', fmtNum(S.alertas.pendentes), `${comAlerta} veículo(s) com alarme ativo`, ['alertas']),
+      kpi('k-total', 'neutral', 'bus', 'Veículos', fmtNum(l.length), `${comAp.length} com aparelho instalado`, mapa),
+      kpi('k-on', 'ok', 'wifi', 'Online agora', fmtNum(on.length), comAp.length ? `${Math.round((on.length / comAp.length) * 100)}% da frota` : 'nenhum aparelho', mapa),
+      kpi('k-mov', 'ok', 'steering-wheel', 'Em movimento', fmtNum(mov.length), `${on.length - mov.length} parados com aparelho online`, mapa),
+      kpi('k-off', off ? 'err' : 'neutral', 'plug-connected-x', 'Offline', fmtNum(off), 'sem conexão com o servidor', mapa),
+      podeTela('alertas')
+        ? kpi('k-alertas', S.alertas.pendentes ? 'warn' : 'neutral', 'alert-triangle', 'Alertas pendentes', fmtNum(S.alertas.pendentes), `${comAlerta} veículo(s) com alarme ativo`, ['alertas'])
+        : kpi('k-alertas', comAlerta ? 'warn' : 'neutral', 'alert-triangle', 'Com alarme ativo', fmtNum(comAlerta), 'veículo(s) com alarme agora', mapa),
     ].join('');
   }
 
@@ -104,7 +109,7 @@ PAGINAS.inicio = (() => {
     box.innerHTML = off.map((i) => `<div class="list-item"><div class="list-ico" style="background:var(--fundo-suave);color:var(--ink-2)">${ico('plug-connected-x')}</div>
       <div class="list-main"><div class="list-title">${H(rotulo(i))}</div>
         <div class="list-sub">${i.ultimoContato ? `Último contato ${H(atras(i.ultimoContato))} (${H(fmtDataHora(i.ultimoContato))})` : 'Nunca conectou'}</div></div>
-      <button class="link" type="button" data-veiculo="${H(i.chave)}">Ver ${ico('chevron-right', 'i-sm')}</button></div>`).join('');
+      ${podeTela('mapa') ? `<button class="link" type="button" data-veiculo="${H(i.chave)}">Ver ${ico('chevron-right', 'i-sm')}</button>` : ''}</div>`).join('');
   }
 
   function desenharPendentes() {

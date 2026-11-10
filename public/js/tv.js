@@ -43,7 +43,7 @@ PAGINAS.tv = (() => {
           <aside class="tv-lado">
             <div class="tv-bloco"><h3>Frota agora</h3><div class="tv-kpis" id="tv-kpis"></div></div>
             <div class="tv-bloco" id="tv-gar-bloco" hidden><h3>Garagens <small>veículos dentro</small></h3><div class="tv-gar" id="tv-gar"></div></div>
-            <div class="tv-bloco tv-al-bloco"><h3>Alertas pendentes <span class="tv-al-n" id="tv-al-n"></span></h3><div class="tv-al" id="tv-al"></div></div>
+            <div class="tv-bloco tv-al-bloco" ${podeTela('alertas') ? '' : 'hidden'}><h3>Alertas pendentes <span class="tv-al-n" id="tv-al-n"></span></h3><div class="tv-al" id="tv-al"></div></div>
           </aside>
         </div>
       </div>`;
@@ -268,6 +268,7 @@ PAGINAS.tv = (() => {
   /* ---------- alertas ---------- */
 
   async function carregarAlertas() {
+    if (!podeTela('alertas')) return; // sem o menu Alertas no Controle de acesso, a TV mostra só a frota
     try {
       const r = await api(`/api/alertas?${qs({ situacao: 'pendentes', limite: 12, empresa: S.empresa })}`);
       const box = $('#tv-al');

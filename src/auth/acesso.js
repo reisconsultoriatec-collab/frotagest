@@ -7,15 +7,21 @@
  *  - admin        administra a própria empresa: usuários, grupos e veículos; vê toda a frota dela.
  *  - operador     mapa, vídeo ao vivo, gravações do DVR e tratamento de alertas (nos grupos liberados).
  *  - visualizador mapa, vídeo ao vivo, histórico e alertas, sem gravações nem tratamento.
+ * O perfil decide a empresa e os grupos que a pessoa enxerga; os menus e as ações (ver, incluir,
+ * alterar, excluir) partem do padrão do perfil e podem ser personalizados por usuário no
+ * Controle de acesso (permissoes.js).
  * Reis Tecnologia
  */
 const { HttpErro, agora } = require('../util/comum');
+const permissoes = require('./permissoes');
 
+/* O que cada perfil faz por padrão está em permissoes.js (PADRAO); o master pode personalizar
+ * por usuário no menu Controle de acesso. Aqui ficam só os nomes. */
 const PERFIS = {
-  master: { nome: 'Master (Reis Tecnologia)', video: true, gravacoes: true, tratarAlertas: true, cadastros: true, auditoria: true, sistema: true },
-  admin: { nome: 'Administrador da empresa', video: true, gravacoes: true, tratarAlertas: true, cadastros: true, auditoria: true, sistema: false },
-  operador: { nome: 'Operador', video: true, gravacoes: true, tratarAlertas: true, cadastros: false, auditoria: false, sistema: false },
-  visualizador: { nome: 'Visualizador', video: true, gravacoes: false, tratarAlertas: false, cadastros: false, auditoria: false, sistema: false },
+  master: { nome: 'Master (Reis Tecnologia)' },
+  admin: { nome: 'Administrador da empresa' },
+  operador: { nome: 'Operador' },
+  visualizador: { nome: 'Visualizador' },
 };
 
 const CACHE_MS = 30000;
@@ -130,6 +136,7 @@ class Acesso {
       empresaNome = emp.nome;
     }
     const todos = Boolean(row.todos_grupos) || row.perfil === 'master' || row.perfil === 'admin';
+    const acessos = permissoes.efetivo(row.perfil, row.acessos);
     const grupos = new Set();
     if (!todos) {
       const gs = await this.banco.query('SELECT grupo_id FROM usuario_grupos WHERE usuario_id = ?', [row.id]);
@@ -146,7 +153,9 @@ class Acesso {
       empresaNome,
       todosGrupos: todos,
       grupos,
-      pode: PERFIS[row.perfil],
+      acessos, // { tela: [ver, incluir, alterar, excluir] } — menus e ações liberados
+      acessoPersonalizado: row.perfil !== 'master' && permissoes.ler(row.acessos) !== null,
+      pode: permissoes.capacidades(row.perfil, acessos),
       doisFatoresAtivo: Boolean(row.totp_segredo), // aplicativo autenticador já cadastrado
       exigir2fa: Boolean(row.exigir_2fa), // o master exige deste usuário (além da regra por perfil)
     };
@@ -201,10 +210,47 @@ function exigir(u, capacidade) {
   if (!u || !u.pode[capacidade]) throw new HttpErro(403, 'Seu perfil não tem acesso a esta função.', 'perfil');
 }
 
+/** Pode entrar na tela (e fazer a ação)? O master pode tudo. */
+function permite(u, tela, acao = 'ver') {
+  if (!u) return false;
+  if (u.perfil === 'master') return true;
+  return permissoes.permite(u.acessos, tela, acao);
+}
+
+/** 'tela.acao' ou uma lista delas (basta uma). */
+function permiteAlgum(u, regra) {
+  const lista = Array.isArray(regra) ? regra : [regra];
+  return lista.some((r) => { const [t, a] = String(r).split('.'); return permite(u, t, a || 'ver'); });
+}
+
+/** Só enxerga alguns grupos (não é master e não tem "todos os grupos")? */
+const limitado = (u) => u.perfil !== 'master' && !u.todosGrupos;
+/** Master e administrador da empresa: os únicos que mexem em administradores. */
+const gerente = (u) => u.perfil === 'master' || u.perfil === 'admin';
+
+/**
+ * Quem edita (u) pode cuidar deste usuário (alvo: linha de usuarios + grupos[])?
+ * Master: todos. Os demais: só da própria empresa (quem chama confere), nunca o master,
+ * administrador só por administrador, e quem só enxerga alguns grupos só cuida de quem
+ * está inteiramente dentro deles.
+ */
+function alcanca(u, alvo) {
+  if (u.perfil === 'master') return true;
+  if (alvo.perfil === 'master' || alvo.empresa_id !== u.empresaId) return false;
+  if (alvo.pendente) return true;
+  if (alvo.perfil === 'admin' && !gerente(u)) return false;
+  if (!limitado(u)) return true;
+  return !alvo.todos_grupos && alvo.perfil !== 'admin' && (alvo.grupos || []).length > 0 && alvo.grupos.every((g) => u.grupos.has(g));
+}
+
+function exigirAcesso(u, regra) {
+  if (!permiteAlgum(u, regra)) throw new HttpErro(403, 'Você não tem acesso a esta função. Fale com o administrador do sistema.', 'sem_acesso');
+}
+
 /** Empresa em que a operação acontece: o master escolhe (ou todas = null); os demais, sempre a própria. */
 function empresaAlvo(u, pedida) {
   if (u.perfil === 'master') return pedida || null;
   return u.empresaId;
 }
 
-module.exports = { Acesso, PERFIS, exigir, empresaAlvo };
+module.exports = { Acesso, PERFIS, exigir, permite, permiteAlgum, exigirAcesso, empresaAlvo, limitado, gerente, alcanca };

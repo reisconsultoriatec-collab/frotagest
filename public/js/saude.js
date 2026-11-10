@@ -154,7 +154,8 @@ PAGINAS.saude = (() => {
       { t: 'Problemas', v: (a) => (a.problemas.length ? `<div class="sa-probs">${a.problemas.map((p) => `<span class="tag ${p.gravidade}" title="${H([p.nome, p.detalhe, p.desde ? `desde ${fmtDataHora(p.desde)}` : ''].filter(Boolean).join(' · '))}">${ico(ICONE_TIPO[p.tipo] || 'alert-triangle', 'i-xs')} ${H(p.nome)}${p.detalhe ? ` <small>${H(p.detalhe)}</small>` : ''}</span>`).join('')}</div>` : '<span class="tag ok">OK</span>') },
       { t: 'Última posição', cls: 'nw', v: (a) => (a.ultimaPosicao ? `${H(atras(a.ultimaPosicao))}<div class="small muted">${a.gps === false ? 'GPS sem sinal' : a.satelites !== null && a.satelites !== undefined ? `${a.satelites} satélite(s)` : ''}</div>` : '<span class="muted">—</span>') },
       { t: 'Sinal', v: sinal },
-      { t: '', cls: 'nw', v: (a) => `<div class="sa-acoes"><button class="btn btn-sm" type="button" data-ir="mapa|${H(a.chave)}" title="Ver no mapa">${ico('map-2', 'i-sm')}</button><button class="btn btn-sm" type="button" data-ir="historico|${H(a.chave)}" title="Histórico">${ico('route', 'i-sm')}</button><button class="btn btn-sm" type="button" data-ir="comunicacoes|${H(a.chave)}" title="Comunicações do aparelho">${ico('antenna', 'i-sm')}</button></div>` },
+      // atalhos só para as telas que a pessoa tem no Controle de acesso
+      { t: '', cls: 'nw', v: (a) => `<div class="sa-acoes">${podeTela('mapa') ? `<button class="btn btn-sm" type="button" data-ir="mapa|${H(a.chave)}" title="Ver no mapa">${ico('map-2', 'i-sm')}</button>` : ''}${podeTela('historico') ? `<button class="btn btn-sm" type="button" data-ir="historico|${H(a.chave)}" title="Histórico">${ico('route', 'i-sm')}</button>` : ''}${podeTela('comunicacoes') ? `<button class="btn btn-sm" type="button" data-ir="comunicacoes|${H(a.chave)}" title="Comunicações do aparelho">${ico('antenna', 'i-sm')}</button>` : ''}</div>` },
     ], lista, { linhaCls: (a) => (a.gravidade === 'alta' ? 'sa-grave' : '') });
   }
 
@@ -190,7 +191,7 @@ function guardarResumoSaude(resumo, aparelhos) {
 let saudeTimer = null;
 async function atualizarSaude() {
   clearTimeout(saudeTimer);
-  if (!S.eu || !S.eu.pode.cadastros) return;
+  if (!S.eu || !podeTela('saude')) return;
   try {
     const r = await api(`/api/saude-aparelhos?${qs({ empresa: S.empresa })}`);
     guardarResumoSaude(r.resumo, r.aparelhos);

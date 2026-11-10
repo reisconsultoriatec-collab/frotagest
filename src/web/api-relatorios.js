@@ -16,7 +16,7 @@ function registrar(srv) {
 
   srv.rota('GET', '/api/relatorios', async () => ({
     tipos: Object.entries(TIPOS).map(([id, t]) => ({ id, titulo: t.titulo })),
-  }));
+  }), { acesso: 'relatorios.ver' });
 
   srv.rota('GET', '/api/relatorios/:tipo', async ({ u, params, query, res, ip }) => {
     const formato = query.formato || 'json';
@@ -39,7 +39,7 @@ function registrar(srv) {
       'Content-Disposition': `attachment; filename="${nome}"`,
     });
     return undefined;
-  });
+  }, { acesso: 'relatorios.ver' });
 }
 
 module.exports = { registrar };

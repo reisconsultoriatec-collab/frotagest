@@ -69,7 +69,7 @@ PAGINAS.online = (() => {
       { t: 'Entrou', v: (s) => `${H(fmtCurto(s.entrouEm))}<span class="sub">conectado ${H(atras(s.conectadoDesde))}</span>` },
       { t: 'Tela', v: (s) => `<div class="chips">${s.abas.map((a) => `<span class="chip${a === 'Modo TV' ? ' warn' : ''}">${H(a)}</span>`).join('')}</div>${s.abas.length > 1 ? `<span class="sub">${s.abas.length} abas abertas</span>` : ''}` },
       { t: 'Atividade', v: (s) => ocioso(s.ociosoSeg) },
-      { t: '', cls: 'num', v: (s) => (s.voce ? '' : `<button class="btn btn-sm btn-ghost on-encerrar" type="button" data-encerrar="${H(s.conexao)}" title="Desconectar este aparelho">${ico('logout', 'i-sm')} Encerrar</button>`) },
+      { t: '', cls: 'num', v: (s) => (s.voce || !podeTela('online', 'alterar') ? '' : `<button class="btn btn-sm btn-ghost on-encerrar" type="button" data-encerrar="${H(s.conexao)}" title="Desconectar este aparelho">${ico('logout', 'i-sm')} Encerrar</button>`) },
     ], sessoes, { vazio: 'Ninguém conectado agora.' });
   }
 

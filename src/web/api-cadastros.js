@@ -5,7 +5,8 @@
  * Reis Tecnologia
  */
 const { HttpErro, validar: V, gerarCodigo } = require('../util/comum');
-const { empresaAlvo } = require('../auth/acesso');
+const { empresaAlvo, limitado, gerente, alcanca } = require('../auth/acesso');
+const permissoes = require('../auth/permissoes');
 
 const PERFIS_USUARIO = ['master', 'admin', 'operador', 'visualizador'];
 const TIPOS_VEICULO = ['onibus', 'micro-onibus', 'van', 'caminhao', 'carro', 'moto', 'maquina', 'outro'];
@@ -32,6 +33,13 @@ function registrar(srv) {
 
   function podeMexer(u, empresaId) {
     if (u.perfil !== 'master' && empresaId !== u.empresaId) throw new HttpErro(404, 'Registro não encontrado.');
+  }
+
+  /* Quem recebeu um cadastro pelo Controle de acesso mas só enxerga alguns grupos mexe só dentro deles
+   * (e nunca dá a outra pessoa mais do que ele mesmo enxerga). */
+  function grupoDoEscopo(u, grupoId, oQue) {
+    if (!limitado(u)) return;
+    if (!grupoId || !u.grupos.has(grupoId)) throw new HttpErro(400, `Escolha um dos grupos que você enxerga para ${oQue}.`);
   }
 
   /* ---------------- empresas (master) ---------------- */
@@ -139,7 +147,7 @@ function registrar(srv) {
     }
     await auditoria.registrar(u, 'novo_codigo', { entidade: 'empresa', entidadeId: id, descricao: 'gerou um código novo para cadastro da equipe', ip, empresaId: id });
     return { codigo };
-  }, { pode: 'cadastros' });
+  }, { acesso: 'usuarios.alterar' });
 
   /* ---------------- grupos ---------------- */
 
@@ -168,30 +176,34 @@ function registrar(srv) {
     const empresaId = empresaDe(u, body.empresaId ?? body.empresa_id);
     const nome = V.texto(body.nome, 'o nome do grupo', { max: 80, obrigatorio: true });
     const paiId = validarPai(empresaId, V.id(body.paiId, 'o grupo pai', false));
+    grupoDoEscopo(u, paiId, 'colocar o grupo novo dentro');
     const x = await banco.query('INSERT INTO grupos (empresa_id, pai_id, nome) VALUES (?, ?, ?)', [empresaId, paiId, nome]);
     await frotaMudou();
     await auditoria.registrar(u, 'criar', { entidade: 'grupo', entidadeId: x.insertId, descricao: nome, ip, empresaId });
     return { id: x.insertId };
-  }, { pode: 'cadastros' });
+  }, { acesso: 'grupos.incluir' });
 
   r('PUT', '/api/grupos/:id', async ({ u, params, body, ip }) => {
     const id = V.id(params.id);
     const g = frota.grupos.get(id);
     if (!g) throw new HttpErro(404, 'Grupo não encontrado.');
     podeMexer(u, g.empresa_id);
+    if (limitado(u) && !u.grupos.has(id)) throw new HttpErro(404, 'Grupo não encontrado.');
     const nome = V.texto(body.nome ?? g.nome, 'o nome do grupo', { max: 80, obrigatorio: true });
     const paiId = validarPai(g.empresa_id, V.id(body.paiId, 'o grupo pai', false), id);
+    if (paiId !== g.pai_id) grupoDoEscopo(u, paiId, 'mudar o grupo de lugar');
     await banco.query('UPDATE grupos SET nome = ?, pai_id = ? WHERE id = ?', [nome, paiId, id]);
     await frotaMudou();
     await auditoria.registrar(u, 'editar', { entidade: 'grupo', entidadeId: id, descricao: nome, ip, empresaId: g.empresa_id });
     return { ok: true };
-  }, { pode: 'cadastros' });
+  }, { acesso: 'grupos.alterar' });
 
   r('DELETE', '/api/grupos/:id', async ({ u, params, ip }) => {
     const id = V.id(params.id);
     const g = frota.grupos.get(id);
     if (!g) throw new HttpErro(404, 'Grupo não encontrado.');
     podeMexer(u, g.empresa_id);
+    if (limitado(u) && !u.grupos.has(id)) throw new HttpErro(404, 'Grupo não encontrado.');
     if ((frota.filhos.get(id) || []).length) throw new HttpErro(409, 'Este grupo tem subgrupos. Mova ou exclua os subgrupos antes.');
     const n = await banco.um('SELECT COUNT(*) AS n FROM veiculos WHERE grupo_id = ?', [id]);
     if (n.n > 0) throw new HttpErro(409, `Este grupo tem ${n.n} veículo(s). Mude os veículos de grupo antes de excluir.`);
@@ -202,7 +214,7 @@ function registrar(srv) {
     acesso.invalidar();
     await auditoria.registrar(u, 'excluir', { entidade: 'grupo', entidadeId: id, descricao: g.nome, ip, empresaId: g.empresa_id });
     return { ok: true };
-  }, { pode: 'cadastros' });
+  }, { acesso: 'grupos.excluir' });
 
   /* ---------------- usuários ---------------- */
 
@@ -220,15 +232,17 @@ function registrar(srv) {
     for (const x of usuarios) {
       x.grupos = vinc.filter((g) => g.usuario_id === x.id).map((g) => g.grupo_id);
       x.dois_fatores_exigido = Boolean(x.exigir_2fa) || perfis2fa.has(x.perfil);
+      x.editavel = x.id === u.id || alcanca(u, x);
     }
-    return { usuarios, perfis2fa: [...perfis2fa] };
-  }, { pode: 'cadastros' });
+    // quem só enxerga alguns grupos não vê os usuários de fora deles
+    return { usuarios: limitado(u) ? usuarios.filter((x) => x.editavel) : usuarios, perfis2fa: [...perfis2fa] };
+  }, { acesso: 'usuarios.ver' });
 
   r('GET', '/api/usuarios/pendentes', async ({ u, query }) => {
     const emp = empresaAlvo(u, query.empresa ? V.id(query.empresa, 'a empresa') : null);
     const x = await banco.um(`SELECT COUNT(*) AS n FROM usuarios WHERE pendente = 1${emp ? ' AND empresa_id = ?' : ''}`, emp ? [emp] : []);
     return { total: Number(x.n) || 0 };
-  }, { pode: 'cadastros' });
+  }, { acesso: 'usuarios.ver' });
 
   r('POST', '/api/usuarios/:id/aprovar', async ({ u, params, body, ip }) => {
     const id = V.id(params.id);
@@ -242,7 +256,7 @@ function registrar(srv) {
     await auditoria.registrar(u, 'aprovar', { entidade: 'usuario', entidadeId: id, descricao: `${atual.nome} <${atual.email}> (${d.perfil})`, ip, empresaId: atual.empresa_id });
     srv.avisarPendentes(atual.empresa_id);
     return { ok: true };
-  }, { pode: 'cadastros' });
+  }, { acesso: 'usuarios.incluir' });
 
   /** Recusar apaga o cadastro pendente: a pessoa pode tentar de novo com o código certo. */
   r('POST', '/api/usuarios/:id/recusar', async ({ u, params, ip }) => {
@@ -254,14 +268,18 @@ function registrar(srv) {
     await auditoria.registrar(u, 'recusar', { entidade: 'usuario', entidadeId: id, descricao: `${atual.nome} <${atual.email}>`, ip, empresaId: atual.empresa_id });
     srv.avisarPendentes(atual.empresa_id);
     return { ok: true };
-  }, { pode: 'cadastros' });
+  }, { acesso: 'usuarios.excluir' });
 
   function dadosUsuario(u, b, atual = null) {
     const perfil = V.opcao(b.perfil ?? (atual && atual.perfil), PERFIS_USUARIO, 'o perfil');
     if (perfil === 'master' && u.perfil !== 'master') throw new HttpErro(403, 'Só o master cria outro master.');
+    if (perfil === 'admin' && !gerente(u) && !(atual && atual.perfil === 'admin')) throw new HttpErro(403, 'Só o administrador da empresa (ou o master) dá o perfil de administrador.');
     let empresaId = null;
     if (perfil !== 'master') empresaId = atual ? atual.empresa_id : empresaDe(u, b.empresaId ?? b.empresa_id);
-    const todosGrupos = perfil === 'operador' || perfil === 'visualizador' ? V.booleano(b.todosGrupos, atual ? !!atual.todos_grupos : true) : true;
+    // quem só enxerga alguns grupos não libera "todos os grupos" para outra pessoa
+    const todosPadrao = limitado(u) ? false : (atual ? !!atual.todos_grupos : true);
+    const todosGrupos = perfil === 'operador' || perfil === 'visualizador' ? V.booleano(b.todosGrupos, todosPadrao) : true;
+    if (limitado(u) && todosGrupos) throw new HttpErro(400, 'Você só pode liberar os grupos que você mesmo enxerga: desmarque "todos os grupos" e escolha os grupos.');
     let grupos = [];
     if (!todosGrupos) {
       // alteração parcial (ex.: só desativar) mantém os grupos que o usuário já tinha
@@ -271,6 +289,7 @@ function registrar(srv) {
       for (const g of grupos) {
         const gr = frota.grupos.get(g);
         if (!gr || gr.empresa_id !== empresaId) throw new HttpErro(400, 'Grupo inválido para esta empresa.');
+        if (limitado(u) && !u.grupos.has(g)) throw new HttpErro(400, 'Você só pode liberar os grupos que você mesmo enxerga.');
       }
     }
     return {
@@ -302,13 +321,16 @@ function registrar(srv) {
       convite = { enviado: false, erro: e.message };
     }
     return { id: x.insertId, convite };
-  }, { pode: 'cadastros' });
+  }, { acesso: 'usuarios.incluir' });
 
   async function usuarioEditavel(u, id) {
     const atual = await banco.um('SELECT * FROM usuarios WHERE id = ?', [id]);
     if (!atual) throw new HttpErro(404, 'Usuário não encontrado.');
     if (u.perfil !== 'master' && (atual.perfil === 'master' || atual.empresa_id !== u.empresaId)) throw new HttpErro(404, 'Usuário não encontrado.');
     atual.grupos = (await banco.query('SELECT grupo_id FROM usuario_grupos WHERE usuario_id = ?', [id])).map((g) => g.grupo_id);
+    if (id !== u.id && !alcanca(u, atual)) {
+      throw new HttpErro(403, atual.perfil === 'admin' ? 'Só o administrador da empresa (ou o master) altera outro administrador.' : 'Este usuário tem acesso a grupos que você não enxerga: só quem enxerga todos os grupos pode alterá-lo.');
+    }
     return atual;
   }
 
@@ -325,15 +347,21 @@ function registrar(srv) {
     if (id === u.id && (!ativo || d.perfil !== atual.perfil)) throw new HttpErro(400, 'Você não pode desativar nem mudar o perfil do seu próprio usuário.');
     // exigir a verificação em duas etapas deste usuário: só o master decide (o administrador não mexe)
     const exigir2fa = u.perfil === 'master' && body.exigir2fa !== undefined ? V.booleano(body.exigir2fa) : !!atual.exigir_2fa;
-    await banco.query('UPDATE usuarios SET nome = ?, perfil = ?, todos_grupos = ?, ativo = ?, exigir_2fa = ? WHERE id = ?', [d.nome, d.perfil, d.todosGrupos ? 1 : 0, ativo ? 1 : 0, exigir2fa ? 1 : 0, id]);
+    let acessos = atual.acessos;
+    if (d.perfil !== atual.perfil && acessos) {
+      const p = permissoes.ler(acessos) || {};
+      acessos = p.acesso && p.acesso.length ? JSON.stringify({ acesso: p.acesso }) : null;
+    }
+    await banco.query('UPDATE usuarios SET nome = ?, perfil = ?, todos_grupos = ?, ativo = ?, exigir_2fa = ?, acessos = ? WHERE id = ?', [d.nome, d.perfil, d.todosGrupos ? 1 : 0, ativo ? 1 : 0, exigir2fa ? 1 : 0, acessos, id]);
     await gravarGrupos(id, d.grupos);
     acesso.invalidar();
+    srv.atualizarUsuario(id).catch(() => {});
     const acao = !!atual.ativo !== ativo ? (ativo ? 'reativar' : 'desativar') : 'editar';
     const mudou2fa = exigir2fa !== !!atual.exigir_2fa ? (exigir2fa ? ' · passou a exigir a verificação em duas etapas' : ' · deixou de exigir a verificação em duas etapas') : '';
     if (mudou2fa) srv.revalidarSegundaEtapa();
     await auditoria.registrar(u, acao, { entidade: 'usuario', entidadeId: id, descricao: `${d.nome} <${atual.email}> (${d.perfil})${mudou2fa}`, ip, empresaId: atual.empresa_id });
     return { ok: true };
-  }, { pode: 'cadastros' });
+  }, { acesso: 'usuarios.alterar' });
 
   r('POST', '/api/usuarios/:id/convite', async ({ u, params, ip }) => {
     const id = V.id(params.id);
@@ -345,7 +373,7 @@ function registrar(srv) {
     acesso.invalidar();
     await auditoria.registrar(u, 'convite', { entidade: 'usuario', entidadeId: id, descricao: atual.email, ip, empresaId: atual.empresa_id });
     return { ok: true, contaExistente: c.existente };
-  }, { pode: 'cadastros' });
+  }, { acesso: 'usuarios.alterar' });
 
   /* ---------------- perfis de protocolo (master) ---------------- */
 
@@ -384,7 +412,7 @@ function registrar(srv) {
       perfis, protocolos: PROTOCOLOS, protocolosVideo: PROTOCOLOS_VIDEO,
       abertas: { sinalizacao: gateway.portas(), video: srv.media.portas() },
     };
-  }, { pode: 'cadastros' });
+  }, { acesso: ['aparelhos.ver', 'veiculos.incluir', 'veiculos.alterar'] });
 
   r('POST', '/api/perfis', async ({ u, body, ip }) => {
     const d = dadosPerfil(body);
@@ -437,8 +465,10 @@ function registrar(srv) {
       a.online = Boolean(dev && dev.online);
       a.nomes_canais = Array.isArray(a.nomes_canais) ? a.nomes_canais : (frota.aparelhos.get(a.id) || {}).nomes_canais || [];
     }
-    return { aparelhos };
-  }, { pode: 'cadastros' });
+    const visiveis = u.perfil === 'master' || !limitado(u) ? aparelhos
+      : aparelhos.filter((a) => !a.veiculo_id || acesso.veVeiculo(u, frota.veiculos.get(a.veiculo_id)));
+    return { aparelhos: visiveis };
+  }, { acesso: ['aparelhos.ver', 'veiculos.incluir', 'veiculos.alterar'] });
 
   /** Aceita empresaId ou empresa_id vindo da tela. */
   function comEmpresa(body) {
@@ -532,12 +562,13 @@ function registrar(srv) {
       v.online = Boolean(dev && dev.online);
     }
     return { veiculos: veiculos.filter((v) => acesso.veVeiculo(u, v)), tipos: TIPOS_VEICULO };
-  }, { pode: 'cadastros' });
+  }, { acesso: 'veiculos.ver' });
 
   function dadosVeiculo(u, b, atual = {}) {
     const m = { ...atual, ...b };
     const empresaId = atual.empresa_id || empresaDe(u, m.empresa_id ?? m.empresaId);
     const grupoId = V.id(m.grupo_id, 'o grupo', false);
+    grupoDoEscopo(u, grupoId, 'o veículo');
     if (grupoId) {
       const g = frota.grupos.get(grupoId);
       if (!g || g.empresa_id !== empresaId) throw new HttpErro(400, 'Grupo inválido para esta empresa.');
@@ -570,7 +601,7 @@ function registrar(srv) {
     await frotaMudou();
     await auditoria.registrar(u, 'criar', { entidade: 'veiculo', entidadeId: x.insertId, descricao: d.placa, ip, empresaId: d.empresa_id });
     return { id: x.insertId };
-  }, { pode: 'cadastros' });
+  }, { acesso: 'veiculos.incluir' });
 
   r('PUT', '/api/veiculos/:id', async ({ u, params, body, ip }) => {
     const id = V.id(params.id);
@@ -585,7 +616,7 @@ function registrar(srv) {
     const acao = !!atual.ativo !== d.ativo ? (d.ativo ? 'reativar' : 'desativar') : 'editar';
     await auditoria.registrar(u, acao, { entidade: 'veiculo', entidadeId: id, descricao: d.placa, ip, empresaId: d.empresa_id });
     return { ok: true };
-  }, { pode: 'cadastros' });
+  }, { acesso: 'veiculos.alterar' });
 
   /* ---------------- configurações (master) ---------------- */
 

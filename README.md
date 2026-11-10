@@ -39,6 +39,8 @@ Navegador ──HTTPS (Cloudflare + Nginx)──► FrotaGest (127.0.0.1:8080) �
 
 Grupos podem ter subgrupos (ex.: Garagem › Linha 10); liberar um grupo libera os subgrupos. Aparelho ainda sem veículo só aparece para o administrador e o master.
 
+A tabela acima é o **padrão** de cada perfil. Em **Controle › Controle de acesso** dá para ajustar, pessoa por pessoa, em quais menus ela entra e se pode incluir, alterar ou excluir (seção 3.6).
+
 ## 3. O que fica no banco
 
 | Tabela | Conteúdo | Guardado por (padrão) |
@@ -53,6 +55,7 @@ Grupos podem ter subgrupos (ex.: Garagem › Linha 10); liberar um grupo libera 
 | `cercas` | Garagens, pontos/terminais e áreas desenhados no mapa (círculo ou área livre) e os avisos de cada uma | sempre |
 | `sessoes_encerradas` | Logins encerrados por um administrador em “Usuários online” (só aquele aparelho) | 90 dias |
 | `empresas_logo` | Logotipo de cada empresa cliente (PNG para a tela, JPEG para os PDFs) | sempre |
+| `usuarios.acessos` | Controle de acesso: só os menus e ações que diferem do padrão do perfil (vazio = padrão) | sempre |
 | `codigos_recuperacao`, `sessoes_2fa` | Verificação em duas etapas: códigos de recuperação (só o resumo SHA-256) e os logins que já passaram pela segunda etapa | até zerar / 90 dias |
 | `eventos_aparelho`, `comandos` | Comunicações: conexões/desconexões e comandos enviados com a resposta | 180 dias |
 | `auditoria` | Acessos, cadastros, câmeras abertas, gravações vistas e baixadas, relatórios exportados, tratamento de alertas | 730 dias (mínimo 180) |
@@ -111,7 +114,20 @@ Feita no próprio FrotaGest: o Firebase continua só com o e-mail e a senha, **n
 - Base pronta para gerar o APK (Bubblewrap/TWA), como no OdontoWorld.
 - **Logotipo da empresa cliente:** o master envia em **Cadastros › Empresas** (PNG, JPG ou WebP; o painel reduz e corta as bordas vazias). Aparece no topo do painel para quem é daquela empresa (e para o master com a empresa escolhida), no modo TV e no cabeçalho dos PDFs. Fica guardado no banco.
 
-## 3.6 Sessão e avisos
+## 3.6 Controle de acesso (menus e ações por usuário)
+
+Em **Controle › Controle de acesso**: escolha a pessoa na lista e marque, menu por menu, o que ela pode fazer — **Ver**, **Incluir**, **Alterar**, **Excluir** (“—” quando a ação não existe naquele menu, por exemplo Monitoramento só tem Ver).
+
+- **O perfil continua decidindo o que a pessoa enxerga** (a empresa e os grupos). A matriz decide em quais menus ela entra e o que pode fazer lá. Sem personalizar, vale o padrão do perfil (seção 2) — ninguém perdeu acesso com a mudança.
+- **O master tem acesso total e é o único que libera o menu Controle de acesso** para alguém. Empresas e Sistema continuam só do master.
+- Quem recebeu o menu cuida só dos usuários da própria empresa; não mexe no próprio acesso, no master, nem em quem também cuida do controle de acesso; administrador só é alterado por administrador ou pelo master; e **não libera o que ele mesmo não tem** (essas caixas aparecem travadas).
+- Quem só enxerga alguns grupos e recebeu um cadastro (veículos, cercas, usuários) mexe só dentro dos grupos dele e não libera “todos os grupos” para ninguém.
+- Marcar Incluir, Alterar ou Excluir marca o Ver junto; tirar o Ver tira o menu inteiro. Clicar no nome da coluna marca ou desmarca a coluna toda. O pontinho âmbar mostra o que está diferente do padrão do perfil; “Preencher com o padrão de…” copia o padrão de outro perfil; **Voltar ao padrão do perfil** desfaz a personalização.
+- Vale **na hora**, também para quem está com o painel aberto: o menu muda sozinho e, se a pessoa estava numa tela que perdeu, volta ao Início. O servidor confere tudo de novo em cada pedido (não adianta digitar o endereço da tela).
+- Trocar o perfil de alguém (em Usuários) volta os menus dele ao padrão do perfil novo (o Controle de acesso dado pelo master continua).
+- Cada alteração fica na auditoria com o que entrou e o que saiu (“+ Veículos (ver, incluir); − Câmeras ao vivo (ver)”).
+
+## 3.7 Sessão e avisos
 
 - **Sessão encerrada por falta de uso** depois do tempo de **Sistema › Configurações › Segurança** (padrão 60 min; 0 = nunca, só para telas de central/TV). Um minuto antes aparece “Você ainda está aí?”. Vale também se a janela foi fechada sem clicar em Sair.
 - **Tema claro ou escuro:** botão da lua/sol no topo; a escolha fica no navegador (sem escolha, segue o tema do sistema). No escuro, o mapa de ruas também escurece; o satélite fica como está.
@@ -191,7 +207,7 @@ O Nginx e o certificado da Cloudflare que já publicam o laboratório continuam 
 
 1. Cada empresa tem um **código de cadastro** (Usuários, no topo da tela; ou a coluna Código em Empresas). Passe o código para a equipe.
 2. A pessoa abre o FrotaGest › **Criar conta** › nome, e-mail, senha e o código. O cadastro fica **aguardando aprovação**.
-3. O administrador da empresa (ou o master) vê o aviso no Início e o selo no menu **Usuários**, clica em **Aprovar** e escolhe o perfil e os grupos (ou **Recusar**).
+3. O administrador da empresa (ou o master) vê o aviso no Início e o selo no menu **Usuários**, clica em **Aprovar** e escolhe o perfil e os grupos (ou **Recusar**). Se precisar, ajuste os menus da pessoa em **Controle de acesso**.
 4. A pessoa clica em “Verificar novamente” e entra. Senha esquecida: “Esqueci minha senha” na tela de entrada.
 
 “Gerar outro” troca o código (o antigo para de valer; quem já tem login não é afetado). Também dá para **convidar por e-mail** em Usuários: a pessoa recebe o link para criar a senha, sem precisar de aprovação.
@@ -240,7 +256,8 @@ Cada perfil também diz o **horário configurado no aparelho** (Brasília, ou UT
 - Auditoria de acessos, senhas erradas, cadastros e aprovações, câmeras ao vivo abertas, gravações vistas e baixadas, relatórios exportados, sessões encerradas por falta de uso e tratamento de alertas.
 - Sessão encerrada depois de um tempo sem uso (configurável), mesmo com a janela fechada.
 - Criar conta exige o código da empresa e a aprovação do administrador; o código pode ser trocado a qualquer momento.
-- 2FA: previsto para uma próxima etapa.
+- Verificação em duas etapas (Google Authenticator) feita no próprio FrotaGest, exigida pelo master por perfil ou por pessoa (seção 3.4).
+- Controle de acesso por usuário (menus e ações), conferido no servidor a cada pedido e no tempo real (seção 3.6).
 
 ## 9. Testar sem o DVR
 

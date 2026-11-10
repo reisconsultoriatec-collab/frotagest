@@ -2,7 +2,9 @@
 /* FrotaGest — Cadastros: veículos, grupos, usuários, aparelhos (DVR) e empresas. Reis Tecnologia */
 
 /** Página de lista com busca, "mostrar inativos" e botão de novo. */
-function paginaLista({ id, titulo, sub, novoTexto, podeCriar, carregar, colunas, busca, ativo, editar, vazio, dica, topo }) {
+function paginaLista({ id, titulo, sub, novoTexto, podeCriar, podeEditar, carregar, colunas, busca, ativo, editar, vazio, dica, topo }) {
+  // controle de acesso: sem "alterar" a linha não abre o formulário (só consulta)
+  const abre = (l) => Boolean(editar) && (!podeEditar || podeEditar(l));
   let linhas = [];
   let offs = [];
   const st = { q: '', inativos: false };
@@ -29,7 +31,7 @@ function paginaLista({ id, titulo, sub, novoTexto, podeCriar, carregar, colunas,
     $(`#${id}-n`).textContent = `${lista.length} de ${linhas.length}${inativos ? ` · ${inativos} inativo(s)` : ''}`;
     box.innerHTML = tabela(colunas, lista, {
       vazio: linhas.length ? 'Nada encontrado com essa busca.' : vazio,
-      linhaCls: (l) => `${editar ? 'clic' : ''}${ativo && !ativo(l) ? ' inativo' : ''}`,
+      linhaCls: (l) => `${abre(l) ? 'clic' : ''}${ativo && !ativo(l) ? ' inativo' : ''}`,
       atributos: (l) => `data-i="${linhas.indexOf(l)}"`,
     });
   }
@@ -58,7 +60,7 @@ function paginaLista({ id, titulo, sub, novoTexto, podeCriar, carregar, colunas,
     $(`#${id}-tabela`).addEventListener('click', (e) => {
       if (e.target.closest('button, a')) return;
       const tr = e.target.closest('tr[data-i]');
-      if (tr && editar) editar(linhas[Number(tr.dataset.i)], atualizar);
+      if (tr && abre(linhas[Number(tr.dataset.i)])) editar(linhas[Number(tr.dataset.i)], atualizar);
     });
     atualizar();
     offs.push(on('empresa', atualizar));
@@ -108,7 +110,8 @@ PAGINAS.veiculos = paginaLista({
   titulo: 'Veículos',
   sub: 'Frota cadastrada e o aparelho (DVR) instalado em cada veículo',
   novoTexto: 'Novo veículo',
-  podeCriar: () => S.eu.pode.cadastros,
+  podeCriar: () => podeTela('veiculos', 'incluir'),
+  podeEditar: () => podeTela('veiculos', 'alterar'),
   vazio: 'Nenhum veículo cadastrado ainda.',
   carregar: async () => (await api(`/api/veiculos${qEmpresa()}`)).veiculos,
   busca: (v) => [v.placa, v.prefixo, v.descricao, v.grupo, v.identificador, v.empresa].join(' '),
@@ -166,7 +169,8 @@ PAGINAS.grupos = paginaLista({
   titulo: 'Grupos',
   sub: 'Organize a frota (garagens, linhas, setores) e limite o que cada usuário vê',
   novoTexto: 'Novo grupo',
-  podeCriar: () => S.eu.pode.cadastros,
+  podeCriar: () => podeTela('grupos', 'incluir'),
+  podeEditar: () => podeTela('grupos', 'alterar') || podeTela('grupos', 'excluir'),
   vazio: 'Nenhum grupo cadastrado. Grupos são opcionais: use para separar garagens, linhas ou clientes.',
   carregar: async () => (await api(`/api/grupos${qEmpresa()}`)).grupos,
   busca: (g) => g.caminho,
@@ -178,7 +182,18 @@ PAGINAS.grupos = paginaLista({
   editar: editarGrupo,
 });
 
+async function excluirGrupo(g, aposSalvar) {
+  if (!(await confirmar(`Excluir o grupo "${g.nome}"?`, { ok: 'Excluir', perigo: true }))) return;
+  try {
+    await api(`/api/grupos/${g.id}`, { metodo: 'DELETE' });
+    toast('Grupo excluído.', 'ok');
+    aposSalvar && aposSalvar();
+  } catch (e) { toast(e.message, 'err'); }
+}
+
 async function editarGrupo(g, aposSalvar) {
+  // pode excluir mas não alterar: vai direto para a exclusão
+  if (g && !podeTela('grupos', 'alterar')) { excluirGrupo(g, aposSalvar); return; }
   const empresaId = g ? g.empresaId : await escolherEmpresa();
   if (!empresaId) return;
   const todos = (await api(`/api/grupos?${qs({ empresa: empresaId })}`)).grupos;
@@ -198,7 +213,7 @@ async function editarGrupo(g, aposSalvar) {
       { nome: 'paiId', rotulo: 'Dentro de', tipo: 'select', cheio: true, opcoes: [{ v: '', t: '— (grupo principal)' }, ...todos.filter((x) => !proibidos.has(x.id)).map((x) => ({ v: x.id, t: x.caminho }))] },
     ],
     valores: g ? { nome: g.nome, paiId: g.paiId || '' } : {},
-    extras: g ? `<p style="margin:14px 0 0"><button class="btn btn-danger btn-sm" type="button" data-excluir>${ico('trash', 'i-sm')} Excluir grupo</button></p>` : '',
+    extras: g && podeTela('grupos', 'excluir') ? `<p style="margin:14px 0 0"><button class="btn btn-danger btn-sm" type="button" data-excluir>${ico('trash', 'i-sm')} Excluir grupo</button></p>` : '',
     salvar: async (d) => {
       const corpo = { nome: d.nome, paiId: d.paiId || null, empresaId };
       if (g) await api(`/api/grupos/${g.id}`, { metodo: 'PUT', corpo });
@@ -209,14 +224,9 @@ async function editarGrupo(g, aposSalvar) {
   });
   const ex = j.el.querySelector('[data-excluir]');
   if (ex) {
-    ex.addEventListener('click', async () => {
+    ex.addEventListener('click', () => {
       j.fechar();
-      if (!(await confirmar(`Excluir o grupo "${g.nome}"?`, { ok: 'Excluir', perigo: true }))) return;
-      try {
-        await api(`/api/grupos/${g.id}`, { metodo: 'DELETE' });
-        toast('Grupo excluído.', 'ok');
-        aposSalvar && aposSalvar();
-      } catch (e) { toast(e.message, 'err'); }
+      excluirGrupo(g, aposSalvar);
     });
   }
 }
@@ -227,10 +237,11 @@ PAGINAS.usuarios = paginaLista({
   id: 'usuarios',
   titulo: 'Usuários',
   sub: 'Quem acessa o FrotaGest e o que cada um pode ver',
-  podeCriar: () => S.eu.pode.cadastros,
+  podeCriar: () => podeTela('usuarios', 'incluir'),
+  podeEditar: (u) => podeTela('usuarios', 'alterar') && u.editavel !== false,
   vazio: 'Nenhum usuário cadastrado.',
   novoTexto: 'Convidar por e-mail',
-  dica: 'Cada pessoa cria o próprio login em <b>Criar conta</b>, na tela de entrada, com o código da empresa; depois você aprova e escolhe o perfil. Também dá para convidar por e-mail. Perfis: <b>Administrador</b> (cadastros da empresa), <b>Operador</b> (mapa, câmeras, gravações e alertas) e <b>Visualizador</b> (mapa, câmeras ao vivo e histórico).',
+  dica: 'Cada pessoa cria o próprio login em <b>Criar conta</b>, na tela de entrada, com o código da empresa; depois você aprova e escolhe o perfil. Também dá para convidar por e-mail. Perfis: <b>Administrador</b> (cadastros da empresa), <b>Operador</b> (mapa, câmeras, gravações e alertas) e <b>Visualizador</b> (mapa, câmeras ao vivo e histórico). O que cada pessoa pode fazer em cada menu se ajusta em <b>Controle de acesso</b>.',
   carregar: async () => {
     const todos = (await api(`/api/usuarios${qEmpresa()}`)).usuarios;
     usuariosPendentes = todos.filter((u) => u.pendente);
@@ -272,7 +283,7 @@ async function topoUsuarios(el, recarregar) {
           <div class="small muted">Na tela de entrada: <b>Criar conta</b> › nome, e-mail, senha e este código. Depois o cadastro aparece aqui para aprovar.</div></div>
         <code id="cod-empresa">${H(emp.codigo_convite || '—')}</code>
         <button class="btn btn-sm" type="button" data-copiar>${ico('copy', 'i-sm')} Copiar</button>
-        <button class="btn btn-sm" type="button" data-novo-codigo="${emp.id}">${ico('refresh', 'i-sm')} Gerar outro</button>
+        ${podeTela('usuarios', 'alterar') ? `<button class="btn btn-sm" type="button" data-novo-codigo="${emp.id}">${ico('refresh', 'i-sm')} Gerar outro</button>` : ''}
       </div></section>`;
     }
   } else if (S.eu.perfil === 'master') {
@@ -286,8 +297,8 @@ async function topoUsuarios(el, recarregar) {
       <div class="avatar">${H(iniciais(u.nome))}</div>
       <div class="list-main"><div class="list-title">${H(u.nome)}</div>
         <div class="list-sub">${H(u.email)}${S.eu.perfil === 'master' ? ` · ${H(u.empresa || '')}` : ''} · desde ${H(fmtDataHora(u.criado_em).slice(0, 16))}</div></div>
-      <button class="btn btn-primary btn-sm" type="button" data-aprovar="${u.id}">${ico('check', 'i-sm')} Aprovar</button>
-      <button class="btn btn-danger btn-sm" type="button" data-recusar="${u.id}">${ico('x', 'i-sm')} Recusar</button>
+      ${podeTela('usuarios', 'incluir') ? `<button class="btn btn-primary btn-sm" type="button" data-aprovar="${u.id}">${ico('check', 'i-sm')} Aprovar</button>` : ''}
+      ${podeTela('usuarios', 'excluir') ? `<button class="btn btn-danger btn-sm" type="button" data-recusar="${u.id}">${ico('x', 'i-sm')} Recusar</button>` : ''}
     </div>`).join('')}</div></section>` : '';
   el.innerHTML = codigo + cardPend;
   el.hidden = !(codigo || cardPend);
@@ -322,6 +333,21 @@ async function topoUsuarios(el, recarregar) {
   }));
 }
 
+/* Quem só enxerga alguns grupos libera só os grupos dele (sem "todos os grupos");
+ * o perfil de administrador só é dado por administrador ou pelo master. */
+const souLimitado = () => S.eu.perfil !== 'master' && !S.eu.todosGrupos;
+const souGerente = () => S.eu.perfil === 'master' || S.eu.perfil === 'admin';
+function camposGrupos(grupos) {
+  const opcoes = grupos.map((x) => ({ v: x.id, t: x.caminho }));
+  if (souLimitado()) {
+    return [{ nome: 'grupos', rotulo: 'Grupos liberados', tipo: 'multi', opcoes, se: 'perfil=operador|visualizador', ajuda: 'Inclui os subgrupos de cada grupo marcado. Você libera só os grupos que você enxerga.' }];
+  }
+  return [
+    { nome: 'todosGrupos', rotulo: 'Pode ver todos os grupos', tipo: 'check', se: 'perfil=operador|visualizador' },
+    { nome: 'grupos', rotulo: 'Grupos liberados', tipo: 'multi', opcoes, se: 'perfil=operador|visualizador&todosGrupos=false', ajuda: 'Inclui os subgrupos de cada grupo marcado.' },
+  ];
+}
+
 async function aprovarUsuario(u, recarregar) {
   if (!u) return;
   const grupos = (await api(`/api/grupos?${qs({ empresa: u.empresa_id })}`)).grupos;
@@ -331,13 +357,12 @@ async function aprovarUsuario(u, recarregar) {
     textoSalvar: 'Aprovar acesso',
     aviso: `${H(u.email)} criou a conta com o código da empresa${S.eu.perfil === 'master' ? ` <b>${H(u.empresa || '')}</b>` : ''}. Escolha o que a pessoa pode fazer.`,
     campos: [
-      { nome: 'perfil', rotulo: 'Perfil', tipo: 'select', cheio: true, opcoes: [{ v: 'operador', t: 'Operador (mapa, câmeras, gravações e alertas)' }, { v: 'visualizador', t: 'Visualizador (mapa, câmeras ao vivo e histórico)' }, { v: 'admin', t: 'Administrador da empresa' }] },
-      { nome: 'todosGrupos', rotulo: 'Pode ver todos os grupos', tipo: 'check', se: 'perfil=operador|visualizador' },
-      { nome: 'grupos', rotulo: 'Grupos liberados', tipo: 'multi', opcoes: grupos.map((x) => ({ v: x.id, t: x.caminho })), se: 'perfil=operador|visualizador&todosGrupos=false', ajuda: 'Inclui os subgrupos de cada grupo marcado.' },
+      { nome: 'perfil', rotulo: 'Perfil', tipo: 'select', cheio: true, opcoes: [{ v: 'operador', t: 'Operador (mapa, câmeras, gravações e alertas)' }, { v: 'visualizador', t: 'Visualizador (mapa, câmeras ao vivo e histórico)' }, ...(souGerente() ? [{ v: 'admin', t: 'Administrador da empresa' }] : [])] },
+      ...camposGrupos(grupos),
     ],
-    valores: { perfil: 'operador', todosGrupos: true },
+    valores: { perfil: 'operador', todosGrupos: !souLimitado() },
     salvar: async (d) => {
-      const corpo = { perfil: d.perfil, todosGrupos: d.todosGrupos, grupos: d.grupos.map(Number) };
+      const corpo = { perfil: d.perfil, todosGrupos: souLimitado() ? false : d.todosGrupos, grupos: d.grupos.map(Number) };
       if (d.perfil === 'admin') { corpo.todosGrupos = true; corpo.grupos = []; }
       await api(`/api/usuarios/${u.id}/aprovar`, { corpo });
       toast(`Acesso de ${u.nome} aprovado.`, 'ok');
@@ -358,7 +383,8 @@ async function editarUsuario(u, aposSalvar) {
   }
   const grupos = master ? [] : (await api(`/api/grupos?${qs({ empresa: empresaId })}`)).grupos;
   const perfis = master ? [{ v: 'master', t: 'Master (Reis Tecnologia)' }] : [
-    { v: 'operador', t: 'Operador' }, { v: 'visualizador', t: 'Visualizador' }, { v: 'admin', t: 'Administrador da empresa' },
+    { v: 'operador', t: 'Operador' }, { v: 'visualizador', t: 'Visualizador' },
+    ...(souGerente() || (u && u.perfil === 'admin') ? [{ v: 'admin', t: 'Administrador da empresa' }] : []),
   ];
   const eu = u && u.id === S.eu.id;
   const j = formulario({
@@ -368,18 +394,18 @@ async function editarUsuario(u, aposSalvar) {
     campos: [
       { nome: 'nome', rotulo: 'Nome', obrigatorio: true, maxlength: 120 },
       { nome: 'email', rotulo: 'E-mail de login', tipo: 'email', obrigatorio: true, desativado: !!u, ajuda: u ? 'O e-mail não muda. Para trocar, desative e cadastre outro.' : 'A pessoa recebe neste e-mail o link para criar a senha.' },
-      { nome: 'perfil', rotulo: 'Perfil', tipo: 'select', opcoes: perfis, desativado: master || eu },
-      { nome: 'todosGrupos', rotulo: 'Pode ver todos os grupos', tipo: 'check', se: 'perfil=operador|visualizador' },
-      { nome: 'grupos', rotulo: 'Grupos liberados', tipo: 'multi', opcoes: grupos.map((x) => ({ v: x.id, t: x.caminho })), se: 'perfil=operador|visualizador&todosGrupos=false', ajuda: 'Inclui os subgrupos de cada grupo marcado.' },
+      { nome: 'perfil', rotulo: 'Perfil', tipo: 'select', opcoes: perfis, desativado: master || eu, ajuda: u && !master && !eu ? 'Ao trocar o perfil, os menus da pessoa voltam ao padrão do perfil novo (Controle de acesso).' : '' },
+      ...camposGrupos(grupos),
       ...(u && !eu ? [{ nome: 'ativo', rotulo: 'Acesso ativo', tipo: 'check' }] : []),
       // só o master decide quem precisa da verificação em duas etapas
       ...(S.eu.perfil === 'master' ? [{ nome: 'exigir2fa', rotulo: 'Exigir verificação em duas etapas (código do celular) deste usuário', tipo: 'check', cheio: true }] : []),
     ],
-    valores: u ? { ...u, todosGrupos: !!u.todos_grupos, ativo: !!u.ativo, grupos: u.grupos, exigir2fa: !!u.exigir_2fa } : { perfil: master ? 'master' : 'operador', todosGrupos: true, exigir2fa: false },
+    valores: u ? { ...u, todosGrupos: !!u.todos_grupos, ativo: !!u.ativo, grupos: u.grupos, exigir2fa: !!u.exigir_2fa } : { perfil: master ? 'master' : 'operador', todosGrupos: !souLimitado(), exigir2fa: false },
     extras: (u && u.ativo ? `<p style="margin:14px 0 0" class="small muted">${u.conta_ligada ? 'Login já criado.' : 'A pessoa ainda não criou a senha.'} <button class="link" type="button" data-convite>${ico('mail', 'i-sm')} Reenviar e-mail para criar/redefinir a senha</button></p>` : '')
-      + (u && S.eu.perfil === 'master' ? blocoUsuario2fa(u) : ''),
+      + (u && S.eu.perfil === 'master' ? blocoUsuario2fa(u) : '')
+      + (u && !master && podeTela('acesso') ? `<p style="margin:12px 0 0"><button class="link" type="button" data-ver-acesso>${ico('lock-access', 'i-sm')} Menus e ações desta pessoa (Controle de acesso)</button></p>` : ''),
     salvar: async (d) => {
-      const corpo = { nome: d.nome, perfil: master ? 'master' : d.perfil, todosGrupos: d.todosGrupos, grupos: d.grupos.map(Number), empresaId };
+      const corpo = { nome: d.nome, perfil: master ? 'master' : d.perfil, todosGrupos: souLimitado() ? false : d.todosGrupos, grupos: d.grupos.map(Number), empresaId };
       if (S.eu.perfil === 'master') corpo.exigir2fa = d.exigir2fa;
       if (!['operador', 'visualizador'].includes(corpo.perfil)) { corpo.todosGrupos = true; corpo.grupos = []; }
       if (u) {
@@ -408,6 +434,8 @@ async function editarUsuario(u, aposSalvar) {
       } catch (e) { toast(e.message, 'err'); }
     });
   }
+  const va = j.el.querySelector('[data-ver-acesso]');
+  if (va) va.addEventListener('click', () => { j.fechar(); navegar('acesso', qs({ u: u.id })); });
   const conv = j.el.querySelector('[data-convite]');
   if (conv) {
     conv.addEventListener('click', async () => {

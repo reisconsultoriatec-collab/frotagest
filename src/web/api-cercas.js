@@ -5,7 +5,7 @@
  * Reis Tecnologia
  */
 const { HttpErro, validar: V } = require('../util/comum');
-const { empresaAlvo } = require('../auth/acesso');
+const { empresaAlvo, permite } = require('../auth/acesso');
 const { FINALIDADES, daLinha } = require('../servicos/cercas');
 const { areaM2 } = require('../servicos/geo');
 
@@ -39,6 +39,14 @@ function registrar(srv) {
     if (u.todosGrupos || !c.grupo_id) return true;
     return u.grupos.has(c.grupo_id);
   }
+
+  /** Quem só enxerga alguns grupos só mexe nas cercas desses grupos (as gerais valem para a empresa toda). */
+  function podeMexer(u, c) {
+    if (u.perfil === 'master') return true;
+    if (c.empresa_id !== u.empresaId) return false;
+    return u.todosGrupos || Boolean(c.grupo_id && u.grupos.has(c.grupo_id));
+  }
+  const SO_SEUS_GRUPOS = 'Você só cadastra cercas dos grupos que você enxerga: escolha um deles no campo Grupo.';
 
   function dados(u, b, atual = null) {
     const empresaId = atual ? atual.empresa_id : (u.perfil === 'master' ? V.id(b.empresa, 'a empresa') : u.empresaId);
@@ -107,12 +115,13 @@ function registrar(srv) {
     const emp = empresaAlvo(u, query.empresa ? V.id(query.empresa, 'a empresa') : null);
     const rows = await banco.query(`SELECT * FROM cercas${emp ? ' WHERE empresa_id = ?' : ''} ORDER BY ativo DESC, nome`, emp ? [emp] : []);
     const oc = cercas.ocupacao();
-    const lista = rows.filter((r) => ve(u, r) && (r.ativo || u.pode.cadastros)).map((r) => saida(r, oc, u));
+    const lista = rows.filter((r) => ve(u, r) && (r.ativo || permite(u, 'cercas'))).map((r) => saida(r, oc, u));
     return { cercas: lista, finalidades: Object.entries(FINALIDADES).map(([id, f]) => ({ id, ...f })) };
   });
 
   srv.rota('POST', '/api/cercas', async ({ u, body, ip }) => {
     const d = dados(u, body);
+    if (!podeMexer(u, d)) throw new HttpErro(400, SO_SEUS_GRUPOS);
     const n = await banco.um('SELECT COUNT(*) AS n FROM cercas WHERE empresa_id = ?', [d.empresa_id]);
     if (n.n >= MAX_POR_EMPRESA) throw new HttpErro(400, `Limite de ${MAX_POR_EMPRESA} cercas por empresa.`);
     const x = await banco.query(`INSERT INTO cercas (${COLUNAS.join(', ')}) VALUES (?)`, [COLUNAS.map((k) => d[k])]);
@@ -120,13 +129,15 @@ function registrar(srv) {
     srv.paraTodos({ type: 'cercas' });
     await auditoria.registrar(u, 'criar', { entidade: 'cerca', entidadeId: x.insertId, descricao: `${d.nome} (${FINALIDADES[d.finalidade].nome})`, ip, empresaId: d.empresa_id });
     return { id: x.insertId };
-  }, { pode: 'cadastros' });
+  }, { acesso: 'cercas.incluir' });
 
   srv.rota('PUT', '/api/cercas/:id', async ({ u, params, body, ip }) => {
     const id = V.id(params.id);
     const atual = await banco.um('SELECT * FROM cercas WHERE id = ?', [id]);
-    if (!atual || (u.perfil !== 'master' && atual.empresa_id !== u.empresaId)) throw new HttpErro(404, 'Cerca não encontrada.');
+    if (!atual || !ve(u, atual)) throw new HttpErro(404, 'Cerca não encontrada.');
+    if (!podeMexer(u, atual)) throw new HttpErro(403, 'Esta cerca vale para a empresa toda: só quem enxerga todos os grupos pode mexer nela.');
     const d = dados(u, body, atual);
+    if (!podeMexer(u, d)) throw new HttpErro(400, SO_SEUS_GRUPOS);
     const campos = COLUNAS.filter((k) => k !== 'empresa_id');
     await banco.query(`UPDATE cercas SET ${campos.map((k) => `${k} = ?`).join(', ')} WHERE id = ?`, [...campos.map((k) => d[k]), id]);
     await cercas.carregar();
@@ -134,18 +145,19 @@ function registrar(srv) {
     const mudou = [atual.ativo && !d.ativo ? 'desativada' : '', !atual.ativo && d.ativo ? 'reativada' : ''].filter(Boolean).join(' ');
     await auditoria.registrar(u, 'editar', { entidade: 'cerca', entidadeId: id, descricao: `${d.nome}${mudou ? ` (${mudou})` : ''}`, ip, empresaId: atual.empresa_id });
     return { ok: true };
-  }, { pode: 'cadastros' });
+  }, { acesso: 'cercas.alterar' });
 
   srv.rota('DELETE', '/api/cercas/:id', async ({ u, params, ip }) => {
     const id = V.id(params.id);
     const atual = await banco.um('SELECT * FROM cercas WHERE id = ?', [id]);
-    if (!atual || (u.perfil !== 'master' && atual.empresa_id !== u.empresaId)) throw new HttpErro(404, 'Cerca não encontrada.');
+    if (!atual || !ve(u, atual)) throw new HttpErro(404, 'Cerca não encontrada.');
+    if (!podeMexer(u, atual)) throw new HttpErro(403, 'Esta cerca vale para a empresa toda: só quem enxerga todos os grupos pode excluir.');
     await banco.query('DELETE FROM cercas WHERE id = ?', [id]);
     await cercas.carregar();
     srv.paraTodos({ type: 'cercas' });
     await auditoria.registrar(u, 'excluir', { entidade: 'cerca', entidadeId: id, descricao: atual.nome, ip, empresaId: atual.empresa_id });
     return { ok: true };
-  }, { pode: 'cadastros' });
+  }, { acesso: 'cercas.excluir' });
 }
 
 module.exports = { registrar };

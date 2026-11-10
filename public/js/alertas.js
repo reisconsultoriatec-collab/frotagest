@@ -89,8 +89,8 @@ PAGINAS.alertas = (() => {
       { t: 'Situação', v: (a) => `<span class="tag ${a.situacao === 'tratado' ? 'ok' : a.situacao === 'novo' ? 'novo' : 'wait'}">${H(SITUACOES[a.situacao])}</span>${a.tratado_por_nome ? `<span class="sub">${H(a.tratado_por_nome)} · ${H(fmtCurto(a.tratado_em))}</span>` : ''}${a.tratativa ? `<span class="sub">${H(a.tratativa)}</span>` : ''}` },
       {
         t: '', cls: 'acts', v: (a) => {
-          const item = [...S.itens.values()].find((i) => i.aparelhoId === a.aparelho_id);
-          return `${item ? `<button class="btn" type="button" data-ver="${H(item.chave)}">${ico('map-pin', 'i-sm')} Mapa</button>` : ''}${S.eu.pode.tratarAlertas && a.situacao !== 'tratado' ? `<button class="btn btn-primary" type="button" data-tratar="${a.id}">Tratar</button>` : ''}`;
+          const item = podeTela('mapa') && [...S.itens.values()].find((i) => i.aparelhoId === a.aparelho_id);
+          return `${item ? `<button class="btn" type="button" data-ver="${H(item.chave)}">${ico('map-pin', 'i-sm')} Mapa</button>` : ''}${podeTela('alertas', 'alterar') && a.situacao !== 'tratado' ? `<button class="btn btn-primary" type="button" data-tratar="${a.id}">Tratar</button>` : ''}`;
         },
       },
     ], dados, { vazio: f.situacao === 'pendentes' ? 'Nenhum alerta pendente.' : 'Nenhum alerta com esses filtros.' });

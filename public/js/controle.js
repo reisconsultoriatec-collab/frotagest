@@ -13,7 +13,7 @@ const NOMES_ACAO = {
   novo_codigo: 'Gerou código de cadastro', falha_login: 'Senha errada', ver_ao_vivo: 'Abriu câmera ao vivo',
   exportar_relatorio: 'Exportou relatório', sessao_expirada: 'Sessão encerrada por inatividade', encerrar_sessao: 'Encerrou sessão de outro usuário',
   '2fa_ativada': 'Ativou a verificação em 2 etapas', '2fa_falha': 'Código de 2 etapas errado', '2fa_recuperacao': 'Entrou com código de recuperação',
-  '2fa_zerada': 'Zerou a verificação em 2 etapas',
+  '2fa_zerada': 'Zerou a verificação em 2 etapas', alterar_acesso: 'Alterou o controle de acesso',
 };
 const NOMES_ENTIDADE = {
   empresa: 'Empresa', usuario: 'Usuário', grupo: 'Grupo', veiculo: 'Veículo', aparelho: 'Aparelho', aparelho_pendente: 'Aparelho pendente',

@@ -34,6 +34,7 @@ const apiRelatorios = require('./src/web/api-relatorios');
 const apiSaude = require('./src/web/api-saude');
 const apiCercas = require('./src/web/api-cercas');
 const apiOnline = require('./src/web/api-online');
+const apiAcessos = require('./src/web/api-acessos');
 const apiDoisFatores = require('./src/web/api-2fa');
 const { Relatorios } = require('./src/relatorios/relatorios');
 const { Logotipos } = require('./src/servicos/logotipos');
@@ -200,6 +201,7 @@ async function main() {
   apiSaude.registrar(srv);
   apiCercas.registrar(srv);
   apiOnline.registrar(srv);
+  apiAcessos.registrar(srv);
   apiDoisFatores.registrar(srv);
   srv.onLog = (e) => log(e.level, e.text, { source: 'painel' });
 

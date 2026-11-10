@@ -135,14 +135,14 @@ PAGINAS.cercas = (() => {
       <div class="fleet-head">
         <label class="search">${ico('search', 'i-sm')}<input id="ce-q" placeholder="Buscar cerca" autocomplete="off"></label>
         <select id="ce-fin" aria-label="Tipo de cerca"><option value="">Todos os tipos</option>${Object.entries(FINALIDADES_CERCA).map(([id, x]) => `<option value="${id}">${H(x.nome)}</option>`).join('')}</select>
-        <button class="btn btn-primary" type="button" id="ce-nova">${ico('plus', 'i-sm')} Nova cerca</button>
+        ${podeTela('cercas', 'incluir') ? `<button class="btn btn-primary" type="button" id="ce-nova">${ico('plus', 'i-sm')} Nova cerca</button>` : ''}
       </div>
       <div class="fleet-list" id="ce-lista"><div class="fleet-empty">Carregando…</div></div>`;
     $('#ce-q').value = f.q;
     $('#ce-fin').value = f.fin;
     $('#ce-q').addEventListener('input', (e) => { f.q = e.target.value; desenharLista(); });
     $('#ce-fin').addEventListener('change', (e) => { f.fin = e.target.value; desenharLista(); desenharMapa(false); });
-    $('#ce-nova').addEventListener('click', () => editar(null));
+    if ($('#ce-nova')) $('#ce-nova').addEventListener('click', () => editar(null));
     $('#ce-lista').addEventListener('click', (e) => {
       const b = e.target.closest('[data-id]');
       if (b) selecionar(Number(b.dataset.id), true);
@@ -261,7 +261,10 @@ PAGINAS.cercas = (() => {
     const fin = FINALIDADES_CERCA[c.finalidade];
     const dentro = c.dentro.map((k) => S.itens.get(k)).filter(Boolean).sort((a, b) => rotulo(a).localeCompare(rotulo(b), 'pt-BR', { numeric: true }));
     const dado = (t, v) => `<div><span>${H(t)}</span><strong>${v}</strong></div>`;
-    const pode = S.eu.pode.cadastros;
+    // quem só enxerga alguns grupos não mexe nas cercas gerais (valem para a empresa toda)
+    const doEscopo = S.eu.perfil === 'master' || S.eu.todosGrupos || Boolean(c.grupo);
+    const podeAlt = doEscopo && podeTela('cercas', 'alterar');
+    const podeExc = doEscopo && podeTela('cercas', 'excluir');
     const tipoRel = c.finalidade === 'garagem' ? 'garagem' : 'cercas';
     box.innerHTML = `
       <div class="det-head">
@@ -278,16 +281,17 @@ PAGINAS.cercas = (() => {
       <div class="ce-avisos">${ico('bell', 'i-sm')} ${H(resumoAvisos(c))}</div>
       ${c.observacao ? `<p class="small muted" style="margin:0">${H(c.observacao)}</p>` : ''}
       <div class="info-block"><div class="block-title">Dentro agora (${dentro.length})</div>
-        ${dentro.length ? `<div class="ce-dentro">${dentro.map((i) => `<button type="button" class="chip" data-v="${H(i.chave)}">${H(rotuloCurto(i))}</button>`).join('')}</div>` : '<p class="small muted" style="margin:0">Nenhum veículo dentro agora.</p>'}</div>
+        ${dentro.length ? `<div class="ce-dentro">${dentro.map((i) => `<button type="button" class="chip" data-v="${H(i.chave)}" ${podeTela('mapa') ? '' : 'disabled'}>${H(rotuloCurto(i))}</button>`).join('')}</div>` : '<p class="small muted" style="margin:0">Nenhum veículo dentro agora.</p>'}</div>
       <div class="det-actions">
-        ${pode ? `<button class="btn btn-sm" type="button" data-editar>${ico('pencil', 'i-sm')} Editar</button>` : ''}
-        <button class="btn btn-sm" type="button" data-rel>${ico('file-analytics', 'i-sm')} ${c.finalidade === 'garagem' ? 'Saídas e chegadas' : 'Passagens'}</button>
-        ${pode ? `<button class="btn btn-sm btn-ghost" type="button" data-ativo>${c.ativo ? 'Desativar' : 'Reativar'}</button><button class="btn btn-sm btn-ghost" type="button" data-excluir style="color:var(--err)">${ico('trash', 'i-sm')} Excluir</button>` : ''}
+        ${podeAlt ? `<button class="btn btn-sm" type="button" data-editar>${ico('pencil', 'i-sm')} Editar</button>` : ''}
+        ${podeTela('relatorios') ? `<button class="btn btn-sm" type="button" data-rel>${ico('file-analytics', 'i-sm')} ${c.finalidade === 'garagem' ? 'Saídas e chegadas' : 'Passagens'}</button>` : ''}
+        ${podeAlt ? `<button class="btn btn-sm btn-ghost" type="button" data-ativo>${c.ativo ? 'Desativar' : 'Reativar'}</button>` : ''}${podeExc ? `<button class="btn btn-sm btn-ghost" type="button" data-excluir style="color:var(--err)">${ico('trash', 'i-sm')} Excluir</button>` : ''}
       </div>`;
     box.hidden = false;
     box.querySelector('[data-fechar-det]').onclick = () => { sel = null; box.hidden = true; destacar(); $$('#ce-lista .ce-item').forEach((b) => b.classList.remove('sel')); };
     box.querySelectorAll('[data-v]').forEach((b) => { b.onclick = () => navegar('mapa', qs({ v: b.dataset.v })); });
-    box.querySelector('[data-rel]').onclick = () => navegar('relatorios', qs({ tipo: tipoRel, cerca: c.id }));
+    const rel = box.querySelector('[data-rel]');
+    if (rel) rel.onclick = () => navegar('relatorios', qs({ tipo: tipoRel, cerca: c.id }));
     const e = box.querySelector('[data-editar]');
     if (e) e.onclick = () => editar(c);
     const a = box.querySelector('[data-ativo]');

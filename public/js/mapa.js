@@ -544,7 +544,7 @@ PAGINAS.mapa = (() => {
       ? `<div class="alarms">${i.alertas.map((a) => `<div class="alarm">${ico('alert-triangle')} ${H(a.nome)} <span class="muted small" style="margin-left:auto">${H(fmtCurto(a.inicio))}</span></div>`).join('')}</div>`
       : '';
     let cams = '';
-    if (S.eu.pode.video && i.ident && !i.semAparelho) {
+    if (podeTela('cameras') && i.ident && !i.semAparelho) {
       const n = Math.max(1, i.canais || 4);
       const botoes = Array.from({ length: n }, (_, k) => {
         const ch = k + 1;
@@ -556,8 +556,8 @@ PAGINAS.mapa = (() => {
     }
     const acoes = [];
     if (i.pendente && S.eu.perfil === 'master') acoes.push(`<button class="btn btn-primary btn-sm" type="button" data-cadastrar>${ico('plus', 'i-sm')} Cadastrar aparelho</button>`);
-    if (i.aparelhoId) acoes.push(`<button class="btn btn-sm" type="button" data-hist>${ico('route', 'i-sm')} Histórico</button>`);
-    if (i.aparelhoId && S.eu.pode.gravacoes) acoes.push(`<button class="btn btn-sm" type="button" data-grav>${ico('video', 'i-sm')} Gravações</button>`);
+    if (i.aparelhoId && podeTela('historico')) acoes.push(`<button class="btn btn-sm" type="button" data-hist>${ico('route', 'i-sm')} Histórico</button>`);
+    if (i.aparelhoId && podeTela('gravacoes')) acoes.push(`<button class="btn btn-sm" type="button" data-grav>${ico('video', 'i-sm')} Gravações</button>`);
     box.innerHTML = `
       <div class="det-head">
         <div class="info-ico">${ico(i.pendente ? 'device-cctv' : 'bus')}</div>

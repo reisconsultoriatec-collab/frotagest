@@ -34,7 +34,7 @@ PAGINAS.gravacoes = (() => {
             <label class="check"><input type="checkbox" id="gr-alarmes"> Só trechos com alarme</label>
             <div class="rec-actions">
               <button class="btn btn-primary" type="submit" id="gr-buscar">${ico('search', 'i-sm')} Buscar no DVR</button>
-              <button class="btn" type="button" id="gr-periodo">${ico('download', 'i-sm')} Baixar período</button>
+              ${podeTela('gravacoes', 'incluir') ? `<button class="btn" type="button" id="gr-periodo">${ico('download', 'i-sm')} Baixar período</button>` : ''}
             </div>
           </form>
           <div class="rec-status" id="gr-status"></div>
@@ -44,7 +44,7 @@ PAGINAS.gravacoes = (() => {
           <div class="card-head"><h2>${ico('player-play')} Reprodução</h2><button class="btn btn-sm" type="button" id="gr-play-fechar">${ico('x', 'i-sm')} Fechar</button></div>
           <div class="tiles" id="gr-tiles"></div>
         </section>
-        <section class="card">
+        <section class="card" ${podeTela('gravacoes', 'incluir') ? '' : 'hidden'}>
           <div class="card-head"><h2>${ico('download')} Downloads</h2><span class="small muted">Os arquivos ficam no servidor por poucos dias e depois são apagados sozinhos.</span></div>
           <p class="hint" id="gr-ffmpeg" hidden></p>
           <div class="table-wrap flat" id="gr-downloads"></div>
@@ -59,7 +59,7 @@ PAGINAS.gravacoes = (() => {
     $('#gr-veic').addEventListener('change', () => { f.veiculo = $('#gr-veic').value; canais(); itens = []; desenharLista(); });
     $('#gr-alarmes').addEventListener('change', () => { f.alarmes = $('#gr-alarmes').checked; desenharLista(); });
     $('#gr-form').addEventListener('submit', buscar);
-    $('#gr-periodo').addEventListener('click', baixarPeriodo);
+    if ($('#gr-periodo')) $('#gr-periodo').addEventListener('click', baixarPeriodo);
     $('#gr-lista').addEventListener('click', (e) => {
       const a = e.target.closest('[data-assistir]');
       const b = e.target.closest('[data-baixar]');
@@ -73,7 +73,7 @@ PAGINAS.gravacoes = (() => {
     mosaico = new Mosaico($('#gr-tiles'), () => { $('#gr-play').hidden = !mosaico.tamanho; });
     $('#gr-play-fechar').addEventListener('click', () => mosaico.fecharTodos());
     desenharDownloads();
-    api('/api/downloads').then((r) => {
+    if (podeTela('gravacoes', 'incluir')) api('/api/downloads').then((r) => {
       S.downloads = new Map(r.downloads.map((d) => [d.id, d]));
       const n = $('#gr-ffmpeg');
       if (n && !r.ffmpeg) { n.hidden = false; n.textContent = 'O ffmpeg não está instalado no servidor: os downloads saem em H.264 bruto (abra com o VLC).'; }
@@ -155,7 +155,7 @@ PAGINAS.gravacoes = (() => {
       { t: 'Duração', v: (x) => H(fmtDur(segEntre(x.start, x.end))) },
       { t: 'Alarmes', v: (x) => (x.alarms.length ? x.alarms.map((a) => `<span class="tag alarm">${H(a)}</span>`).join(' ') : '—') },
       { t: 'Tamanho', cls: 'num', v: (x) => H(fmtTamanho(x.size)) },
-      { t: '', cls: 'acts', v: (x) => `<button class="btn" type="button" data-assistir="${x.i}">${ico('player-play', 'i-sm')} Assistir</button><button class="btn" type="button" data-baixar="${x.i}">${ico('download', 'i-sm')} Baixar MP4</button>` },
+      { t: '', cls: 'acts', v: (x) => `<button class="btn" type="button" data-assistir="${x.i}">${ico('player-play', 'i-sm')} Assistir</button>${podeTela('gravacoes', 'incluir') ? `<button class="btn" type="button" data-baixar="${x.i}">${ico('download', 'i-sm')} Baixar MP4</button>` : ''}` },
     ], lista);
     status(itens.length ? `${lista.length} de ${itens.length} trecho(s) encontrado(s).` : 'Nenhuma gravação encontrada nesse período.');
   }

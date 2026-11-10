@@ -90,7 +90,7 @@ function registrar(srv) {
       'Content-Disposition': `attachment; filename="${nome}"`,
     });
     return undefined;
-  }, { pode: 'cadastros' });
+  }, { acesso: 'saude.ver' });
 }
 
 module.exports = { registrar };

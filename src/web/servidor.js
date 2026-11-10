@@ -11,6 +11,7 @@ const crypto = require('crypto');
 const ws = require('./ws');
 const { normalizeId } = require('../protocolo/jt808');
 const { HttpErro } = require('../util/comum');
+const { permite, exigirAcesso } = require('../auth/acesso');
 
 const ROOT = path.join(__dirname, '..', '..');
 const PUBLIC = path.join(ROOT, 'public');
@@ -129,7 +130,7 @@ class Servidor {
 
   /* ---------- rotas da API ---------- */
 
-  /** caminho como '/api/empresas/:id'; opcoes: { publica, conta, pode: 'cadastros', limite, livre2fa, corpoMax } */
+  /** caminho como '/api/empresas/:id'; opcoes: { publica, conta, pode: 'sistema', acesso: 'tela.acao' | [...], limite, livre2fa, corpoMax } */
   rota(metodo, caminho, handler, opcoes = {}) {
     const nomes = [];
     const re = new RegExp(`^${caminho.replace(/:(\w+)/g, (_, n) => { nomes.push(n); return '([^/]+)'; })}$`);
@@ -340,6 +341,8 @@ class Servidor {
           if (b) throw new HttpErro(403, b.mensagem, b.codigo, { nome: u.nome, email: u.email });
         }
         if (rota.pode && !u.pode[rota.pode]) throw new HttpErro(403, 'Seu perfil não tem acesso a esta função.', 'perfil');
+        // controle de acesso: menu e ação liberados para este usuário (basta uma das regras da lista)
+        if (rota.acesso) exigirAcesso(u, rota.acesso);
       }
       const body = await this.readJson(req, rota.corpoMax || MAX_BODY);
       const query = Object.fromEntries(url.searchParams.entries());
@@ -644,6 +647,7 @@ class Servidor {
     const a = ev.alerta;
     this.paraTodos({ type: 'alerta', acao: ev.acao, alerta: a }, (u) => {
       if (u.perfil === 'master') return true;
+      if (!permite(u, 'alertas')) return false;
       if (a.empresaId !== u.empresaId) return false;
       if (a.veiculoId) return this.acesso.veVeiculo(u, this.frota.veiculos.get(a.veiculoId));
       return u.perfil === 'admin';
@@ -667,9 +671,25 @@ class Servidor {
     this.paraTodos({ type: 'download', download: job }, (u) => this.downloadVisivel(u, job));
   }
 
-  /** Avisa administradores (e o master) que chegou cadastro para aprovar. */
+  /** Avisa quem cuida dos usuários da empresa (e o master) que chegou cadastro para aprovar. */
   avisarPendentes(empresaId) {
-    this.paraTodos({ type: 'pendentes' }, (u) => u.perfil === 'master' || (u.perfil === 'admin' && u.empresaId === empresaId));
+    this.paraTodos({ type: 'pendentes' }, (u) => u.perfil === 'master' || (u.empresaId === empresaId && permite(u, 'usuarios')));
+  }
+
+  /** O cadastro ou o acesso de um usuário mudou: as conexões abertas dele passam a filtrar pelo que vale
+   * agora, e o painel dele recarrega o menu (sai da tela que perdeu). */
+  async atualizarUsuario(usuarioId, avisar = true) {
+    this.acesso.invalidar();
+    for (const c of this.eventos) {
+      if (!c.u || c.u.id !== usuarioId || !c.sessao) continue;
+      try {
+        c.u = await this.acesso.doClaims({ uid: c.sessao.uid, authTime: c.sessao.authTime });
+        if (avisar) c.sendJson({ type: 'acessos' });
+      } catch {
+        // desativado, empresa desativada etc.: o painel tenta reconectar, recebe a recusa e mostra o aviso
+        try { c.close(); } catch { /* já fechou */ }
+      }
+    }
   }
 
   recarregarFrota() {

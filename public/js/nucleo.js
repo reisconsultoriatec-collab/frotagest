@@ -174,6 +174,10 @@ function atualizarStatusFrota() {
 let resumoTimer = null;
 function atualizarResumoAlertas() {
   clearTimeout(resumoTimer);
+  const pode = podeTela('alertas');
+  const sino = $('#tb-alertas');
+  if (sino) sino.hidden = !pode;
+  if (!pode) { S.alertas = { pendentes: 0, novos: 0, altas: 0 }; emit('resumo-alertas'); return; }
   resumoTimer = setTimeout(async () => {
     try {
       S.alertas = await api('/api/alertas/resumo');
@@ -193,7 +197,7 @@ function atualizarResumoAlertas() {
 /** Cadastros novos aguardando aprovação: selo no menu Usuários e aviso no Início. */
 let pendentesTimer = null;
 function atualizarPendentes() {
-  if (!S.eu || !S.eu.pode.cadastros) return;
+  if (!S.eu || !podeTela('usuarios')) return;
   clearTimeout(pendentesTimer);
   pendentesTimer = setTimeout(async () => {
     try {
@@ -218,6 +222,8 @@ async function conectarEventos() {
     url = await wsUrl('/ws/eventos');
   } catch (e) {
     if (seq !== seqConexao || !S.eu) return;
+    // usuário (ou empresa) desativado enquanto o painel estava aberto: recarrega e a tela de entrada explica
+    if (e.status === 403 && ['inativo', 'empresa_inativa', 'sem_cadastro', 'pendente'].includes(e.codigo)) { location.reload(); return; }
     setTimeout(conectarEventos, Math.min(espera *= 2, 30000));
     return;
   }
@@ -315,17 +321,20 @@ function tratarEvento(m) {
     case 'sessao_encerrada':
       sessaoEncerradaPorAdmin();
       break;
+    case 'acessos': // o master (ou quem cuida do controle de acesso) mudou o que esta pessoa pode fazer
+      recarregarAcessos();
+      break;
     default:
   }
 }
 
 /* ---------- navegação ---------- */
 
+/* Cada item é uma tela do Controle de acesso (mesmo id); "master" = só o master; Início é de todos. */
 const NAV = [
   // Cadastros primeiro: é por onde a empresa começa (quem não cadastra não vê este grupo)
   {
     grupo: 'Cadastros',
-    pode: 'cadastros',
     itens: [
       // na ordem em que se monta uma empresa: empresa → DVRs → grupos → veículos → pessoas
       { id: 'empresas', nome: 'Empresas', ico: 'building', master: true },
@@ -339,32 +348,59 @@ const NAV = [
   {
     grupo: 'Operação',
     itens: [
-      { id: 'inicio', nome: 'Início', ico: 'layout-dashboard' },
+      { id: 'inicio', nome: 'Início', ico: 'layout-dashboard', todos: true },
       { id: 'mapa', nome: 'Monitoramento', ico: 'map-2' },
       { id: 'alertas', nome: 'Alertas', ico: 'bell-ringing', badge: 'nav-alertas' },
       { id: 'historico', nome: 'Histórico', ico: 'route' },
       { id: 'relatorios', nome: 'Relatórios', ico: 'file-analytics' },
-      { id: 'gravacoes', nome: 'Gravações', ico: 'video', pode: 'gravacoes' },
+      { id: 'gravacoes', nome: 'Gravações', ico: 'video' },
       { id: 'tv', nome: 'Modo TV', ico: 'device-tv' },
     ],
   },
   {
     grupo: 'Controle',
     itens: [
-      { id: 'saude', nome: 'Saúde dos aparelhos', ico: 'heartbeat', pode: 'cadastros', badge: 'nav-saude', badgeCls: 'err' },
-      { id: 'comunicacoes', nome: 'Comunicações', ico: 'antenna', pode: 'cadastros' },
-      { id: 'online', nome: 'Usuários online', ico: 'users-group', pode: 'cadastros' },
-      { id: 'auditoria', nome: 'Auditoria', ico: 'shield-check', pode: 'auditoria' },
-      { id: 'sistema', nome: 'Sistema', ico: 'server', pode: 'sistema' },
+      { id: 'saude', nome: 'Saúde dos aparelhos', ico: 'heartbeat', badge: 'nav-saude', badgeCls: 'err' },
+      { id: 'comunicacoes', nome: 'Comunicações', ico: 'antenna' },
+      { id: 'online', nome: 'Usuários online', ico: 'users-group' },
+      { id: 'auditoria', nome: 'Auditoria', ico: 'shield-check' },
+      { id: 'acesso', nome: 'Controle de acesso', ico: 'lock-access' },
+      { id: 'sistema', nome: 'Sistema', ico: 'server', master: true },
     ],
   },
 ];
 
+/** Controle de acesso: a pessoa entra nesta tela (e pode fazer esta ação)? O master pode tudo. */
+function podeTela(tela, acao = 'ver') {
+  if (!S.eu) return false;
+  if (S.eu.perfil === 'master') return true;
+  const a = S.eu.acessos && S.eu.acessos[tela];
+  return Boolean(a && a.includes(acao));
+}
+
 function podeVer(item) {
   if (!S.eu) return false;
-  if (item.master && S.eu.perfil !== 'master') return false;
-  if (item.pode && !S.eu.pode[item.pode]) return false;
-  return true;
+  if (item.todos) return true;
+  if (item.master) return S.eu.perfil === 'master';
+  return podeTela(item.id);
+}
+
+/** O acesso desta pessoa mudou: menu novo e, se perdeu a tela aberta, volta ao Início. */
+async function recarregarAcessos() {
+  if (!S.eu) return;
+  try {
+    const antes = JSON.stringify(S.eu.acessos);
+    const eu = await api('/api/eu');
+    if (!S.eu) return;
+    Object.assign(S.eu, eu);
+    if (JSON.stringify(S.eu.acessos) === antes) return;
+    montarNav();
+    abrirRota();
+    atualizarResumoAlertas();
+    atualizarPendentes();
+    atualizarSaude();
+    toast('O seu acesso ao FrotaGest foi atualizado pelo administrador.', '');
+  } catch { /* tenta de novo no próximo aviso */ }
 }
 
 /* Menu recolhível (mesmo padrão do EduGest): cada grupo abre com um clique no
@@ -374,7 +410,6 @@ function podeVer(item) {
 function montarNav() {
   let html = '';
   NAV.forEach((g, n) => {
-    if (g.pode && !S.eu.pode[g.pode]) return;
     const itens = g.itens.filter(podeVer);
     if (!itens.length) return;
     const links = itens.map((it) => `<a class="sb-item" href="#/${it.id}" data-nav="${it.id}">${ico(it.ico)}<span>${H(it.nome)}</span>${it.badge ? `<span class="sb-badge ${it.badgeCls || 'err'}" id="${it.badge}" hidden></span>` : ''}</a>`).join('');
@@ -447,8 +482,9 @@ function abrirRota() {
   if (!S.eu) return;
   const id = (location.hash.replace(/^#\/?/, '').split('?')[0]) || 'inicio';
   let pag = PAGINAS[id];
-  const nav = NAV.flatMap((g) => g.itens.map((i) => ({ ...i, pode: i.pode || g.pode }))).find((i) => i.id === id);
-  if (!pag || (nav && !podeVer(nav))) {
+  const nav = NAV.flatMap((g) => g.itens).find((i) => i.id === id);
+  // tela que não está no menu (ex.: alguma interna) segue a regra da própria página, se tiver
+  if (!pag || (nav ? !podeVer(nav) : (pag.tela && !podeTela(pag.tela)))) {
     pag = PAGINAS.inicio;
     if (id !== 'inicio') { history.replaceState(null, '', '#/inicio'); }
   }
@@ -500,11 +536,12 @@ function janela({ titulo, icone = null, corpo = '', rodape = '', tamanho = '', a
   return { el: back, fechar };
 }
 
-function confirmar(texto, { titulo = 'Confirmar', ok = 'Confirmar', perigo = false } = {}) {
+/** html: true quando o texto já vem montado (e escapado) por quem chama. */
+function confirmar(texto, { titulo = 'Confirmar', ok = 'Confirmar', perigo = false, html = false } = {}) {
   return new Promise((resolve) => {
     let resp = false;
     const j = janela({
-      titulo, tamanho: 'sm', corpo: `<p style="margin:0">${H(texto)}</p>`,
+      titulo, tamanho: 'sm', corpo: html ? texto : `<p style="margin:0">${H(texto)}</p>`,
       rodape: `<button class="btn" type="button" data-fechar>Cancelar</button><button class="btn ${perigo ? 'btn-danger' : 'btn-primary'}" type="button" data-ok>${H(ok)}</button>`,
       aoFechar: () => resolve(resp),
     });

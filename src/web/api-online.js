@@ -93,7 +93,7 @@ function registrar(srv) {
         ativos: sessoes.filter((s) => s.ociosoSeg < 600).length,
       },
     };
-  }, { pode: 'cadastros' });
+  }, { acesso: 'online.ver' });
 
   srv.rota('POST', '/api/online/encerrar', async ({ u, body, claims, ip }) => {
     const id = typeof body.conexao === 'string' ? body.conexao : '';
@@ -102,6 +102,7 @@ function registrar(srv) {
     if (!visiveis(u, null).includes(c)) throw new HttpErro(404, 'Essa sessão já não está mais conectada.');
     const s = c.sessao;
     if (s.uid === claims.uid && s.authTime === claims.authTime) throw new HttpErro(400, 'Esta é a sua própria sessão: para sair, use o botão Sair.');
+    if (c.u.perfil === 'admin' && u.perfil !== 'admin' && u.perfil !== 'master') throw new HttpErro(403, 'Só o administrador da empresa (ou o master) encerra a sessão de um administrador.');
     if (!s.authTime) throw new HttpErro(409, 'Não foi possível identificar o login dessa sessão.');
     await acesso.encerrarSessao(s.uid, s.authTime, c.u.id, u.id);
     acesso.invalidar();
@@ -112,7 +113,7 @@ function registrar(srv) {
       descricao: `Encerrou a sessão de ${c.u.nome} <${c.u.email}> (${nav.texto}, IP ${s.ip}${n > 1 ? `, ${n} abas` : ''})`,
     });
     return { ok: true, abas: n };
-  }, { pode: 'cadastros', limite: { chave: 'encerrar', max: 30, minutos: 10 } });
+  }, { acesso: 'online.alterar', limite: { chave: 'encerrar', max: 30, minutos: 10 } });
 }
 
 module.exports = { registrar, navegador };

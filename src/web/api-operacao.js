@@ -6,7 +6,7 @@
  */
 const os = require('os');
 const { HttpErro, validar: V, formatar, paraMs, agora } = require('../util/comum');
-const { empresaAlvo } = require('../auth/acesso');
+const { empresaAlvo, permite } = require('../auth/acesso');
 const { normalizeId } = require('../protocolo/jt808');
 
 const MAX_PONTOS = 20000;
@@ -40,6 +40,7 @@ function registrar(srv) {
     return {
       id: u.id, nome: u.nome, email: u.email, perfil: u.perfil, perfilNome: u.perfilNome,
       empresaId: u.empresaId, empresaNome: u.empresaNome, todosGrupos: u.todosGrupos, pode: u.pode,
+      acessos: u.acessos, acessoPersonalizado: Boolean(u.acessoPersonalizado),
       sessaoMin: config.numeroOuZero('sessao_inatividade_min'),
       doisFatores: { ativo: u.doisFatoresAtivo, exigido: srv.doisFatores ? srv.doisFatores.exige(u) : false },
     };
@@ -133,7 +134,7 @@ function registrar(srv) {
       resumo: { pontos: rows.length, km: Math.round(km * 10) / 10, velocidadeMax: velMax, movimentoMin: Math.round(movimentoSeg / 60) },
       posicoes: rows,
     };
-  });
+  }, { acesso: ['historico.ver', 'mapa.ver'] });
 
   /* ---------------- alertas ---------------- */
 
@@ -173,7 +174,7 @@ function registrar(srv) {
         ${where} ORDER BY a.inicio DESC, a.id DESC LIMIT ?`, [...args, limite]);
     const cont = await banco.um(`SELECT COUNT(*) AS n, SUM(a.situacao = 'novo') AS novos FROM alertas a ${where}`, args);
     return { alertas, total: Number(cont.n) || 0, novos: Number(cont.novos) || 0 };
-  });
+  }, { acesso: 'alertas.ver' });
 
   r('GET', '/api/alertas/resumo', async ({ u }) => {
     const onde = ["a.situacao <> 'tratado'"];
@@ -188,7 +189,7 @@ function registrar(srv) {
     const x = await banco.um(`SELECT COUNT(*) AS pendentes, SUM(a.situacao = 'novo') AS novos, SUM(a.gravidade = 'alta' AND a.situacao = 'novo') AS altas
       FROM alertas a WHERE ${onde.join(' AND ')}`, args);
     return { pendentes: Number(x.pendentes) || 0, novos: Number(x.novos) || 0, altas: Number(x.altas) || 0 };
-  });
+  }, { acesso: 'alertas.ver' });
 
   r('POST', '/api/alertas/:id/tratar', async ({ u, params, body, ip }) => {
     const id = V.id(params.id, 'o alerta');
@@ -203,12 +204,11 @@ function registrar(srv) {
     await auditoria.registrar(u, 'tratar_alerta', { entidade: 'alerta', entidadeId: id, descricao: `${a.nome}: ${situacao}${tratativa ? ` — ${tratativa}` : ''}`, ip, empresaId: a.empresa_id });
     srv.enviarAlerta({ acao: 'tratado', alerta: { id, empresaId: a.empresa_id, veiculoId: a.veiculo_id, aparelhoId: a.aparelho_id, situacao, tratadoPor: u.nome } });
     return { ok: true };
-  }, { pode: 'tratarAlertas' });
+  }, { acesso: 'alertas.alterar' });
 
   /* ---------------- comunicações (conexões e comandos) ---------------- */
 
   r('GET', '/api/comunicacoes', async ({ u, query }) => {
-    if (!u.pode.cadastros) throw new HttpErro(403, 'Seu perfil não tem acesso a esta função.');
     const { de, ate } = periodo(query, 31);
     const onde = [];
     const args = [];
@@ -248,7 +248,7 @@ function registrar(srv) {
       if (u.perfil !== 'master') { i.ip = null; i.porta = null; }
     }
     return { itens };
-  });
+  }, { acesso: 'comunicacoes.ver' });
 
   /* ---------------- auditoria ---------------- */
 
@@ -265,7 +265,7 @@ function registrar(srv) {
         FROM auditoria x LEFT JOIN usuarios us ON us.id = x.usuario_id LEFT JOIN empresas e ON e.id = x.empresa_id
        WHERE ${onde.join(' AND ')} ORDER BY x.data_hora DESC, x.id DESC LIMIT 1000`, args);
     return { itens };
-  }, { pode: 'auditoria' });
+  }, { acesso: 'auditoria.ver' });
 
   /* ---------------- sistema (master) ---------------- */
 
@@ -318,9 +318,12 @@ function registrar(srv) {
 
   /* ---------------- comandos ao DVR ---------------- */
 
+  /** capacidade: 'sistema' (master) ou 'tela.acao' do controle de acesso. */
   function dvr(u, ident, capacidade) {
     const id = normalizeId(V.identificador(ident));
-    if (capacidade && !u.pode[capacidade]) throw new HttpErro(403, 'Seu perfil não tem acesso a esta função.');
+    if (capacidade === 'sistema' ? !u.pode.sistema : capacidade && !permite(u, ...capacidade.split('.'))) {
+      throw new HttpErro(403, 'Você não tem acesso a esta função. Fale com o administrador do sistema.', 'sem_acesso');
+    }
     if (!acesso.aparelhoVisivel(u, id)) throw new HttpErro(404, 'Aparelho não encontrado.');
     return id;
   }
@@ -337,7 +340,7 @@ function registrar(srv) {
   // câmera ao vivo fica na auditoria (uma linha por pessoa, aparelho e canal a cada 10 min)
   const vistos = new Map();
   r('POST', '/api/dvr/:ident/video/iniciar', async ({ u, params, body, ip }) => {
-    const id = dvr(u, params.ident, 'video');
+    const id = dvr(u, params.ident, 'cameras.ver');
     const ch = canal(body.canal);
     media.expect(id, ch, 'live');
     const serial = gateway.comoUsuario(u.id, () => gateway.startVideo(id, { channel: ch, stream: Number(body.fluxo) === 0 ? 0 : 1 }, midia(id)));
@@ -354,13 +357,13 @@ function registrar(srv) {
   });
 
   r('POST', '/api/dvr/:ident/video/parar', async ({ u, params, body }) => {
-    const id = dvr(u, params.ident, 'video');
+    const id = dvr(u, params.ident, 'cameras.ver');
     const ch = canal(body.canal);
     return { ok: true, serial: gateway.comoUsuario(u.id, () => gateway.stopVideo(id, ch)) };
   });
 
   r('POST', '/api/dvr/:ident/gravacoes/buscar', async ({ u, params, body }) => {
-    const id = dvr(u, params.ident, 'gravacoes');
+    const id = dvr(u, params.ident, 'gravacoes.ver');
     const ch = canal(body.canal, true);
     const { start, end } = periodoDvr(body);
     const list = await gateway.comoUsuario(u.id, () => gateway.queryResources(id, { channel: ch, start, end }));
@@ -368,7 +371,7 @@ function registrar(srv) {
   });
 
   r('POST', '/api/dvr/:ident/reproducao/iniciar', async ({ u, params, body, ip }) => {
-    const id = dvr(u, params.ident, 'gravacoes');
+    const id = dvr(u, params.ident, 'gravacoes.ver');
     const ch = canal(body.canal);
     const { start, end } = periodoDvr(body);
     const s = media.expect(id, ch, 'playback', { purpose: 'ver', start, end });
@@ -385,7 +388,7 @@ function registrar(srv) {
   });
 
   r('POST', '/api/dvr/:ident/reproducao/controle', async ({ u, params, body }) => {
-    const id = dvr(u, params.ident, 'gravacoes');
+    const id = dvr(u, params.ident, 'gravacoes.ver');
     const ch = canal(body.canal);
     const actions = { continuar: 0, pausar: 1, encerrar: 2, acelerar: 3 };
     if (!Object.prototype.hasOwnProperty.call(actions, body.acao)) throw new HttpErro(400, 'Ação inválida.');
@@ -395,7 +398,7 @@ function registrar(srv) {
   });
 
   r('POST', '/api/dvr/:ident/downloads', async ({ u, params, body, ip }) => {
-    const id = dvr(u, params.ident, 'gravacoes');
+    const id = dvr(u, params.ident, 'gravacoes.incluir');
     const ch = canal(body.canal);
     const { start, end } = periodoDvr(body);
     const ap = frota.porIdent.get(id);
@@ -426,7 +429,7 @@ function registrar(srv) {
 
   /* ---------------- downloads ---------------- */
 
-  r('GET', '/api/downloads', async ({ u }) => ({ downloads: srv.downloadsVisiveis(u), ffmpeg: recorder.hasFfmpeg }), { pode: 'gravacoes' });
+  r('GET', '/api/downloads', async ({ u }) => ({ downloads: srv.downloadsVisiveis(u), ffmpeg: recorder.hasFfmpeg }), { acesso: 'gravacoes.ver' });
 
   r('POST', '/api/downloads/:id/:acao', async ({ u, params, ip }) => {
     if (!/^[0-9a-f]{12}$/.test(params.id)) throw new HttpErro(404, 'Download não encontrado.');
@@ -440,7 +443,7 @@ function registrar(srv) {
     if (params.acao === 'cancelar') { recorder.cancel(job.id); return { ok: true }; }
     if (params.acao === 'excluir') { recorder.remove(job.id); return { ok: true }; }
     throw new HttpErro(404, 'Ação inválida.');
-  }, { pode: 'gravacoes' });
+  }, { acesso: 'gravacoes.incluir' });
 }
 
 function distanciaKm(lat1, lon1, lat2, lon2) {
