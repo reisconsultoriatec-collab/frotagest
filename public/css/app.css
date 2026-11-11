@@ -1197,3 +1197,47 @@ button.gr-lb-l:hover { background: var(--fundo-hover); }
 .db-sem-ico .i { width: 26px; height: 26px; }
 .db-sem h2 { margin: 6px 0 0; font-size: 19px; }
 .db-sem p { margin: 0; color: var(--ink-2); line-height: 1.55; }
+
+/* ---------- 1.9 — Regras de alerta ---------- */
+.rg-intro { display: flex; gap: 14px; align-items: flex-start; padding: 16px 18px; line-height: 1.5; }
+.rg-intro .sub { display: block; color: var(--ink-2); font-size: 13.5px; margin-top: 2px; }
+.rg-intro-ico { width: 40px; height: 40px; border-radius: 11px; display: grid; place-items: center; background: var(--amber-50); color: var(--amber-600); flex: none; }
+.rg-grade { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; align-items: start; }
+.rg-tipo { padding: 0; overflow: hidden; }
+.rg-head { display: flex; gap: 12px; align-items: flex-start; padding: 16px 16px 14px; border-bottom: 1px solid var(--line); }
+.rg-ico { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; background: var(--fundo-suave); color: var(--ink-soft); flex: none; }
+.rg-head-txt { flex: 1; min-width: 0; }
+.rg-head h3 { margin: 0; font-size: 15.5px; font-family: var(--display); }
+.rg-head p { margin: 3px 0 0; color: var(--ink-2); font-size: 13px; line-height: 1.45; }
+.rg-head .btn { flex: none; }
+.rg-lista { display: flex; flex-direction: column; }
+.rg-vazio { margin: 0; padding: 16px; color: var(--ink-3); font-size: 13.5px; }
+.rg-item { display: flex; gap: 12px; align-items: center; justify-content: space-between; padding: 12px 16px; border-top: 1px solid var(--line-2); }
+.rg-item:first-child { border-top: 0; }
+.rg-item.clic { cursor: pointer; }
+.rg-item.clic:hover { background: var(--fundo-hover); }
+.rg-item.off .rg-item-txt { opacity: .55; }
+.rg-item-txt { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.rg-alvo { display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 14px; flex-wrap: wrap; }
+.rg-alvo .i { color: var(--ink-3); }
+.rg-alvo small { font-weight: 500; color: var(--ink-3); }
+.rg-par { color: var(--ink-2); font-size: 13px; }
+.rg-par b { color: var(--ink); font-weight: 600; }
+.rg-item-lado { display: flex; align-items: center; gap: 10px; flex: none; }
+.rg-n { color: var(--ink-3); font-size: 12px; white-space: nowrap; }
+.switch { position: relative; display: inline-flex; width: 38px; height: 22px; flex: none; cursor: pointer; }
+.switch input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+.switch span { position: absolute; inset: 0; border-radius: 999px; background: var(--linha-forte); transition: background .2s; pointer-events: none; }
+.switch span::after { content: ''; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0, 0, 0, .25); transition: transform .2s; }
+.switch input:checked + span { background: var(--ok); }
+.switch input:checked + span::after { transform: translateX(16px); }
+.switch input:focus-visible + span { outline: 2px solid var(--amber); outline-offset: 2px; }
+.switch input:disabled + span { opacity: .6; }
+@media (max-width: 1080px) { .rg-grade { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 560px) {
+  .rg-item { flex-direction: column; align-items: stretch; }
+  .rg-item-lado { justify-content: space-between; }
+  .rg-head { flex-wrap: wrap; }
+}
+.rg-sem-garagem { display: inline-flex; gap: 6px; align-items: flex-start; margin-top: 6px; color: var(--amber-ink); font-weight: 600; }
+.rg-sem-garagem .i { flex: none; margin-top: 2px; }

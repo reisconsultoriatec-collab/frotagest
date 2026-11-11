@@ -20,6 +20,7 @@ const { Frota } = require('./src/servicos/frota');
 const { Historico } = require('./src/servicos/historico');
 const { Monitor } = require('./src/servicos/monitor');
 const { Cercas } = require('./src/servicos/cercas');
+const { Regras } = require('./src/servicos/regras');
 const { Configuracoes } = require('./src/servicos/configuracoes');
 const { Auditoria } = require('./src/servicos/auditoria');
 const { Retencao } = require('./src/servicos/retencao');
@@ -40,6 +41,7 @@ const { Relatorios } = require('./src/relatorios/relatorios');
 const { Logotipos } = require('./src/servicos/logotipos');
 const { Painel } = require('./src/servicos/painel');
 const apiPainel = require('./src/web/api-painel');
+const apiRegras = require('./src/web/api-regras');
 const { definirFuso, gerarCodigo } = require('./src/util/comum');
 const { version } = require('./package.json');
 
@@ -181,6 +183,9 @@ async function main() {
   const recorder = new Recorder(cfg.gravacoes, DATA, gateway, media, midiaPara);
   const transcoders = new TranscoderManager(cfg.media, media, cfg.gravacoes.ffmpeg);
   const monitor = new Monitor({ frota, gateway, historico, cercas });
+  const regras = new Regras({ banco, frota, historico, cercas, gateway, log: (level, text) => log(level, text) });
+  await regras.carregar();
+  frota.on('recarregada', () => regras.frotaMudou());
   const fbOpcoes = { publicUrl: cfg.web.publicUrl };
   // só para testes automatizados (certificados e API de contas simulados)
   if (process.env.FROTAGEST_TESTE_CERTS) fbOpcoes.buscarCertificados = async () => ({ certs: JSON.parse(fs.readFileSync(process.env.FROTAGEST_TESTE_CERTS, 'utf8')), validadeSeg: 60 });
@@ -195,7 +200,8 @@ async function main() {
     cfg: cfg.web, versao: version, gateway, media, mediaCfg: cfg.media, recorder, transcoders, frota, historico, monitor, acesso,
     firebase, banco, config, auditoria, retencao, logs: ring, mensagens, iniciadoEm: Date.now(), cercas, doisFatores, logotipos: new Logotipos(banco),
     relatorios: new Relatorios({ banco, frota, acesso, cercas }),
-    painel: new Painel({ banco, frota, log: (level, text) => log(level, text) }),
+    painel: new Painel({ banco, frota, regras, log: (level, text) => log(level, text) }),
+    regras,
   });
   apiOperacao.registrar(srv);
   apiConta.registrar(srv);
@@ -206,6 +212,7 @@ async function main() {
   apiOnline.registrar(srv);
   apiAcessos.registrar(srv);
   apiPainel.registrar(srv);
+  apiRegras.registrar(srv);
   apiDoisFatores.registrar(srv);
   srv.onLog = (e) => log(e.level, e.text, { source: 'painel' });
 
@@ -229,12 +236,14 @@ async function main() {
   gateway.on('online', (d) => {
     historico.evento(d.id, 'conectou', { ip: d.ip, porta: d.port, detalhe: d.protocolo });
     historico.conexao(d.id, true, { ip: d.ip, protocolo: d.protocolo });
+    regras.conexao(d.id, true);
     if (!frota.porIdent.has(d.id)) historico.pendente(d.id, { ip: d.ip, porta: d.port, protocolo: d.protocolo });
     agendarItem(d.id);
   });
   gateway.on('offline', (d) => {
     historico.evento(d.id, 'desconectou', { ip: d.ip, porta: d.port, detalhe: d.motivo });
     historico.conexao(d.id, false);
+    regras.conexao(d.id, false);
     agendarItem(d.id);
   });
   gateway.on('recusado', (d) => {
@@ -252,6 +261,7 @@ async function main() {
   gateway.on('position', ({ id, position }) => {
     const r = historico.posicao(id, position, position.receivedAt);
     try { cercas.posicao(id, position, r); } catch (e) { log('erro', `Cercas: ${e.message}`); }
+    try { regras.posicao(id, position, r); } catch (e) { log('erro', `Regras de alerta: ${e.message}`); }
     agendarItem(id);
   });
   // entrou/saiu de cerca: as telas abertas na lista de cercas e no modo TV atualizam a ocupação
@@ -279,6 +289,7 @@ async function main() {
   }
   retencao.iniciar();
   srv.painel.iniciar();
+  regras.iniciar();
   limparLogs();
 
   let saindo = false;
@@ -302,7 +313,7 @@ async function main() {
   console.log(`  Login:              Firebase — ${fb}`);
   console.log(`  DVRs (sinalização): porta(s) ${portaTxt(r1)}`);
   console.log(`  Vídeo:              porta(s) ${portaTxt(r2)}`);
-  console.log(`  Cadastros:          ${frota.empresas.size} empresa(s), ${frota.veiculos.size} veículo(s), ${frota.aparelhos.size} aparelho(s), ${cercas.lista.size} cerca(s)`);
+  console.log(`  Cadastros:          ${frota.empresas.size} empresa(s), ${frota.veiculos.size} veículo(s), ${frota.aparelhos.size} aparelho(s), ${cercas.lista.size} cerca(s), ${regras.lista.size} regra(s) de alerta`);
   console.log(`  Painel:             http://${cfg.web.host === '0.0.0.0' ? '127.0.0.1' : cfg.web.host}:${cfg.web.port}${cfg.web.publicUrl ? `  ·  ${cfg.web.publicUrl}` : ''}`);
   console.log(`  Vídeo H.265:        ${transcoders.enabled ? 'convertido para H.264 no servidor' : `enviado direto ao navegador (${transcoders.reason || 'conversão desligada'})`}`);
   if (!cfg.proprietarios.length) console.log('  Aviso: nenhum e-mail em "proprietarios" no config.json — ninguém entra como master.');

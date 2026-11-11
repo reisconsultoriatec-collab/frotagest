@@ -318,6 +318,9 @@ function tratarEvento(m) {
       S.cercas = null;
       emit('cercas');
       break;
+    case 'regras': // alguém mudou as regras de alerta
+      emit('regras');
+      break;
     case 'sessao_encerrada':
       sessaoEncerradaPorAdmin();
       break;
@@ -348,6 +351,7 @@ const NAV = [
       { id: 'grupos', nome: 'Grupos', ico: 'folders' },
       { id: 'veiculos', nome: 'Veículos', ico: 'bus' },
       { id: 'cercas', nome: 'Cercas', ico: 'fence' },
+      { id: 'regras', nome: 'Regras de alerta', ico: 'bell-cog' },
       { id: 'usuarios', nome: 'Usuários', ico: 'users', badge: 'nav-pendentes', badgeCls: 'warn' },
     ],
   },
@@ -621,7 +625,7 @@ function formulario({ titulo, icone, campos, valores = {}, salvar, textoSalvar =
         return `<div class="${cls}"${se}>${H(c.rotulo)}<div class="canais-grid" data-canais="${c.nome}">${ins}</div>${ajuda}</div>`;
       }
       default: {
-        const tipo = { email: 'email', numero: 'number', senha: 'password', data: 'datetime-local' }[c.tipo] || 'text';
+        const tipo = { email: 'email', numero: 'number', senha: 'password', data: 'datetime-local', hora: 'time' }[c.tipo] || 'text';
         const extra = [c.min !== undefined ? `min="${c.min}"` : '', c.max !== undefined && c.tipo === 'numero' ? `max="${c.max}"` : '', c.maxlength ? `maxlength="${c.maxlength}"` : '', c.placeholder ? `placeholder="${H(c.placeholder)}"` : ''].join(' ');
         return `<label class="${cls}"${se}><span>${H(c.rotulo)}${req}</span><input type="${tipo}" name="${c.nome}" id="${id}" value="${H(v(c.nome))}" ${extra}${dis}${c.tipo === 'email' ? ' autocomplete="off"' : ''}>${ajuda}</label>`;
       }

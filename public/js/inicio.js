@@ -363,7 +363,7 @@ PAGINAS.dashboard = (() => {
     contar($('#k-km-v'), h.km, fmtKm);
     const rodaram = h.veic.filter((v) => v.km >= 0.5).length;
     const mov = h.veic.reduce((t, v) => t + v.movimento, 0);
-    $('#k-km-sub').innerHTML = `${fmtNum(rodaram)} veículo${rodaram === 1 ? '' : 's'} rodaram · ${fmtNum(Math.round(mov / 3600))} h em movimento${h.excessos ? ` · ${fmtNum(h.excessos)} excesso${h.excessos === 1 ? '' : 's'} acima de ${dados.limiteKmh} km/h` : ''}`;
+    $('#k-km-sub').innerHTML = `${fmtNum(rodaram)} veículo${rodaram === 1 ? '' : 's'} rodaram · ${fmtNum(Math.round(mov / 3600))} h em movimento${h.excessos ? ` · ${fmtNum(h.excessos)} excesso${h.excessos === 1 ? '' : 's'} ${dados.limiteKmh ? `acima de ${dados.limiteKmh} km/h` : 'acima do limite'}` : ''}`;
     // comparação justa: ontem até esta mesma hora
     const d = $('#k-km-delta');
     d.textContent = '';

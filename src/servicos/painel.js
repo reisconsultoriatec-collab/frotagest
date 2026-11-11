@@ -17,7 +17,7 @@ const DIAS_HISTORICO = 14;
 const PARADO_KMH = 3; // iguais aos dos relatórios
 const LACUNA_SEG = 600;
 const JUNTAR_EXCESSO_SEG = 60;
-const LIMITE_KMH = 80; // excesso de velocidade no dashboard (o relatório deixa escolher)
+const LIMITE_KMH = 80; // excesso de velocidade quando o veículo não tem regra de velocidade (o relatório deixa escolher)
 const ATUALIZAR_MS = 15000; // no máximo uma leitura de posições novas a cada 15 s
 const LOTE = 20000;
 
@@ -26,7 +26,8 @@ const diaMais = (dia, n) => formatar(paraMs(`${dia} 12:00:00`) + n * 86400000).s
 
 /** Acumulador de um veículo no dia (mesmas regras do relatorios.analisar, posição a posição). */
 class Acumulador {
-  constructor() {
+  constructor(limite = LIMITE_KMH) {
+    this.limite = limite;
     this.km = 0;
     this.ligado = 0;
     this.movimento = 0;
@@ -67,7 +68,7 @@ class Acumulador {
       }
     }
     this.antGps = { t, lat, lon };
-    if (vel > LIMITE_KMH) {
+    if (vel > this.limite) {
       if (!this.ultimoAcima || (t - this.ultimoAcima) / 1000 > JUNTAR_EXCESSO_SEG) this.excessos++;
       this.ultimoAcima = t;
     }
@@ -83,9 +84,10 @@ class Acumulador {
 }
 
 class Painel {
-  constructor({ banco, frota, log }) {
+  constructor({ banco, frota, regras = null, log }) {
     this.banco = banco;
     this.frota = frota;
+    this.regras = regras;
     this.log = typeof log === 'function' ? log : () => {}; // log(nível, texto)
     this.dia = null;
     this.acc = new Map(); // veiculoId → Acumulador (hoje)
@@ -105,6 +107,11 @@ class Painel {
 
   parar() {
     clearInterval(this.timer);
+  }
+
+  /** Limite de velocidade do veículo: o da regra de velocidade dele (fora das cercas), senão 80 km/h. */
+  limiteDe(veiculoId) {
+    return (this.regras && this.regras.limiteDe(veiculoId)) || LIMITE_KMH;
   }
 
   /* ---------- hoje (ao vivo) ---------- */
@@ -128,7 +135,7 @@ class Painel {
         `SELECT data_hora, latitude, longitude, velocidade, ignicao, gps_valido FROM posicoes
           WHERE veiculo_id = ? AND data_hora >= ? AND id <= ? ORDER BY data_hora, id`, [v.id, `${hoje} 00:00:00`, ate]);
       if (!rows.length) continue;
-      const a = new Acumulador();
+      const a = new Acumulador(this.limiteDe(v.id));
       for (const p of rows) a.passo(p);
       acc.set(v.id, a);
     }
@@ -150,6 +157,7 @@ class Painel {
         if (!p.veiculo_id || p.data_hora < inicio) continue;
         let a = this.acc.get(p.veiculo_id);
         if (!a) { a = new Acumulador(); this.acc.set(p.veiculo_id, a); }
+        a.limite = this.limiteDe(p.veiculo_id); // regra mudou no meio do dia: vale dali em diante
         a.passo(p);
       }
       if (rows.length < LOTE) break;
@@ -187,7 +195,7 @@ class Painel {
       const rows = ids.includes(id) ? await this.banco.query(
         `SELECT data_hora, latitude, longitude, velocidade, ignicao, gps_valido FROM posicoes
           WHERE veiculo_id = ? AND data_hora BETWEEN ? AND ? ORDER BY data_hora, id`, [id, de, ate]) : [];
-      const a = analisar(rows, { limite: LIMITE_KMH });
+      const a = analisar(rows, { limite: this.limiteDe(id) });
       const porHora = new Acumulador(); // mesma conta, guardando os km de cada hora (comparar "até esta hora")
       for (const p of rows) porHora.passo(p);
       linhas.push([dia, id, Math.round(a.km * 100) / 100, Math.round(a.ligadoSeg), Math.round(a.movimentoSeg), a.velMax || 0, a.excessos.length, alertas.get(id) || 0,
@@ -216,11 +224,13 @@ class Painel {
     const r = {
       dia: hoje,
       atualizadoEm: formatar(this.atualizadoEm || Date.now()),
-      limiteKmh: LIMITE_KMH,
+      limiteKmh: null, // o mesmo para todos os veículos? (cada um pode ter o seu pelas regras)
       hoje: ids.map((id) => this.acc.get(id)).map((a, k) => (a ? a.publico(ids[k]) : null)).filter(Boolean),
       dias: [],
       historico: {},
     };
+    const limites = new Set(ids.map((id) => this.limiteDe(id)));
+    r.limiteKmh = limites.size <= 1 ? (limites.values().next().value || LIMITE_KMH) : null;
     for (let n = DIAS_HISTORICO - 1; n >= 1; n--) r.dias.push(diaMais(hoje, -n));
     if (ids.length) {
       const rows = await this.banco.query(

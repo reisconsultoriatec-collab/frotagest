@@ -57,6 +57,7 @@ A tabela acima é o **padrão** de cada perfil. Em **Controle › Controle de ac
 | `empresas_logo` | Logotipo de cada empresa cliente (PNG para a tela, JPEG para os PDFs) | sempre |
 | `usuarios.acessos` | Controle de acesso: só os menus e ações que diferem do padrão do perfil (vazio = padrão) | sempre |
 | `painel_dias`, `painel_dias_ok` | Dashboard: totais de cada dia por veículo (km, km por hora, tempos, excessos, alertas), calculados das posições uma vez por dia | sempre (o dia de hoje é calculado ao vivo) |
+| `regras_alerta` | Regras de alerta da empresa (velocidade, horário, parada longa, motor ligado parado) | sempre |
 | `codigos_recuperacao`, `sessoes_2fa` | Verificação em duas etapas: códigos de recuperação (só o resumo SHA-256) e os logins que já passaram pela segunda etapa | até zerar / 90 dias |
 | `eventos_aparelho`, `comandos` | Comunicações: conexões/desconexões e comandos enviados com a resposta | 180 dias |
 | `auditoria` | Acessos, cadastros, câmeras abertas, gravações vistas e baixadas, relatórios exportados, tratamento de alertas | 730 dias (mínimo 180) |
@@ -140,9 +141,28 @@ O Dashboard se atualiza sozinho:
 - **Hoje, hora a hora** (km ou veículos rodando, com a linha de ontem), **últimos 14 dias**, **alertas de hoje** por hora e gravidade e por tipo, **garagens agora**, **quem mais rodou hoje** e **quem está sem comunicação** há mais tempo, e a tabela **por grupo**.
 - **Filtro por grupo** no alto vale para tudo (ou clique num grupo na tabela). Passe o mouse (ou use as setas do teclado) nos gráficos para ver os números; "Ver como tabela" mostra os mesmos números em tabela.
 - Cada cartão leva para a tela do assunto: a situação leva ao Monitoramento já filtrado, um dia do gráfico abre o relatório daquele dia, um veículo abre no mapa. Tudo respeita o **Controle de acesso** (quem não tem Alertas não vê os gráficos de alerta, e o servidor nem manda esses dados).
-- Os km e os tempos usam **a mesma conta dos relatórios**. O dia de hoje é calculado ao vivo, lendo só as posições novas; cada dia fechado fica guardado em `painel_dias`, e ao iniciar o servidor completa sozinho os últimos 14 dias que faltarem. Excesso de velocidade no dashboard: acima de 80 km/h.
+- Os km e os tempos usam **a mesma conta dos relatórios**. O dia de hoje é calculado ao vivo, lendo só as posições novas; cada dia fechado fica guardado em `painel_dias`, e ao iniciar o servidor completa sozinho os últimos 14 dias que faltarem. Excesso de velocidade no dashboard: acima do limite da regra de velocidade de cada veículo (seção 3.8); sem regra, 80 km/h.
 
-## 3.8 Sessão e avisos
+## 3.8 Regras de alerta
+
+Em **Cadastros › Regras de alerta** a empresa decide o que quer acompanhar, além dos alarmes que o próprio DVR manda e das cercas. O **servidor confere as regras o tempo todo** (a cada posição e a cada 20 s), mesmo com o painel fechado, e abre o alerta na hora: ele aparece no mapa, na lista de alertas, no som e na notificação como qualquer outro.
+
+| Regra | Avisa quando | Ajustes |
+|---|---|---|
+| **Excesso de velocidade** | passa do limite por mais tempo que a tolerância | limite (km/h), tolerância (s, padrão 20), em qualquer lugar ou **só dentro de uma cerca** |
+| **Uso fora do horário** | o veículo é ligado ou anda fora dos dias e do horário permitidos | dias da semana, das/até (pode passar da meia-noite), tolerância (min) |
+| **Parada longa** | fica parado (ligado ou desligado) mais que o tempo, fora das garagens | minutos (padrão 30), não avisar nas garagens / nos pontos |
+| **Motor ligado parado** | o motor fica ligado com o veículo parado mais que o tempo | minutos (padrão 10), não avisar nas garagens / nos pontos |
+
+- Cada regra vale para **a empresa toda, um grupo (com os subgrupos) ou um veículo**, e tem a gravidade escolhida. **Vale a regra mais específica**: a do veículo, senão a do grupo mais próximo, senão a da empresa toda (ex.: empresa a 80 km/h e o grupo Rodoviário a 100 km/h). Dentro de uma cerca com limite próprio vale o limite da cerca (ex.: 20 km/h no pátio da garagem).
+- O alerta **fica aberto enquanto a situação durar e fecha sozinho** (voltou abaixo do limite, desligou o motor, saiu do lugar, entrou no horário). No excesso de velocidade o alerta guarda a maior velocidade do trecho. Se o aparelho cai, o excesso, o uso fora do horário e o motor ligado parado fecham; a parada continua (o veículo ficou onde estava).
+- A parada longa vale também para o veículo desligado com o DVR apagado (o "dormiu na rua"), pela última posição. Aparelho sem contato há mais de 1 dia não abre parada nova. **Desenhe as garagens em Cercas antes**: sem garagem, todo veículo parado conta (a tela avisa).
+- Posições que chegam atrasadas (área sem sinal) não abrem alerta antigo; os relatórios mostram esses trechos.
+- O botão de cada regra **liga e desliga** sem apagar; desligar ou excluir fecha os alertas dela que estavam abertos. A lista mostra quantos alertas cada regra gerou nos últimos 7 dias.
+- No **Controle de acesso** a tela "Regras de alerta" vem liberada para o administrador; quem só enxerga alguns grupos mexe só nas regras desses grupos e veículos. Tudo fica na auditoria.
+- O **Dashboard** passa a contar o excesso de velocidade pelo limite da regra de cada veículo.
+
+## 3.9 Sessão e avisos
 
 - **Sessão encerrada por falta de uso** depois do tempo de **Sistema › Configurações › Segurança** (padrão 60 min; 0 = nunca, só para telas de central/TV). Um minuto antes aparece “Você ainda está aí?”. Vale também se a janela foi fechada sem clicar em Sair.
 - **Tema claro ou escuro:** botão da lua/sol no topo; a escolha fica no navegador (sem escolha, segue o tema do sistema). No escuro, o mapa de ruas também escurece; o satélite fica como está.

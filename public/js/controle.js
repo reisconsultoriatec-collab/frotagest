@@ -18,6 +18,7 @@ const NOMES_ACAO = {
 const NOMES_ENTIDADE = {
   empresa: 'Empresa', usuario: 'Usuário', grupo: 'Grupo', veiculo: 'Veículo', aparelho: 'Aparelho', aparelho_pendente: 'Aparelho pendente',
   perfil_protocolo: 'Perfil de protocolo', configuracoes: 'Configurações', alerta: 'Alerta', download: 'Download',
+  cerca: 'Cerca', regra_alerta: 'Regra de alerta',
 };
 
 /* ---------------- comunicações ---------------- */

@@ -32,8 +32,8 @@ function nomeAlarme(codigo) {
 }
 
 const r6 = (n) => Math.round(Number(n) * 1e6) / 1e6;
-/** Alerta que não vem dos bits de alarme do DVR (cercas: c12e, c12s, c12p). */
-const externo = (codigo) => /^c\d/.test(String(codigo));
+/** Alerta que não vem dos bits de alarme do DVR (cercas: c12e, c12s, c12p; regras de alerta: r7). */
+const externo = (codigo) => /^[cr]\d/.test(String(codigo));
 const limita = (n, min, max) => Math.max(min, Math.min(max, Math.round(Number(n) || 0)));
 
 class Historico extends EventEmitter {
@@ -172,7 +172,7 @@ class Historico extends EventEmitter {
       this.abertos.set(aparelho.id, abertos);
     }
     for (const c of atuais) if (!abertos.has(c)) this.abrir(info, c, p, dataHora, abertos);
-    // os alertas das cercas não vêm dos bits de alarme: quem abre e fecha é o serviço das cercas
+    // os alertas das cercas e das regras não vêm dos bits de alarme: quem abre e fecha são esses serviços
     for (const [c, entry] of abertos) if (!atuais.has(c) && !entry.externo) this.encerrar(info, c, entry, dataHora, abertos);
   }
 
