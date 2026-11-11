@@ -24,6 +24,10 @@ const TIPOS_REGRA = {
     nome: 'Sem comunicação', ico: 'antenna-bars-off',
     desc: 'Avisa quando o aparelho para de se comunicar com o veículo ligado: antena ou cabo cortado, DVR desligado, falta de energia ou área sem sinal.',
   },
+  direcao_continua: {
+    nome: 'Direção contínua', ico: 'steering-wheel',
+    desc: 'Avisa quando o veículo roda tempo demais sem uma parada de descanso (Lei do Motorista: no máximo 5h30 dirigindo sem parar). Se o motorista for informado, ele aparece no alerta.',
+  },
 };
 const DIAS_SEMANA = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
@@ -52,6 +56,7 @@ function resumoRegra(r) {
   if (r.tipo === 'fora_horario') {
     return [`permitido <b>${H(textoDiasRegra(r.dias))}, ${H(r.inicio)}–${H(r.fim)}</b>`, r.tempoSeg ? `tolerância ${fmtTempoRegra(r.tempoSeg)}` : ''].filter(Boolean).join(' · ');
   }
+  if (r.tipo === 'direcao_continua') return `mais de <b>${fmtTempoRegra(r.tempoSeg)}</b> dirigindo · descanso de ${fmtTempoRegra(r.descansoSeg || 1800)} zera a conta`;
   if (r.tipo === 'sem_comunicacao') return `mais de <b>${fmtTempoRegra(r.tempoSeg)}</b> · ${r.soLigado ? 'só se estava ligado' : 'mesmo com o veículo desligado'}`;
   const fora = [r.ignorarGaragem ? 'garagens' : '', r.ignorarPonto ? 'pontos' : ''].filter(Boolean).join(' e ');
   return [`mais de <b>${fmtTempoRegra(r.tempoSeg)}</b>`, fora ? `não avisa em ${fora}` : 'avisa em qualquer lugar'].join(' · ');
@@ -213,6 +218,13 @@ PAGINAS.regras = (() => {
         { tipo: 'info', html: 'Desmarcado, avisa também os veículos desligados: o DVR que desliga junto com a chave gera um alerta toda noite.', se: 'soLigado=false' },
       );
       Object.assign(valores, { minutos: r ? Math.round(r.tempoSeg / 60) : 10, soLigado: r ? r.soLigado : true });
+    } else if (tipo === 'direcao_continua') {
+      campos.push(
+        { nome: 'minutos', rotulo: 'Dirigindo há mais de (minutos)', tipo: 'numero', min: 30, max: 720, obrigatorio: true, ajuda: '330 minutos = 5h30, o máximo da lei.' },
+        { nome: 'descanso', rotulo: 'Parada que conta como descanso (minutos)', tipo: 'numero', min: 5, max: 180, obrigatorio: true, ajuda: 'Parado por pelo menos este tempo, a contagem recomeça.' },
+        { tipo: 'info', html: 'O tempo é contado pelo GPS do veículo (andando acima de 3 km/h). Paradas curtas, como semáforo e ponto, não interrompem a contagem. Trocou o motorista, a contagem recomeça.' },
+      );
+      Object.assign(valores, { minutos: r ? Math.round(r.tempoSeg / 60) : 330, descanso: r ? Math.round((r.descansoSeg || 1800) / 60) : 30 });
     } else {
       const parada = tipo === 'parada';
       campos.push(
@@ -229,7 +241,7 @@ PAGINAS.regras = (() => {
       { nome: 'gravidade', rotulo: 'Gravidade do alerta', tipo: 'select', opcoes: [{ v: 'alta', t: 'Alta' }, { v: 'media', t: 'Média' }, { v: 'baixa', t: 'Baixa' }] },
       { nome: 'ativo', rotulo: 'Regra ligada', tipo: 'check' },
     );
-    if (!valores.gravidade) valores.gravidade = { velocidade: 'media', fora_horario: 'alta', parada: 'media', ociosidade: 'baixa', sem_comunicacao: 'alta' }[tipo];
+    if (!valores.gravidade) valores.gravidade = { velocidade: 'media', fora_horario: 'alta', parada: 'media', ociosidade: 'baixa', sem_comunicacao: 'alta', direcao_continua: 'media' }[tipo];
     // parada longa sem nenhuma garagem desenhada: todo veículo parado contaria
     const semGaragem = tipo === 'parada' && !ce.cercas.some((x) => x.ativo && x.finalidade === 'garagem');
     const j = formulario({
@@ -264,5 +276,5 @@ PAGINAS.regras = (() => {
     }
   }
 
-  return { id: 'regras', titulo: 'Regras de alerta', sub: 'Velocidade, horário, parada longa, motor ligado parado e sem comunicação: o que a empresa quer acompanhar', render, sair };
+  return { id: 'regras', titulo: 'Regras de alerta', sub: 'Velocidade, horário, paradas, motor ligado parado, sem comunicação e direção contínua: o que a empresa quer acompanhar', render, sair };
 })();

@@ -83,7 +83,7 @@ PAGINAS.alertas = (() => {
     box.innerHTML = tabela([
       { t: 'Gravidade', v: (a) => `<span class="tag ${a.gravidade}">${H(NOMES_GRAVIDADE[a.gravidade])}</span>` },
       { t: 'Alerta', v: (a) => `<b>${H(a.nome)}</b>${a.velocidade !== null ? `<span class="sub">${fmtNum(a.velocidade)} km/h</span>` : ''}` },
-      { t: 'Veículo', v: (a) => `${H(a.placa ? `${a.prefixo ? `${a.prefixo} · ` : ''}${a.placa}` : `Aparelho ${a.identificador}`)}${master ? `<span class="sub">${H(a.empresa || '')}</span>` : ''}` },
+      { t: 'Veículo', v: (a) => `${H(a.placa ? `${a.prefixo ? `${a.prefixo} · ` : ''}${a.placa}` : `Aparelho ${a.identificador}`)}${a.motorista ? `<span class="sub">${ico('id-badge-2', 'i-xs')} ${H(a.motorista)}</span>` : ''}${master ? `<span class="sub">${H(a.empresa || '')}</span>` : ''}` },
       { t: 'Início', cls: 'nw', v: (a) => H(fmtDataHora(a.inicio)) },
       { t: 'Fim', cls: 'nw', v: (a) => (a.fim ? H(fmtDataHora(a.fim)) : '<span class="tag err">ativo</span>') },
       { t: 'Situação', v: (a) => `<span class="tag ${a.situacao === 'tratado' ? 'ok' : a.situacao === 'novo' ? 'novo' : 'wait'}">${H(SITUACOES[a.situacao])}</span>${a.tratado_por_nome ? `<span class="sub">${H(a.tratado_por_nome)} · ${H(fmtCurto(a.tratado_em))}</span>` : ''}${a.tratativa ? `<span class="sub">${H(a.tratativa)}</span>` : ''}` },

@@ -8,6 +8,7 @@
  *  parada        parado há mais de N minutos fora das garagens (e, se marcado, dos pontos/terminais)
  *  ociosidade    motor ligado com o veículo parado há mais de N minutos
  *  sem_comunicacao  o aparelho parou de falar há mais de N minutos (por padrão, só se estava ligado)
+ *  direcao_continua o motorista dirige há mais de N horas sem um descanso de M minutos (Lei do Motorista)
  *
  * Vale a regra mais específica para cada veículo: a do veículo, senão a do grupo mais próximo, senão
  * a da empresa toda. Dentro de uma cerca com limite próprio, vale o limite da cerca.
@@ -23,7 +24,10 @@ const TIPOS = {
   parada: { nome: 'Parada longa fora da garagem', gravidade: 'media', tempoSeg: 1800 },
   ociosidade: { nome: 'Motor ligado parado', gravidade: 'baixa', tempoSeg: 600 },
   sem_comunicacao: { nome: 'Sem comunicação', gravidade: 'alta', tempoSeg: 600 },
+  direcao_continua: { nome: 'Direção contínua', gravidade: 'media', tempoSeg: 19800 },
 };
+const DESCANSO_PADRAO_SEG = 1800; // Lei do Motorista: 30 min de descanso
+const LACUNA_DIRECAO_MS = 10 * 60000; // mais de 10 min sem posição: o veículo ficou parado (desligado) nesse tempo
 
 const PARADO_KMH = 3; // igual aos relatórios
 const ANDANDO_KMH = 10; // acima disto o veículo saiu do lugar (entre 3 e 10 é ruído do GPS parado)
@@ -62,6 +66,7 @@ function daLinha(r) {
     dias, inicio: r.horario_inicio || null, fim: r.horario_fim || null,
     ignorarGaragem: Boolean(r.ignorar_garagem), ignorarPonto: Boolean(r.ignorar_ponto),
     soLigado: r.so_ligado === undefined || r.so_ligado === null ? true : Boolean(r.so_ligado),
+    descansoSeg: Number(r.descanso_seg) || DESCANSO_PADRAO_SEG,
     gravidade: r.gravidade || TIPOS[r.tipo].gravidade, ativo: Boolean(r.ativo),
   };
 }
@@ -82,7 +87,8 @@ function permitido(r, ms) {
 }
 
 class Regras {
-  constructor({ banco, frota, historico, cercas, gateway = null, log = () => {} }) {
+  constructor({ banco, frota, historico, cercas, gateway = null, motoristas = null, log = () => {} }) {
+    this.motoristas = motoristas;
     this.banco = banco;
     this.frota = frota;
     this.historico = historico;
@@ -133,7 +139,7 @@ class Regras {
   estado(apId) {
     let st = this.estados.get(apId);
     if (!st) {
-      st = { t: 0, contato: 0, recebido: 0, lat: null, lng: null, vel: 0, ign: false, gps: false, online: false, exc: null, foraDesde: null, parada: null, ociosoDesde: null };
+      st = { t: 0, contato: 0, recebido: 0, lat: null, lng: null, vel: 0, ign: false, gps: false, online: false, exc: null, foraDesde: null, parada: null, ociosoDesde: null, dir: null };
       this.estados.set(apId, st);
     }
     return st;
@@ -229,7 +235,31 @@ class Regras {
       }
     }
     st.ociosoDesde = ign && st.parada ? (st.ociosoDesde ?? t) : null;
+    this.direcao(info.veiculo, st, t, vel > PARADO_KMH);
     this.avaliar(info, st, t, Date.now() - t <= VELHA_MS, 'posicao');
+  }
+
+  /**
+   * Tempo dirigindo desde o último descanso: soma o tempo andando; parado (ou sem posição) por pelo
+   * menos o descanso da regra zera a conta. Troca de motorista também zera.
+   */
+  direcao(v, st, t, andando) {
+    const r = this.efetiva(v, 'direcao_continua');
+    const descansoMs = (r ? r.descansoSeg : DESCANSO_PADRAO_SEG) * 1000;
+    const mot = this.motoristas ? this.motoristas.atual(v.id) : null;
+    const motId = mot ? mot.id : null;
+    let d = st.dir;
+    if (!d || d.motorista !== motId) d = st.dir = { dirigido: 0, paradoDesde: andando ? null : t, ultimoT: null, ultimoMov: false, motorista: motId };
+    if (d.ultimoT !== null) {
+      const dt = t - d.ultimoT;
+      if (dt > LACUNA_DIRECAO_MS) { if (d.paradoDesde === null) d.paradoDesde = d.ultimoT; } else if (d.ultimoMov && dt > 0) d.dirigido += dt;
+    }
+    if (andando) {
+      if (d.paradoDesde !== null && t - d.paradoDesde >= descansoMs) d.dirigido = 0; // descansou
+      d.paradoDesde = null;
+    } else if (d.paradoDesde === null) d.paradoDesde = t;
+    d.ultimoMov = andando;
+    d.ultimoT = t;
   }
 
   /** O aparelho caiu ou voltou. */
@@ -328,6 +358,20 @@ class Regras {
           quando = st.ociosoDesde + r.tempoSeg * 1000;
         }
         if (r) nome = `Motor ligado parado há mais de ${fmtTempo(r.tempoSeg)}`;
+      } else if (tipo === 'direcao_continua') {
+        const d = st.dir;
+        if (r && d) {
+          // sem posição há um tempo (desligou, perdeu sinal): conta como parado desde a última
+          if (d.paradoDesde === null && d.ultimoT !== null && Date.now() - st.recebido > SEM_POSICAO_MS) d.paradoDesde = d.ultimoT;
+          const descansou = d.paradoDesde !== null && agoraMs - d.paradoDesde >= r.descansoSeg * 1000;
+          if (descansou) d.dirigido = 0;
+          cond = !descansou && d.dirigido >= r.tempoSeg * 1000;
+          quando = Math.min(agoraMs, d.ultimoT || agoraMs);
+        }
+        if (r) {
+          const mot = this.motoristas ? this.motoristas.atual(v.id) : null;
+          nome = `Dirigindo há mais de ${fmtTempo(r.tempoSeg)} sem descanso de ${fmtTempo(r.descansoSeg)}${mot ? ` · ${mot.nome}` : ''}`;
+        }
       } else if (tipo === 'sem_comunicacao') {
         const silencio = Date.now() - st.contato;
         if (r && st.contato && (!r.soLigado || st.ign) && silencio >= r.tempoSeg * 1000) {

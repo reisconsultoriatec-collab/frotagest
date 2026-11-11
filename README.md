@@ -33,7 +33,7 @@ Navegador ──HTTPS (Cloudflare + Nginx)──► FrotaGest (127.0.0.1:8080) �
 | Perfil | Vê | Pode fazer |
 | --- | --- | --- |
 | **Master** (Reis Tecnologia) | Todas as empresas | Tudo: empresas, aparelhos (DVR), portas/protocolos, aparelhos pendentes, configurações, sistema |
-| **Administrador** da empresa | Toda a frota da empresa | Usuários, grupos e veículos da empresa; câmeras, gravações, alertas, comunicações, auditoria |
+| **Administrador** da empresa | Toda a frota da empresa | Usuários, grupos, veículos e motoristas da empresa; câmeras, gravações, alertas, comunicações, auditoria |
 | **Operador** | Grupos liberados (ou todos) | Mapa, câmeras ao vivo, gravações do DVR, tratar alertas, histórico |
 | **Visualizador** | Grupos liberados (ou todos) | Mapa, câmeras ao vivo, histórico, ver alertas |
 
@@ -51,13 +51,15 @@ A tabela acima é o **padrão** de cada perfil. Em **Controle › Controle de ac
 | `aparelhos_estado` | Último estado de cada aparelho (posição, online, sinal) | sempre |
 | `aparelhos_pendentes` | DVRs que se conectaram sem cadastro | 30 dias sem contato |
 | `posicoes` | Todas as posições recebidas | 90 dias |
-| `alertas` | Alarmes do DVR e das cercas (início, fim, gravidade) e o tratamento (quem, quando, o quê) | 365 dias |
+| `alertas` | Alarmes do DVR e das cercas (início, fim, gravidade, motorista do momento) e o tratamento (quem, quando, o quê) | 365 dias |
 | `cercas` | Garagens, pontos/terminais e áreas desenhados no mapa (círculo ou área livre) e os avisos de cada uma | sempre |
 | `sessoes_encerradas` | Logins encerrados por um administrador em “Usuários online” (só aquele aparelho) | 90 dias |
 | `empresas_logo` | Logotipo de cada empresa cliente (PNG para a tela, JPEG para os PDFs) | sempre |
 | `usuarios.acessos` | Controle de acesso: só os menus e ações que diferem do padrão do perfil (vazio = padrão) | sempre |
 | `painel_dias`, `painel_dias_ok` | Dashboard: totais de cada dia por veículo (km, km por hora, tempos, excessos, alertas), calculados das posições uma vez por dia | sempre (o dia de hoje é calculado ao vivo) |
-| `regras_alerta` | Regras de alerta da empresa (velocidade, horário, parada longa, motor ligado parado, sem comunicação) | sempre |
+| `regras_alerta` | Regras de alerta da empresa (velocidade, horário, parada longa, motor ligado parado, sem comunicação, direção contínua) | sempre |
+| `motoristas`, `motorista_vinculos` | Motoristas (nome, matrícula, CNH, cartão) e quem dirigiu cada veículo, de quando até quando (escolhido no painel ou pelo cartão no DVR) | sempre |
+| `motorista_cartoes_lidos` | Cartões passados no DVR que ainda não estão no cadastro | até cadastrar ou esquecer |
 | `fotos` | Fotos das câmeras: veículo, câmera, hora, posição e quem pediu (o JPEG fica em `data/fotos`) | 30 dias (configurável) |
 | `push_inscricoes`, `usuarios.push_nivel` | Avisos no celular: os aparelhos de cada pessoa (endereço do serviço de push e as chaves públicas do aparelho) e quais alertas ela quer | até a pessoa tirar o aparelho ou sair |
 | `codigos_recuperacao`, `sessoes_2fa` | Verificação em duas etapas: códigos de recuperação (só o resumo SHA-256) e os logins que já passaram pela segunda etapa | até zerar / 90 dias |
@@ -78,6 +80,8 @@ Em **Operação › Relatórios**, na tela, em **Excel (.xlsx)** e em **PDF** (g
 | Alertas | Alertas do período com gravidade, situação e tratamento | até 92 dias |
 | Saídas e chegadas na garagem | A que horas cada veículo saiu e voltou, de qual garagem, tempo e km fora | até 31 dias* |
 | Entradas e saídas das cercas | Cada passagem por ponto, terminal ou área: entrada, saída e tempo dentro | até 31 dias* |
+| Jornada dos motoristas | Cada jornada de cada motorista: início, fim, tempo dirigindo, **maior direção sem descanso**, pausas, km, veículos, alertas e o **descanso antes da jornada** (avisa abaixo de 11 h) | até 31 dias* |
+| Resumo por motorista | Km, jornadas, tempo dirigindo, maior direção contínua, velocidade máxima, excessos e alertas de cada motorista | até 31 dias* |
 
 \* Para não pesar o servidor, veículos × dias fica em até 400 (ex.: 363 veículos por 1 dia, ou 1 veículo por 31 dias); com mais veículos, filtre por grupo. Cada exportação fica na auditoria.
 
@@ -193,6 +197,18 @@ No **Monitoramento**, clique no veículo e em **Comandos**:
 - **Tema claro ou escuro:** botão da lua/sol no topo; a escolha fica no navegador (sem escolha, segue o tema do sistema). No escuro, o mapa de ruas também escurece; o satélite fica como está.
 - **Barra do topo:** tempo conectado, botão de atualizar a tela, botão do som dos alertas (só gravidade alta, alta e média, todos ou sem som, e notificação na área de trabalho) e aviso quando sai uma versão nova.
 - **Tela de entrada** no padrão do OdontoWorld e do CondoGest (um ônibus percorre as linhas trazendo a frase e estaciona no fim), com “Lembrar meu e-mail” (guarda só o e-mail, e só se a pessoa marcar) e os links de **Termos de uso** (`/termos`) e **Política de privacidade** (`/privacidade`, LGPD).
+
+## 3.12 Motoristas e jornada
+
+Em **Cadastros › Motoristas**: nome (só ele é obrigatório), matrícula, telefone, grupo, CNH (número, categoria e validade, que aparece em amarelo a 30 dias de vencer e em vermelho vencida) e o código do **cartão** do DVR. Tudo é opcional para a operação: sem motorista informado o sistema funciona como antes.
+
+- **Quem está dirigindo** aparece no painel do veículo (Monitoramento), com **Trocar**: escolhe o motorista, que passa a valer a partir daquele momento (se ele estava em outro veículo, sai de lá). "Sem motorista" encerra.
+- **Cartão no DVR:** aparelhos com leitor de cartão (mensagem JT/T 808 `0x0702`) trocam o motorista sozinhos quando ele passa o cartão; tirar o cartão encerra. Cartão que não está no cadastro aparece no alto da tela Motoristas ("Cartões lidos pelo DVR sem cadastro") com **Cadastrar** (o código já vai preenchido). O código é o número do certificado (ou, se vier vazio, o documento) que o DVR manda.
+- Cada **alerta guarda o motorista do momento** (aparece na lista de alertas, no relatório e no aviso do celular).
+- **Regra "Direção contínua"** (Regras de alerta): avisa quando o veículo roda mais que o tempo (padrão 5h30 = 330 min) sem uma parada de descanso (padrão 30 min). Paradas curtas (semáforo, ponto) não interrompem; troca de motorista zera a conta. Referência: **Lei 13.103/2015 (CTB art. 67-C)**: no máximo 5h30 dirigindo sem parar, 30 min de descanso (a cada 4 h para passageiros, 6 h para carga, podendo fracionar) e 11 h de descanso a cada 24 h.
+- **Relatórios "Jornada dos motoristas" e "Resumo por motorista"** contam só os trechos em que cada motorista estava no veículo. Jornada nova começa depois de 8 h sem dirigir.
+- Histórico de cada motorista (veículos que dirigiu, de quando até quando, quem trocou) no cadastro dele; trocas e cadastros na auditoria. Motorista que já dirigiu não pode ser excluído (desative).
+- Controle de acesso: tela **Motoristas** (Cadastros). Ver = lista e quem está no veículo; Incluir = cadastrar; Alterar = editar e **trocar o motorista do veículo**; Excluir. Padrão: administrador tudo; operador e visualizador não entram na tela (o menu deles não muda), mas veem no Monitoramento quem está dirigindo cada veículo. O administrador libera mais no Controle de acesso.
 
 ---
 

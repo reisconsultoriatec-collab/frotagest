@@ -34,6 +34,7 @@ const MSG = {
   TEXT_MESSAGE: 0x8300,
   MEDIA_UPLOAD_RESP: 0x8800,
   CAMERA_SHOT: 0x8801,
+  DRIVER_INFO: 0x0702,
 };
 
 const MSG_NAMES = {
@@ -49,6 +50,7 @@ const MSG_NAMES = {
   0x0800: 'Evento de mídia',
   0x0801: 'Envio de mídia',
   0x0805: 'Resposta da foto',
+  0x0702: 'Cartão do motorista',
   0x0900: 'Dados transparentes',
   0x1003: 'Atributos de áudio e vídeo',
   0x1005: 'Contagem de passageiros',
@@ -591,6 +593,29 @@ function bodyTerminalControl(command, params = '') {
   return Buffer.concat([Buffer.from([command]), Buffer.from(String(params), 'latin1')]);
 }
 
+/**
+ * 0x0702 — cartão do motorista (IC): 1 = passou o cartão (começou), 2 = tirou o cartão (terminou).
+ * Com o cartão lido: nome, código do certificado (20), órgão emissor, validade e (2019) o documento (20).
+ */
+function parseDriverInfo(body, v2019 = false) {
+  if (body.length < 7) throw new Error('cartão do motorista incompleto');
+  const r = { status: body[0], time: bcdTime(body.subarray(1, 7)), lido: null };
+  if (r.status !== 1 || body.length < 8) return r;
+  r.resultado = body[7];
+  r.resultadoNome = ['lido', 'senha do cartão não confere', 'cartão bloqueado', 'cartão retirado na leitura', 'erro de leitura'][r.resultado] || `código ${r.resultado}`;
+  if (r.resultado !== 0) return r;
+  let o = 8;
+  const n = body[o++] || 0;
+  const nome = cleanString(body.subarray(o, o + n)); o += n;
+  const certificado = cleanString(body.subarray(o, o + 20)); o += 20;
+  const m = body[o++] || 0;
+  const orgao = cleanString(body.subarray(o, o + m)); o += m;
+  const val = bcdToString(body.subarray(o, o + 4)); o += 4;
+  const documento = v2019 && body.length >= o + 20 ? cleanString(body.subarray(o, o + 20)) : '';
+  r.lido = { nome, certificado, orgao, validade: /^\d{8}$/.test(val) ? `${val.slice(0, 4)}-${val.slice(4, 6)}-${val.slice(6, 8)}` : null, documento };
+  return r;
+}
+
 /** Parâmetros conhecidos (JT/T 808): id → { nome, tipo }. */
 const PARAMS = {
   0x0001: { chave: 'batimento', nome: 'Sinal de vida (heartbeat)', tipo: 'dword', unidade: 's' },
@@ -655,5 +680,5 @@ module.exports = {
   timeToBcd, bodyQueryResources, bodyPlaybackRequest, bodyPlaybackControl, parseResourceList, VIDEO_ALARM_BITS, ALARM_BITS,
   parseTerminalResponse, parseRegister, parseAuth, parseLocation, parseBatchLocation, parseAttributes, parseAvAttributes,
   semAcentos, bodyTextMessage, bodyCameraShot, parseCameraResponse, parseMediaEvent, parseMediaUpload, bodyMediaUploadResponse,
-  bodyTerminalControl, PARAMS, PARAM_POR_CHAVE, parseParamsResponse, bodySetParams,
+  bodyTerminalControl, PARAMS, PARAM_POR_CHAVE, parseParamsResponse, bodySetParams, parseDriverInfo,
 };

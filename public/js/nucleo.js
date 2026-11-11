@@ -321,6 +321,9 @@ function tratarEvento(m) {
     case 'regras': // alguém mudou as regras de alerta
       emit('regras');
       break;
+    case 'motoristas': // cadastro mudou, motorista trocado ou cartão novo lido pelo DVR
+      emit('motoristas');
+      break;
     case 'foto': // chegou uma foto das câmeras de um veículo
       emit('foto', m.foto);
       break;
@@ -353,6 +356,7 @@ const NAV = [
       { id: 'aparelhos', nome: 'Aparelhos (DVR)', ico: 'device-cctv' },
       { id: 'grupos', nome: 'Grupos', ico: 'folders' },
       { id: 'veiculos', nome: 'Veículos', ico: 'bus' },
+      { id: 'motoristas', nome: 'Motoristas', ico: 'id-badge-2' },
       { id: 'cercas', nome: 'Cercas', ico: 'fence' },
       { id: 'regras', nome: 'Regras de alerta', ico: 'bell-cog' },
       { id: 'usuarios', nome: 'Usuários', ico: 'users', badge: 'nav-pendentes', badgeCls: 'warn' },
@@ -595,7 +599,7 @@ function confirmar(texto, { titulo = 'Confirmar', ok = 'Confirmar', perigo = fal
 
 /**
  * Formulário em janela. campos: [{ nome, rotulo, tipo, opcoes, obrigatorio, ajuda, cheio, min, max, placeholder, se }]
- * tipos: texto, email, numero, select, check, textarea, multi, canais, separador, info.
+ * tipos: texto, email, numero, data (data e hora), dia, hora, select, check, textarea, multi, canais, separador, info.
  * salvar(dados) → Promise; se lançar erro, a mensagem aparece no formulário.
  */
 function formulario({ titulo, icone, campos, valores = {}, salvar, textoSalvar = 'Salvar', aviso = '', tamanho = '', extras = '', aoFechar = null }) {
@@ -628,7 +632,7 @@ function formulario({ titulo, icone, campos, valores = {}, salvar, textoSalvar =
         return `<div class="${cls}"${se}>${H(c.rotulo)}<div class="canais-grid" data-canais="${c.nome}">${ins}</div>${ajuda}</div>`;
       }
       default: {
-        const tipo = { email: 'email', numero: 'number', senha: 'password', data: 'datetime-local', hora: 'time' }[c.tipo] || 'text';
+        const tipo = { email: 'email', numero: 'number', senha: 'password', data: 'datetime-local', dia: 'date', hora: 'time' }[c.tipo] || 'text';
         const extra = [c.min !== undefined ? `min="${c.min}"` : '', c.max !== undefined && c.tipo === 'numero' ? `max="${c.max}"` : '', c.maxlength ? `maxlength="${c.maxlength}"` : '', c.placeholder ? `placeholder="${H(c.placeholder)}"` : ''].join(' ');
         return `<label class="${cls}"${se}><span>${H(c.rotulo)}${req}</span><input type="${tipo}" name="${c.nome}" id="${id}" value="${H(v(c.nome))}" ${extra}${dis}${c.tipo === 'email' ? ' autocomplete="off"' : ''}>${ajuda}</label>`;
       }

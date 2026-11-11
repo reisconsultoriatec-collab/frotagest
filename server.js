@@ -23,11 +23,12 @@ const { Cercas } = require('./src/servicos/cercas');
 const { Regras } = require('./src/servicos/regras');
 const { Avisos } = require('./src/servicos/avisos');
 const { Fotos } = require('./src/servicos/fotos');
+const { Motoristas } = require('./src/servicos/motoristas');
 const { Configuracoes } = require('./src/servicos/configuracoes');
 const { Auditoria } = require('./src/servicos/auditoria');
 const { Retencao } = require('./src/servicos/retencao');
 const { Firebase } = require('./src/auth/firebase');
-const { Acesso } = require('./src/auth/acesso');
+const { Acesso, permite } = require('./src/auth/acesso');
 const { DoisFatores } = require('./src/auth/dois-fatores');
 const { Servidor } = require('./src/web/servidor');
 const apiCadastros = require('./src/web/api-cadastros');
@@ -46,6 +47,7 @@ const apiPainel = require('./src/web/api-painel');
 const apiRegras = require('./src/web/api-regras');
 const apiAvisos = require('./src/web/api-avisos');
 const apiComandos = require('./src/web/api-comandos');
+const apiMotoristas = require('./src/web/api-motoristas');
 const { definirFuso, gerarCodigo } = require('./src/util/comum');
 const { version } = require('./package.json');
 
@@ -186,8 +188,11 @@ async function main() {
   const midiaPara = (id) => frota.midiaPara(id, (gateway.devices.get(id) || {}).port || null);
   const recorder = new Recorder(cfg.gravacoes, DATA, gateway, media, midiaPara);
   const transcoders = new TranscoderManager(cfg.media, media, cfg.gravacoes.ffmpeg);
-  const monitor = new Monitor({ frota, gateway, historico, cercas });
-  const regras = new Regras({ banco, frota, historico, cercas, gateway, log: (level, text) => log(level, text) });
+  const motoristas = new Motoristas({ banco, frota, log: (level, text) => log(level, text) });
+  await motoristas.carregar();
+  historico.motoristaDe = (veiculoId) => motoristas.atual(veiculoId);
+  const monitor = new Monitor({ frota, gateway, historico, cercas, motoristas });
+  const regras = new Regras({ banco, frota, historico, cercas, gateway, motoristas, log: (level, text) => log(level, text) });
   await regras.carregar();
   frota.on('recarregada', () => regras.frotaMudou());
   const fbOpcoes = { publicUrl: cfg.web.publicUrl };
@@ -208,11 +213,12 @@ async function main() {
   srv = new Servidor({
     cfg: cfg.web, versao: version, gateway, media, mediaCfg: cfg.media, recorder, transcoders, frota, historico, monitor, acesso,
     firebase, banco, config, auditoria, retencao, logs: ring, mensagens, iniciadoEm: Date.now(), cercas, doisFatores, logotipos: new Logotipos(banco),
-    relatorios: new Relatorios({ banco, frota, acesso, cercas }),
+    relatorios: new Relatorios({ banco, frota, acesso, cercas, motoristas }),
     painel: new Painel({ banco, frota, regras, log: (level, text) => log(level, text) }),
     regras,
     avisos,
     fotos: new Fotos({ banco, frota, config, dados: DATA, log: (level, text) => log(level, text) }),
+    motoristas,
   });
   apiOperacao.registrar(srv);
   apiConta.registrar(srv);
@@ -226,6 +232,7 @@ async function main() {
   apiRegras.registrar(srv);
   apiAvisos.registrar(srv);
   apiComandos.registrar(srv);
+  apiMotoristas.registrar(srv);
   apiDoisFatores.registrar(srv);
   srv.onLog = (e) => log(e.level, e.text, { source: 'painel' });
 
@@ -280,6 +287,16 @@ async function main() {
   // entrou/saiu de cerca: as telas abertas na lista de cercas e no modo TV atualizam a ocupação
   cercas.on('evento', (ev) => srv.enviarCerca(ev));
   gateway.on('commandSent', (c) => historico.comando(c));
+  // cartão do motorista passado no DVR: quem está dirigindo
+  gateway.on('motorista', (d) => {
+    motoristas.cartao(frota.info(d.id), d).catch((e) => log('erro', `Cartão do motorista (${d.id}): ${e.message}`));
+  });
+  // trocou o motorista de algum veículo: mapa e telas abertas
+  motoristas.on('mudou', (ids) => {
+    for (const id of ids) { const it = monitor.porVeiculo(id); if (it) srv.enviarItem(it); }
+    srv.paraTodos({ type: 'motoristas' }, (u) => permite(u, 'motoristas') || permite(u, 'mapa'));
+  });
+  motoristas.on('cartaoDesconhecido', (c) => srv.paraTodos({ type: 'motoristas' }, (u) => permite(u, 'motoristas') && (u.perfil === 'master' || u.empresaId === c.empresaId)));
   // foto que chegou das câmeras (pedida no painel ou mandada pelo aparelho): disco + registro, e avisa as telas
   gateway.on('midia', (md) => {
     srv.fotos.salvar(md).then((f) => { if (f) srv.enviarFoto(f); }).catch((e) => log('erro', `Foto do aparelho ${md.id}: ${e.message}`));

@@ -50,6 +50,7 @@ class Historico extends EventEmitter {
     this.recentes = new Map(); // `${aparelho}:${codigo}` → { id, em } (encerrados há pouco)
     this.pontuais = new Map(); // `${aparelho}:${codigo}` → quando (alertas de um momento só, das cercas)
     this.comandos = new Map(); // `${ident}:${serial}` → { promessa, em }
+    this.motoristaDe = () => null; // quem está no veículo agora (o serviço de motoristas preenche)
     this.recusas = new Map();
     this.descartadas = 0;
     this.gravadas = 0;
@@ -185,9 +186,10 @@ class Historico extends EventEmitter {
     abertos.set(codigo, entry);
     const chave = `${aparelho.id}:${codigo}`;
     const rec = this.recentes.get(chave);
+    const mot = veiculo ? this.motoristaDe(veiculo.id) : null;
     const base = {
       empresaId: empresa.id, aparelhoId: aparelho.id, veiculoId: veiculo ? veiculo.id : null, ident: aparelho.identificador,
-      codigo, nome, gravidade: grav,
+      codigo, nome, gravidade: grav, motoristaId: mot ? mot.id : null, motorista: mot ? mot.nome : null,
     };
     if (rec && Date.now() - rec.em < REABRIR_MS) {
       this.recentes.delete(chave);
@@ -200,9 +202,9 @@ class Historico extends EventEmitter {
       const gps = Math.abs(p.lat) > 0.0001 || Math.abs(p.lon) > 0.0001;
       const vel = Math.min(9999.9, Math.max(0, Number(p.speed) || 0));
       entry.promessa = this.banco.query(
-        `INSERT INTO alertas (empresa_id, aparelho_id, veiculo_id, codigo, nome, gravidade, inicio, latitude, longitude, velocidade)
+        `INSERT INTO alertas (empresa_id, aparelho_id, veiculo_id, codigo, nome, gravidade, inicio, latitude, longitude, velocidade, motorista_id)
          VALUES (?)`,
-        [[empresa.id, aparelho.id, veiculo ? veiculo.id : null, codigo, nome, base.gravidade, dataHora, gps ? r6(p.lat) : null, gps ? r6(p.lon) : null, vel]],
+        [[empresa.id, aparelho.id, veiculo ? veiculo.id : null, codigo, nome, base.gravidade, dataHora, gps ? r6(p.lat) : null, gps ? r6(p.lon) : null, vel, base.motoristaId]],
       ).then((r) => {
         entry.id = r.insertId;
         this.emit('alerta', {
@@ -263,15 +265,17 @@ class Historico extends EventEmitter {
     const gps = Number.isFinite(lat) && (Math.abs(lat) > 0.0001 || Math.abs(lng) > 0.0001);
     const v = Math.min(9999.9, Math.max(0, Number(vel) || 0));
     const n = String(nome).slice(0, 80);
+    const mot = veiculo ? this.motoristaDe(veiculo.id) : null;
     return this.banco.query(
-      `INSERT INTO alertas (empresa_id, aparelho_id, veiculo_id, codigo, nome, gravidade, inicio, fim, latitude, longitude, velocidade)
+      `INSERT INTO alertas (empresa_id, aparelho_id, veiculo_id, codigo, nome, gravidade, inicio, fim, latitude, longitude, velocidade, motorista_id)
        VALUES (?)`,
-      [[empresa.id, aparelho.id, veiculo ? veiculo.id : null, codigo, n, grav, dataHora, dataHora, gps ? r6(lat) : null, gps ? r6(lng) : null, v]],
+      [[empresa.id, aparelho.id, veiculo ? veiculo.id : null, codigo, n, grav, dataHora, dataHora, gps ? r6(lat) : null, gps ? r6(lng) : null, v, mot ? mot.id : null]],
     ).then((r) => {
       this.emit('alerta', {
         acao: 'novo',
         alerta: {
           empresaId: empresa.id, aparelhoId: aparelho.id, veiculoId: veiculo ? veiculo.id : null, ident: aparelho.identificador,
+          motoristaId: mot ? mot.id : null, motorista: mot ? mot.nome : null,
           codigo, nome: n, gravidade: grav, id: r.insertId, inicio: dataHora, fim: dataHora,
           latitude: gps ? r6(lat) : null, longitude: gps ? r6(lng) : null, velocidade: v, situacao: 'novo',
         },

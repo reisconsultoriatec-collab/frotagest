@@ -295,6 +295,16 @@ class Gateway808 extends EventEmitter {
         else this.settle(id, r.replySerial, null, r);
         return;
       }
+      case J.MSG.DRIVER_INFO: {
+        const d = J.parseDriverInfo(m.body, m.v2019);
+        const txt = d.status === 1
+          ? (d.lido ? `cartão passado: ${d.lido.nome || 'sem nome'} (${d.lido.certificado || d.lido.documento || 'sem código'})` : `cartão passado, mas ${d.resultadoNome || 'não lido'}`)
+          : d.status === 2 ? 'cartão retirado' : `situação ${d.status}`;
+        this.logMsg('in', dev, m, txt, d);
+        this.reply(dev, m, 0);
+        this.emit('motorista', { id, ...d, recebidoEm: Date.now() });
+        return;
+      }
       case J.MSG.MEDIA_EVENT: {
         const e = J.parseMediaEvent(m.body);
         this.logMsg('in', dev, m, e ? `mídia nº ${e.mediaId} (${['foto', 'áudio', 'vídeo'][e.type] || e.type}, canal ${e.channel})` : 'incompleto', e);

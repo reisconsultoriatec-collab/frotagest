@@ -14,11 +14,13 @@ const NOMES_ACAO = {
   exportar_relatorio: 'Exportou relatório', sessao_expirada: 'Sessão encerrada por inatividade', encerrar_sessao: 'Encerrou sessão de outro usuário',
   '2fa_ativada': 'Ativou a verificação em 2 etapas', '2fa_falha': 'Código de 2 etapas errado', '2fa_recuperacao': 'Entrou com código de recuperação',
   '2fa_zerada': 'Zerou a verificação em 2 etapas', alterar_acesso: 'Alterou o controle de acesso',
+  ativar_avisos: 'Ligou avisos no celular', mensagem_motorista: 'Mandou mensagem ao motorista', foto_agora: 'Pediu foto das câmeras',
+  reiniciar_aparelho: 'Reiniciou o aparelho', parametros_aparelho: 'Alterou parâmetros do aparelho', trocar_motorista: 'Trocou o motorista do veículo',
 };
 const NOMES_ENTIDADE = {
   empresa: 'Empresa', usuario: 'Usuário', grupo: 'Grupo', veiculo: 'Veículo', aparelho: 'Aparelho', aparelho_pendente: 'Aparelho pendente',
   perfil_protocolo: 'Perfil de protocolo', configuracoes: 'Configurações', alerta: 'Alerta', download: 'Download',
-  cerca: 'Cerca', regra_alerta: 'Regra de alerta',
+  cerca: 'Cerca', regra_alerta: 'Regra de alerta', motorista: 'Motorista',
 };
 
 /* ---------------- comunicações ---------------- */

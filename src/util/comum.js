@@ -146,6 +146,21 @@ function documento(v) {
   return d;
 }
 
+/** Data (dia) em dd/mm/aaaa ou AAAA-MM-DD → 'AAAA-MM-DD' (ou null se vazia e não obrigatória). */
+function dia(v, nome, { obrigatorio = false } = {}) {
+  if (vazio(v)) {
+    if (obrigatorio) throw new HttpErro(400, `Informe ${nome}.`);
+    return null;
+  }
+  const s = String(v).trim();
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s) || /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(s);
+  if (!m) throw new HttpErro(400, `${cap(nome)} inválida (use dd/mm/aaaa).`);
+  const [a, me, d] = m[1].length === 4 ? [m[1], m[2], m[3]] : [m[3], m[2], m[1]];
+  const dt = new Date(Date.UTC(Number(a), Number(me) - 1, Number(d)));
+  if (dt.getUTCMonth() !== Number(me) - 1 || Number(a) < 1950 || Number(a) > 2100) throw new HttpErro(400, `${cap(nome)} inválida.`);
+  return `${a}-${me}-${d}`;
+}
+
 function cap(s) {
   const t = String(s).replace(/^(o|a|os|as) /, '');
   return t.charAt(0).toUpperCase() + t.slice(1);
@@ -155,5 +170,5 @@ module.exports = {
   definirFuso, formatar, agora, paraMs, horaDoAparelho,
   HttpErro,
   gerarCodigo,
-  validar: { vazio, texto, email, inteiro, id, booleano, opcao, placa, identificador, dataHora, documento },
+  validar: { vazio, texto, email, inteiro, id, booleano, opcao, placa, identificador, dataHora, documento, dia },
 };

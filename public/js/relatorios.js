@@ -10,8 +10,12 @@ PAGINAS.relatorios = (() => {
     { id: 'alertas', nome: 'Alertas', ico: 'bell-ringing', desc: 'Alertas do período com a gravidade, a situação e o tratamento registrado.' },
     { id: 'garagem', nome: 'Saídas e chegadas na garagem', ico: 'building-warehouse', desc: 'A que horas cada veículo saiu e voltou, quanto tempo e quantos km ficou fora.' },
     { id: 'cercas', nome: 'Entradas e saídas das cercas', ico: 'fence', desc: 'Cada passagem pelos pontos, terminais e áreas: entrada, saída e tempo dentro.' },
+    { id: 'jornada', nome: 'Jornada dos motoristas', ico: 'steering-wheel', desc: 'Cada jornada de cada motorista: tempo dirigindo, maior direção sem descanso, pausas e o descanso entre jornadas.' },
+    { id: 'motoristas', nome: 'Resumo por motorista', ico: 'id-badge-2', desc: 'Km, tempo dirigindo, velocidade, excessos e alertas de cada motorista no período.' },
   ];
-  const f = { tipo: 'resumo', de: '', ate: '', grupo: '', veiculo: '', limite: '80', minutos: '5', gravidade: '', situacao: '', cerca: '', finalidade: '' };
+  const DE_MOTORISTA = ['jornada', 'motoristas'];
+  const f = { tipo: 'resumo', de: '', ate: '', grupo: '', veiculo: '', limite: '80', minutos: '5', gravidade: '', situacao: '', cerca: '', finalidade: '', motorista: '', continua: '330', descanso: '30' };
+  let motoristas = null; // lista para o filtro (carregada quando abre um relatório de motorista)
   let seq = 0;
   let offs = [];
 
@@ -92,6 +96,10 @@ PAGINAS.relatorios = (() => {
             <label class="field" data-so="alertas">Situação<select id="rl-sit"><option value="">Todas</option><option value="pendentes">Pendentes</option><option value="tratado">Tratados</option></select></label>
             <label class="field" data-so="cercas">Tipo de cerca<select id="rl-fin"><option value="">Todos</option>${Object.entries(FINALIDADES_CERCA).map(([id, x]) => `<option value="${id}">${H(x.nome)}</option>`).join('')}</select></label>
             <label class="field" data-so="garagem cercas">Cerca<select id="rl-cerca"></select></label>
+            <label class="field" data-so="jornada motoristas">Motorista<select id="rl-mot"><option value="">Todos os motoristas</option></select></label>
+            <label class="field" data-so="motoristas">Limite (km/h)<input type="number" id="rl-limite2" min="20" max="200" step="5" style="width:110px"></label>
+            <label class="field" data-so="jornada motoristas" title="Lei do Motorista: no máximo 5h30 (330 min) dirigindo sem descanso">Direção contínua (min)<input type="number" id="rl-cont" min="30" max="720" style="width:150px"></label>
+            <label class="field" data-so="jornada motoristas" title="Parado por pelo menos este tempo conta como descanso">Descanso (min)<input type="number" id="rl-desc" min="5" max="180" style="width:120px"></label>
           </div>
           <div class="rel-acoes">
             <p class="hint" id="rl-status">Escolha o período e clique em Gerar. Posições: até 31 dias (com muitos veículos, menos dias). Alertas: até 92 dias.</p>
@@ -120,6 +128,10 @@ PAGINAS.relatorios = (() => {
     $('#rl-grav').value = f.gravidade;
     $('#rl-sit').value = f.situacao;
     $('#rl-fin').value = f.finalidade;
+    $('#rl-limite2').value = f.limite;
+    $('#rl-cont').value = f.continua;
+    $('#rl-desc').value = f.descanso;
+    preencherMotoristas();
     preencherCercas();
     carregarCercas().then(preencherCercas).catch(() => {});
     mostrarCampos();
@@ -131,8 +143,13 @@ PAGINAS.relatorios = (() => {
       $$('#rl-tipos .rel-tipo').forEach((x) => { x.classList.toggle('active', x === b); x.setAttribute('aria-selected', String(x === b)); });
       mostrarCampos();
       preencherCercas();
+      preencherMotoristas();
       limpar();
     });
+    $('#rl-mot').addEventListener('change', () => { f.motorista = $('#rl-mot').value; });
+    // o limite de velocidade aparece em dois lugares (resumo/velocidade e motoristas): um acompanha o outro
+    $('#rl-limite').addEventListener('input', () => { $('#rl-limite2').value = $('#rl-limite').value; });
+    $('#rl-limite2').addEventListener('input', () => { $('#rl-limite').value = $('#rl-limite2').value; });
     $('#rl-fin').addEventListener('change', () => { f.finalidade = $('#rl-fin').value; preencherCercas(); });
     $('#rl-cerca').addEventListener('change', () => { f.cerca = $('#rl-cerca').value; });
     $('#rl-rapido').addEventListener('click', (e) => {
@@ -156,7 +173,8 @@ PAGINAS.relatorios = (() => {
     $('#rl-xlsx').addEventListener('click', () => baixar('xlsx'));
     $('#rl-pdf').addEventListener('click', () => baixar('pdf'));
     // a empresa escolhida no topo mudou: grupos e veículos mudam junto
-    offs.push(on('empresa', () => { f.grupo = ''; f.veiculo = ''; f.cerca = ''; S.cercas = null; }));
+    offs.push(on('empresa', () => { f.grupo = ''; f.veiculo = ''; f.cerca = ''; f.motorista = ''; S.cercas = null; motoristas = null; }));
+    offs.push(on('motoristas', () => { motoristas = null; preencherMotoristas(); }));
     offs.push(on('cercas', () => carregarCercas().then(preencherCercas).catch(() => {})));
     offs.push(on('frota', () => {
       if (!$('#rl-veic')) return;
@@ -170,6 +188,23 @@ PAGINAS.relatorios = (() => {
     offs.forEach((o) => o());
     offs = [];
     seq++;
+  }
+
+  /** Motoristas para o filtro: só busca quando abre um relatório de motorista (e se a pessoa pode ver o cadastro). */
+  function preencherMotoristas() {
+    const sel = $('#rl-mot');
+    if (!sel || !DE_MOTORISTA.includes(f.tipo)) return;
+    const desenhar = () => {
+      if (!$('#rl-mot')) return;
+      const l = (motoristas || []).filter((m) => m.ativo || String(m.id) === String(f.motorista));
+      sel.innerHTML = `<option value="">Todos os motoristas${l.length ? ` (${l.length})` : ''}</option>${l.map((m) => `<option value="${m.id}">${H(m.nome)}${m.matricula ? ` (${H(m.matricula)})` : ''}</option>`).join('')}`;
+      sel.value = f.motorista;
+      if (sel.value !== String(f.motorista)) { f.motorista = ''; sel.value = ''; }
+    };
+    if (motoristas || !podeTela('motoristas')) { desenhar(); return; }
+    api(`/api/motoristas${S.empresa ? `?${qs({ empresa: S.empresa })}` : ''}`)
+      .then((r) => { motoristas = r.motoristas.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')); desenhar(); })
+      .catch(() => {});
   }
 
   function mostrarCampos() {
@@ -198,6 +233,13 @@ PAGINAS.relatorios = (() => {
     if (f.tipo === 'alertas') { q.gravidade = f.gravidade; q.situacao = f.situacao; }
     if (f.tipo === 'garagem' || f.tipo === 'cercas') { f.cerca = $('#rl-cerca').value; q.cerca = f.cerca; }
     if (f.tipo === 'cercas') { f.finalidade = $('#rl-fin').value; q.finalidade = f.finalidade; }
+    if (DE_MOTORISTA.includes(f.tipo)) {
+      f.motorista = $('#rl-mot').value;
+      f.continua = $('#rl-cont').value;
+      f.descanso = $('#rl-desc').value;
+      Object.assign(q, { motorista: f.motorista, continua: f.continua, descanso: f.descanso });
+    }
+    if (f.tipo === 'motoristas') { f.limite = $('#rl-limite2').value; q.limite = f.limite; }
     return `/api/relatorios/${f.tipo}?${qs(q)}`;
   }
 
@@ -255,5 +297,5 @@ PAGINAS.relatorios = (() => {
     $('#rl-res').hidden = false;
   }
 
-  return { id: 'relatorios', titulo: 'Relatórios', sub: 'Resumo da frota, velocidade, paradas, alertas, garagem e cercas em Excel e PDF', render, sair };
+  return { id: 'relatorios', titulo: 'Relatórios', sub: 'Resumo da frota, velocidade, paradas, alertas, garagem, cercas e motoristas em Excel e PDF', render, sair };
 })();

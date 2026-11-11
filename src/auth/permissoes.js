@@ -23,6 +23,9 @@ const TELAS = [
     ver: 'Ver os grupos da frota', incluir: 'Criar grupos e subgrupos', alterar: 'Renomear e mudar o grupo de lugar', excluir: 'Excluir grupos vazios' } },
   { id: 'veiculos', grupo: 'Cadastros', nome: 'Veículos', acoes: {
     ver: 'Ver a frota cadastrada', incluir: 'Cadastrar veículos', alterar: 'Editar, trocar grupo ou aparelho e desativar' } },
+  { id: 'motoristas', grupo: 'Cadastros', nome: 'Motoristas', acoes: {
+    ver: 'Ver os motoristas e quem está em cada veículo', incluir: 'Cadastrar motoristas (e os cartões lidos pelo DVR)',
+    alterar: 'Editar motoristas e trocar o motorista do veículo', excluir: 'Excluir motoristas que nunca dirigiram' } },
   { id: 'cercas', grupo: 'Cadastros', nome: 'Cercas', acoes: {
     ver: 'Ver as cercas cadastradas', incluir: 'Desenhar cercas novas', alterar: 'Editar e desativar cercas', excluir: 'Excluir cercas' } },
   { id: 'regras', grupo: 'Cadastros', nome: 'Regras de alerta', acoes: {
@@ -130,7 +133,7 @@ function capacidades(perfil, acessos) {
     gravacoes: permite(acessos, 'gravacoes'),
     baixarGravacoes: permite(acessos, 'gravacoes', 'incluir'),
     tratarAlertas: permite(acessos, 'alertas', 'alterar'),
-    cadastros: ['aparelhos', 'grupos', 'veiculos', 'cercas', 'regras', 'usuarios'].some((t) => permite(acessos, t)),
+    cadastros: ['aparelhos', 'grupos', 'veiculos', 'motoristas', 'cercas', 'regras', 'usuarios'].some((t) => permite(acessos, t)),
     auditoria: permite(acessos, 'auditoria'),
     sistema: perfil === 'master',
   };

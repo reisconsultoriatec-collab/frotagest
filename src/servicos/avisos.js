@@ -203,7 +203,7 @@ class Avisos {
     if (l.length === 1) {
       const vel = Number(a.velocidade) > 0 ? ` · ${Math.round(Number(a.velocidade))} km/h` : '';
       return {
-        t: a.nome, b: `${emp(a)}${this.rotulo(a)} · ${String(a.inicio || formatar()).slice(11, 16)}${vel}`,
+        t: a.nome, b: `${emp(a)}${this.rotulo(a)}${a.motorista ? ` · ${a.motorista}` : ''} · ${String(a.inicio || formatar()).slice(11, 16)}${vel}`,
         tag: `fg-a${a.id}`, g: a.gravidade, u: '/#/alertas', em: paraMs(a.inicio) || Date.now(),
       };
     }

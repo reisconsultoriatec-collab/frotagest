@@ -26,7 +26,11 @@ const TIPOS = {
   alertas: { titulo: 'Alertas no período', arquivo: 'alertas' },
   garagem: { titulo: 'Saídas e chegadas na garagem', arquivo: 'saidas-e-chegadas-na-garagem' },
   cercas: { titulo: 'Entradas e saídas das cercas', arquivo: 'entradas-e-saidas-das-cercas' },
+  jornada: { titulo: 'Jornada dos motoristas', arquivo: 'jornada-dos-motoristas' },
+  motoristas: { titulo: 'Resumo por motorista', arquivo: 'resumo-por-motorista' },
 };
+const NOVA_JORNADA_SEG = 8 * 3600; // sem dirigir por 8 h ou mais: começa outra jornada (Lei do Motorista: 8 h seguidas do descanso de 11 h)
+const DESCANSO_DIARIO_SEG = 11 * 3600;
 const NOMES_FINALIDADE = { garagem: 'Garagem', ponto: 'Ponto ou terminal', area: 'Área de interesse', proibida: 'Área proibida' };
 
 /* ---------- formatação (PDF e textos) ---------- */
@@ -179,10 +183,69 @@ function analisar(rows, { limite = 80, paradaMin = 5 } = {}) {
   return r;
 }
 
+/**
+ * Jornadas de um motorista a partir das posições dos veículos que ele dirigiu (em ordem, cada uma
+ * com o veiculo_id). Dirigindo = em movimento; parado (ou sem posição) pelo descanso zera a direção
+ * contínua; 8 h sem dirigir começa outra jornada.
+ */
+function jornadas(rows, { limiteSeg = 19800, descansoSeg = 1800 } = {}) {
+  const lista = [];
+  let j = null;
+  let ant = null;
+  let cont = 0;
+  let acima = false;
+  let ultimoMov = null;
+  for (const p of rows) {
+    const t = paraMs(p.data_hora);
+    const vel = Number(p.velocidade) || 0;
+    const lat = Number(p.latitude);
+    const lon = Number(p.longitude);
+    const gps = !!p.gps_valido && Math.abs(lat) > 0.0001;
+    const mov = vel > PARADO_KMH;
+    if (j && ant && ant.veic === p.veiculo_id) {
+      const dt = (t - ant.t) / 1000;
+      if (dt > 0 && dt <= LACUNA_SEG && ant.mov) {
+        j.dirigindo += dt;
+        cont += dt;
+        if (cont > j.maiorContinua) j.maiorContinua = cont;
+        if (cont >= limiteSeg && !acima) { j.vezesAcima++; acima = true; }
+      }
+      if (gps && ant.gps) {
+        const d = distanciaKm(ant.lat, ant.lon, lat, lon);
+        if (d < 5 || (dt > 0 && d / (dt / 3600) < 250)) j.km += d;
+      }
+    }
+    if (mov) {
+      const pausa = ultimoMov === null ? Infinity : (t - ultimoMov) / 1000;
+      if (!j || pausa >= NOVA_JORNADA_SEG) {
+        const anterior = j;
+        j = { inicio: p.data_hora, inicioMs: t, fim: p.data_hora, fimMs: t, dirigindo: 0, maiorContinua: 0, pausas: 0, vezesAcima: 0, km: 0,
+          veiculos: new Set(), descansoAntes: anterior ? (t - anterior.fimMs) / 1000 : null };
+        lista.push(j);
+        cont = 0;
+        acima = false;
+      } else if (pausa >= descansoSeg) {
+        j.pausas++;
+        cont = 0;
+        acima = false;
+      }
+      j.fim = p.data_hora;
+      j.fimMs = t;
+      j.veiculos.add(p.veiculo_id);
+      ultimoMov = t;
+    }
+    ant = { t, mov, gps, lat, lon, veic: p.veiculo_id };
+  }
+  for (const x of lista) x.km = Math.round(x.km * 10) / 10;
+  // uma posição em movimento solta (o motorista assumiu e o trecho acabou ali) não é jornada
+  return lista.filter((x) => x.dirigindo > 0);
+}
+
 /* ---------- relatórios ---------- */
 
 class Relatorios {
-  constructor({ banco, frota, acesso, cercas = null }) {
+  constructor({ banco, frota, acesso, cercas = null, motoristas = null }) {
+    this.servMotoristas = motoristas;
     this.banco = banco;
     this.frota = frota;
     this.acesso = acesso;
@@ -246,7 +309,8 @@ class Relatorios {
   /** Gera (ou reaproveita, se for o mesmo pedido de há pouco) o relatório. */
   async gerar(u, tipo, q) {
     if (!TIPOS[tipo]) throw new HttpErro(404, 'Relatório não encontrado.');
-    const chave = JSON.stringify([tipo, q.de, q.ate, q.empresa || '', q.grupo || '', q.veiculo || '', q.limite || '', q.minutos || '', q.gravidade || '', q.situacao || '', q.cerca || '', q.finalidade || '']);
+    const chave = JSON.stringify([tipo, q.de, q.ate, q.empresa || '', q.grupo || '', q.veiculo || '', q.limite || '', q.minutos || '', q.gravidade || '', q.situacao || '', q.cerca || '', q.finalidade || '',
+      q.motorista || '', q.continua || '', q.descanso || '']);
     const c = this.cache.get(u.id);
     if (c && c.chave === chave && Date.now() - c.em < CACHE_MS) return c.resultado;
     if (this.rodando.has(u.id)) throw new HttpErro(429, 'Já há um relatório sendo gerado para você. Aguarde ele terminar.');
@@ -645,6 +709,165 @@ class Relatorios {
       observacao: 'Calculado pelas posições do GPS. Entrada em branco: o veículo já estava dentro no começo do período; saída em branco: ainda estava dentro no fim.',
     };
   }
+
+  /* ---------- motoristas ---------- */
+
+  parametrosJornada(q) {
+    const continua = q.continua ? V.inteiro(q.continua, 'a direção contínua', { min: 30, max: 720 }) : 330;
+    const descanso = q.descanso ? V.inteiro(q.descanso, 'o descanso', { min: 5, max: 180 }) : 30;
+    return { limiteSeg: continua * 60, descansoSeg: descanso * 60, continua, descanso };
+  }
+
+  /**
+   * Por motorista: os trechos em que dirigiu cada veículo (dentro do período e do que o usuário vê),
+   * com as posições de cada trecho. Devolve { alvo, porMotorista: Map(id → { m, trechos }) }.
+   */
+  async trechosDosMotoristas(u, q, de, ate) {
+    if (!this.servMotoristas) throw new HttpErro(400, 'Motoristas indisponíveis.');
+    const alvo = this.veiculosAlvo(u, q);
+    if (!alvo.lista.length) throw new HttpErro(400, 'Nenhum veículo encontrado com esses filtros.');
+    const motId = q.motorista ? V.id(q.motorista, 'o motorista') : null;
+    const vinc = await this.servMotoristas.doPeriodo({ de, ate, veiculoIds: alvo.lista.map((v) => v.id), motoristaIds: motId ? [motId] : null });
+    // orçamento: veículos × dias de posição lidos
+    const seg = vinc.reduce((s, x) => s + (paraMs(x.fim && x.fim < ate ? x.fim : ate) - paraMs(x.inicio > de ? x.inicio : de)) / 1000, 0);
+    if (seg / 86400 > ORCAMENTO) throw new HttpErro(400, 'Período longo demais para tantos motoristas: escolha menos dias, um grupo ou um motorista.');
+    const porMotorista = new Map();
+    for (const x of vinc) {
+      const m = this.servMotoristas.lista.get(x.motorista_id);
+      const v = this.frota.veiculos.get(x.veiculo_id);
+      if (!m || !v) continue;
+      const ini = x.inicio > de ? x.inicio : de;
+      const fim = x.fim && x.fim < ate ? x.fim : ate;
+      const rows = (await this.posicoesDe(v, ini, fim)).map((p) => ({ ...p, veiculo_id: v.id }));
+      let e = porMotorista.get(m.id);
+      if (!e) { e = { m, trechos: [] }; porMotorista.set(m.id, e); }
+      e.trechos.push({ v, ini, fim, rows });
+    }
+    return { alvo, porMotorista };
+  }
+
+  async alertasDosMotoristas(ids, de, ate) {
+    if (!ids.length) return [];
+    return this.banco.query('SELECT motorista_id, inicio FROM alertas WHERE motorista_id IN (?) AND inicio BETWEEN ? AND ?', [ids, de, ate]);
+  }
+
+  subtituloMotoristas(u, alvo, de, ate, q, extra) {
+    const m = q.motorista && this.servMotoristas ? this.servMotoristas.lista.get(Number(q.motorista)) : null;
+    const [a, b] = this.subtitulo(u, alvo, de, ate, extra);
+    return [m ? `${a} · Motorista ${m.nome}` : a, b];
+  }
+
+  async jornada(u, q) {
+    const { de, ate } = this.periodo(q, MAX_DIAS);
+    const par = this.parametrosJornada(q);
+    const { alvo, porMotorista } = await this.trechosDosMotoristas(u, q, de, ate);
+    const alertas = await this.alertasDosMotoristas([...porMotorista.keys()], de, ate);
+    const linhas = [];
+    const cont = { jornadas: 0, dirigindo: 0, acima: 0, descansoCurto: 0 };
+    const lista = [...porMotorista.values()].sort((a, b) => a.m.nome.localeCompare(b.m.nome, 'pt-BR'));
+    for (const { m, trechos } of lista) {
+      const rows = trechos.flatMap((t) => t.rows);
+      for (const j of jornadas(rows, par)) {
+        const nAl = alertas.filter((a) => a.motorista_id === m.id && a.inicio >= j.inicio && a.inicio <= j.fim).length;
+        const obs = [];
+        if (j.maiorContinua >= par.limiteSeg) obs.push(`dirigiu ${fmtDuracao(j.maiorContinua).slice(0, -3)} sem descanso de ${par.descanso} min`);
+        if (j.descansoAntes !== null && j.descansoAntes < DESCANSO_DIARIO_SEG) obs.push('descanso antes da jornada menor que 11 h');
+        cont.jornadas++;
+        cont.dirigindo += j.dirigindo;
+        if (j.maiorContinua >= par.limiteSeg) cont.acima++;
+        if (j.descansoAntes !== null && j.descansoAntes < DESCANSO_DIARIO_SEG) cont.descansoCurto++;
+        linhas.push([m.nome, m.matricula || '', j.inicio, j.fim, (j.fimMs - j.inicioMs) / 1000, j.dirigindo, j.maiorContinua, j.pausas, j.km,
+          [...j.veiculos].map((id) => this.nomeVeiculo(this.frota.veiculos.get(id))).join(', '), nAl, j.descansoAntes, obs.join('; ')]);
+      }
+      if (linhas.length > MAX_LINHAS) throw new HttpErro(400, 'Resultado grande demais: escolha um período menor.');
+    }
+    return {
+      titulo: TIPOS.jornada.titulo,
+      subtitulo: this.subtituloMotoristas(u, alvo, de, ate, q, [`Direção contínua até ${fmtDuracao(par.limiteSeg).slice(0, -3)}`, `descanso de ${par.descanso} min`]),
+      colunas: [
+        { titulo: 'Motorista', tipo: 'texto', largura: 24, peso: 1.6 },
+        { titulo: 'Matrícula', tipo: 'texto', largura: 11, peso: 0.8 },
+        { titulo: 'Início', tipo: 'dataHora', largura: 19, peso: 1.25 },
+        { titulo: 'Fim', tipo: 'dataHora', largura: 19, peso: 1.25 },
+        { titulo: 'Jornada', tipo: 'duracao', largura: 10, peso: 0.8, alinhar: 'd' },
+        { titulo: 'Dirigindo', tipo: 'duracao', largura: 10, peso: 0.8, alinhar: 'd' },
+        { titulo: 'Maior direção contínua', tipo: 'duracao', largura: 14, peso: 1, alinhar: 'd' },
+        { titulo: `Descansos (≥ ${par.descanso} min)`, tipo: 'inteiro', largura: 12, peso: 0.9, alinhar: 'd' },
+        { titulo: 'Km', tipo: 'decimal', largura: 9, peso: 0.7, alinhar: 'd' },
+        { titulo: 'Veículos', tipo: 'texto', largura: 22, peso: 1.3 },
+        { titulo: 'Alertas', tipo: 'inteiro', largura: 8, peso: 0.6, alinhar: 'd' },
+        { titulo: 'Descanso antes', tipo: 'duracao', largura: 12, peso: 0.9, alinhar: 'd' },
+        { titulo: 'Atenção', tipo: 'texto', largura: 36, peso: 1.8 }],
+      linhas, totais: null,
+      resumo: [
+        { rotulo: 'Motoristas', valor: fmtNum(porMotorista.size) },
+        { rotulo: 'Jornadas', valor: fmtNum(cont.jornadas) },
+        { rotulo: 'Horas dirigindo', valor: fmtDuracao(cont.dirigindo).slice(0, -3) },
+        { rotulo: 'Acima da direção contínua', valor: fmtNum(cont.acima) },
+        { rotulo: 'Descanso menor que 11 h', valor: fmtNum(cont.descansoCurto) },
+      ],
+      vazio: 'Nenhum motorista dirigiu os veículos escolhidos no período (o motorista é escolhido no painel do veículo, no Monitoramento, ou pelo cartão no DVR).',
+      observacao: `Dirigindo = em movimento (acima de ${PARADO_KMH} km/h), pelos trechos em que o motorista estava no veículo. Parado ${par.descanso} min ou mais conta como descanso e zera a direção contínua; 8 h sem dirigir começa outra jornada. Referência: Lei 13.103/2015 (CTB art. 67-C).`,
+    };
+  }
+
+  async motoristas(u, q) {
+    const { de, ate } = this.periodo(q, MAX_DIAS);
+    const par = this.parametrosJornada(q);
+    const lim = this.parametros(q);
+    const { alvo, porMotorista } = await this.trechosDosMotoristas(u, q, de, ate);
+    const alertas = await this.alertasDosMotoristas([...porMotorista.keys()], de, ate);
+    const linhas = [];
+    const tot = { km: 0, dirigindo: 0, exc: 0, al: 0, jornadas: 0 };
+    const lista = [...porMotorista.values()].sort((a, b) => a.m.nome.localeCompare(b.m.nome, 'pt-BR'));
+    for (const { m, trechos } of lista) {
+      const js = jornadas(trechos.flatMap((t) => t.rows), par);
+      let excessos = 0;
+      let velMax = 0;
+      for (const t of trechos) {
+        const a = analisar(t.rows, lim);
+        excessos += a.excessos.length;
+        velMax = Math.max(velMax, a.velMax);
+      }
+      const km = Math.round(js.reduce((s, j) => s + j.km, 0) * 10) / 10;
+      const dirigindo = js.reduce((s, j) => s + j.dirigindo, 0);
+      const maior = js.reduce((s, j) => Math.max(s, j.maiorContinua), 0);
+      const acima = js.filter((j) => j.maiorContinua >= par.limiteSeg).length;
+      const curtos = js.filter((j) => j.descansoAntes !== null && j.descansoAntes < DESCANSO_DIARIO_SEG).length;
+      const nAl = alertas.filter((a) => a.motorista_id === m.id).length;
+      const veics = new Set(trechos.map((t) => t.v.id));
+      linhas.push([m.nome, m.matricula || '', js.length, km, dirigindo, maior, acima, curtos, excessos, velMax || null, nAl, veics.size]);
+      tot.km += km; tot.dirigindo += dirigindo; tot.exc += excessos; tot.al += nAl; tot.jornadas += js.length;
+    }
+    return {
+      titulo: TIPOS.motoristas.titulo,
+      subtitulo: this.subtituloMotoristas(u, alvo, de, ate, q, [`Limite ${lim.limite} km/h`, `Direção contínua até ${fmtDuracao(par.limiteSeg).slice(0, -3)}`]),
+      colunas: [
+        { titulo: 'Motorista', tipo: 'texto', largura: 24, peso: 1.6 },
+        { titulo: 'Matrícula', tipo: 'texto', largura: 11, peso: 0.8 },
+        { titulo: 'Jornadas', tipo: 'inteiro', largura: 9, peso: 0.7, alinhar: 'd' },
+        { titulo: 'Km', tipo: 'decimal', largura: 10, peso: 0.75, alinhar: 'd' },
+        { titulo: 'Dirigindo', tipo: 'duracao', largura: 11, peso: 0.85, alinhar: 'd' },
+        { titulo: 'Maior direção contínua', tipo: 'duracao', largura: 14, peso: 1, alinhar: 'd' },
+        { titulo: 'Jornadas acima do limite', tipo: 'inteiro', largura: 12, peso: 0.9, alinhar: 'd' },
+        { titulo: 'Descanso < 11 h', tipo: 'inteiro', largura: 11, peso: 0.85, alinhar: 'd' },
+        { titulo: `Excessos (> ${lim.limite})`, tipo: 'inteiro', largura: 11, peso: 0.85, alinhar: 'd' },
+        { titulo: 'Vel. máx. (km/h)', tipo: 'inteiro', largura: 12, peso: 0.85, alinhar: 'd' },
+        { titulo: 'Alertas', tipo: 'inteiro', largura: 8, peso: 0.6, alinhar: 'd' },
+        { titulo: 'Veículos', tipo: 'inteiro', largura: 8, peso: 0.6, alinhar: 'd' }],
+      linhas,
+      totais: linhas.length ? ['Total', null, tot.jornadas, Math.round(tot.km * 10) / 10, tot.dirigindo, null, null, null, tot.exc, null, tot.al, null] : null,
+      resumo: [
+        { rotulo: 'Motoristas', valor: fmtNum(linhas.length) },
+        { rotulo: 'Km rodados', valor: `${fmtNum(tot.km, 1)} km` },
+        { rotulo: 'Horas dirigindo', valor: fmtDuracao(tot.dirigindo).slice(0, -3) },
+        { rotulo: 'Excessos de velocidade', valor: fmtNum(tot.exc) },
+        { rotulo: 'Alertas', valor: fmtNum(tot.al) },
+      ],
+      vazio: 'Nenhum motorista dirigiu os veículos escolhidos no período (o motorista é escolhido no painel do veículo, no Monitoramento, ou pelo cartão no DVR).',
+      observacao: `Contado só nos trechos em que cada motorista estava no veículo. Km e tempos pelo GPS; jornadas como no relatório de jornada (descanso de ${par.descanso} min, 8 h sem dirigir começa outra).`,
+    };
+  }
 }
 
 /** Resultado → abas da planilha e dados do PDF */
@@ -670,4 +893,4 @@ function paraPdf(r) {
   };
 }
 
-module.exports = { Relatorios, TIPOS, analisar, percorrerCercas, paraXlsx, paraPdf, fmtValor, fmtDuracao, distanciaKm };
+module.exports = { Relatorios, TIPOS, analisar, jornadas, percorrerCercas, paraXlsx, paraPdf, fmtValor, fmtDuracao, distanciaKm };

@@ -572,6 +572,7 @@ PAGINAS.mapa = (() => {
         <button class="det-close" type="button" data-fechar-det aria-label="Fechar">${ico('x', 'i-sm')}</button>
       </div>
       <div class="det-status">${status}</div>
+      ${i.pendente ? '' : htmlMotoristaVeiculo(i)}
       ${naCerca}
       ${p ? `<div class="det-grid">${grid}</div>` : '<p class="small muted" style="margin:0">Sem posição registrada ainda.</p>'}
       ${alertas}
@@ -591,6 +592,8 @@ PAGINAS.mapa = (() => {
     if (grav) grav.onclick = () => navegar('gravacoes', qs({ v: i.chave }));
     const cmd = box.querySelector('[data-cmd]');
     if (cmd) cmd.onclick = () => abrirComandos(i);
+    const mot = box.querySelector('[data-trocar-mot]');
+    if (mot) mot.onclick = () => trocarMotorista(i);
   }
 
   function abrirCanal(i, ch) {

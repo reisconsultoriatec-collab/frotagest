@@ -9,7 +9,8 @@ const { formatar, horaDoAparelho } = require('../util/comum');
 const num = (v) => (v === null || v === undefined ? null : Number(v));
 
 class Monitor {
-  constructor({ frota, gateway, historico, cercas = null }) {
+  constructor({ frota, gateway, historico, cercas = null, motoristas = null }) {
+    this.motoristas = motoristas;
     this.frota = frota;
     this.gateway = gateway;
     this.historico = historico;
@@ -54,6 +55,7 @@ class Monitor {
       posicao: this.posicaoDoEstado(e),
       alertas: this.historico.ativos(ap.id),
       cercas: this.cercas ? this.cercas.dentro(ap.id) : [],
+      motorista: v && this.motoristas ? this.motoristas.atual(v.id) : null,
       protocolo: dev && dev.online ? (dev.v2019 ? 'JT/T 808-2019' : 'JT/T 808-2013') : (e ? e.protocolo : null),
     };
   }
@@ -66,6 +68,7 @@ class Monitor {
       veiculoId: v.id, placa: v.placa, prefixo: v.prefixo, descricao: v.descricao, tipo: v.tipo, grupoId: v.grupo_id,
       grupo: v.grupo_id ? this.frota.caminhoGrupo(v.grupo_id) : null, modelo: null, canais: 0, nomesCanais: [],
       online: false, ultimoContato: null, posicao: null, alertas: [], cercas: [], semAparelho: true,
+      motorista: this.motoristas ? this.motoristas.atual(v.id) : null,
     };
   }
 
@@ -88,6 +91,14 @@ class Monitor {
       online: dev.online, ultimoContato: dev.lastSeen ? formatar(dev.lastSeen) : null, posicao, alertas: [], cercas: [],
       protocolo: dev.v2019 ? 'JT/T 808-2019' : 'JT/T 808-2013',
     };
+  }
+
+  /** Item de um veículo (com ou sem aparelho). */
+  porVeiculo(veiculoId) {
+    const v = this.frota.veiculos.get(veiculoId);
+    if (!v || !v.ativo) return null;
+    const ap = v.aparelho_id ? this.frota.aparelhos.get(v.aparelho_id) : null;
+    return ap && ap.ativo ? this.doAparelho(ap) : this.doVeiculoSemAparelho(v);
   }
 
   /** Item pelo número do aparelho (eventos ao vivo). */

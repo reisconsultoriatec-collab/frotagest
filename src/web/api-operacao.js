@@ -165,8 +165,9 @@ function registrar(srv) {
     const limite = Math.min(500, V.inteiro(query.limite, 'o limite', { min: 1, max: 500 }) || 200);
     const where = onde.length ? `WHERE ${onde.join(' AND ')}` : '';
     const alertas = await banco.query(`
-      SELECT a.*, v.placa, v.prefixo, ap.identificador, e.nome AS empresa, us.nome AS tratado_por_nome
+      SELECT a.*, v.placa, v.prefixo, ap.identificador, e.nome AS empresa, us.nome AS tratado_por_nome, mo.nome AS motorista
         FROM alertas a
+        LEFT JOIN motoristas mo ON mo.id = a.motorista_id
         LEFT JOIN veiculos v ON v.id = a.veiculo_id
         LEFT JOIN aparelhos ap ON ap.id = a.aparelho_id
         LEFT JOIN empresas e ON e.id = a.empresa_id
