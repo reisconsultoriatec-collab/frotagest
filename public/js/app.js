@@ -344,6 +344,7 @@ async function abrirApp() {
   if (!location.hash.replace(/^#\/?/, '')) history.replaceState(null, '', `#/${telaInicial()}`);
   montarNav();
   abrirRota();
+  sincronizarAvisos(); // este aparelho já recebe os avisos desta pessoa? mantém em dia
 }
 
 function atualizarSeletorEmpresa() {
@@ -356,6 +357,10 @@ function atualizarSeletorEmpresa() {
 }
 
 async function sair(motivo) {
+  // Sair pelo botão (ou sessão encerrada pelo administrador): este aparelho para de receber os avisos
+  if (!motivo || motivo === 'encerrada') {
+    await Promise.race([desativarAvisosAqui().catch(() => {}), new Promise((ok) => setTimeout(ok, 3000))]);
+  }
   try { if (S.eu || motivo) await api('/api/sair', { corpo: motivo ? { motivo } : {} }); } catch { /* sessão já encerrada */ }
   S.eu = null;
   pararSessao();

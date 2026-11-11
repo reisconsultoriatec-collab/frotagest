@@ -680,6 +680,7 @@ class Servidor {
    * agora, e o painel dele recarrega o menu (sai da tela que perdeu). */
   async atualizarUsuario(usuarioId, avisar = true) {
     this.acesso.invalidar();
+    if (this.avisos) this.avisos.esquecer(usuarioId);
     for (const c of this.eventos) {
       if (!c.u || c.u.id !== usuarioId || !c.sessao) continue;
       try {

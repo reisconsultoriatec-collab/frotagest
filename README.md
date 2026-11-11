@@ -57,7 +57,8 @@ A tabela acima é o **padrão** de cada perfil. Em **Controle › Controle de ac
 | `empresas_logo` | Logotipo de cada empresa cliente (PNG para a tela, JPEG para os PDFs) | sempre |
 | `usuarios.acessos` | Controle de acesso: só os menus e ações que diferem do padrão do perfil (vazio = padrão) | sempre |
 | `painel_dias`, `painel_dias_ok` | Dashboard: totais de cada dia por veículo (km, km por hora, tempos, excessos, alertas), calculados das posições uma vez por dia | sempre (o dia de hoje é calculado ao vivo) |
-| `regras_alerta` | Regras de alerta da empresa (velocidade, horário, parada longa, motor ligado parado) | sempre |
+| `regras_alerta` | Regras de alerta da empresa (velocidade, horário, parada longa, motor ligado parado, sem comunicação) | sempre |
+| `push_inscricoes`, `usuarios.push_nivel` | Avisos no celular: os aparelhos de cada pessoa (endereço do serviço de push e as chaves públicas do aparelho) e quais alertas ela quer | até a pessoa tirar o aparelho ou sair |
 | `codigos_recuperacao`, `sessoes_2fa` | Verificação em duas etapas: códigos de recuperação (só o resumo SHA-256) e os logins que já passaram pela segunda etapa | até zerar / 90 dias |
 | `eventos_aparelho`, `comandos` | Comunicações: conexões/desconexões e comandos enviados com a resposta | 180 dias |
 | `auditoria` | Acessos, cadastros, câmeras abertas, gravações vistas e baixadas, relatórios exportados, tratamento de alertas | 730 dias (mínimo 180) |
@@ -153,16 +154,28 @@ Em **Cadastros › Regras de alerta** a empresa decide o que quer acompanhar, al
 | **Uso fora do horário** | o veículo é ligado ou anda fora dos dias e do horário permitidos | dias da semana, das/até (pode passar da meia-noite), tolerância (min) |
 | **Parada longa** | fica parado (ligado ou desligado) mais que o tempo, fora das garagens | minutos (padrão 30), não avisar nas garagens / nos pontos |
 | **Motor ligado parado** | o motor fica ligado com o veículo parado mais que o tempo | minutos (padrão 10), não avisar nas garagens / nos pontos |
+| **Sem comunicação** | o aparelho para de se comunicar (antena ou cabo cortado, DVR desligado, falta de energia, área sem sinal) | minutos (padrão 10), só se o veículo estava ligado (padrão) |
 
 - Cada regra vale para **a empresa toda, um grupo (com os subgrupos) ou um veículo**, e tem a gravidade escolhida. **Vale a regra mais específica**: a do veículo, senão a do grupo mais próximo, senão a da empresa toda (ex.: empresa a 80 km/h e o grupo Rodoviário a 100 km/h). Dentro de uma cerca com limite próprio vale o limite da cerca (ex.: 20 km/h no pátio da garagem).
 - O alerta **fica aberto enquanto a situação durar e fecha sozinho** (voltou abaixo do limite, desligou o motor, saiu do lugar, entrou no horário). No excesso de velocidade o alerta guarda a maior velocidade do trecho. Se o aparelho cai, o excesso, o uso fora do horário e o motor ligado parado fecham; a parada continua (o veículo ficou onde estava).
-- A parada longa vale também para o veículo desligado com o DVR apagado (o "dormiu na rua"), pela última posição. Aparelho sem contato há mais de 1 dia não abre parada nova. **Desenhe as garagens em Cercas antes**: sem garagem, todo veículo parado conta (a tela avisa).
+- A parada longa vale também para o veículo desligado com o DVR apagado (o "dormiu na rua"), pela última posição. Aparelho sem contato há mais de 1 dia não abre parada nova (nem "sem comunicação": aí é assunto da Saúde dos aparelhos).
+- **Sem comunicação** com "só se estava ligado" (o padrão) avisa quando o DVR some com a ignição ligada na última posição. Desmarcado, avisa também o veículo desligado: o DVR que desliga junto com a chave gera um alerta toda noite. **Desenhe as garagens em Cercas antes**: sem garagem, todo veículo parado conta (a tela avisa).
 - Posições que chegam atrasadas (área sem sinal) não abrem alerta antigo; os relatórios mostram esses trechos.
 - O botão de cada regra **liga e desliga** sem apagar; desligar ou excluir fecha os alertas dela que estavam abertos. A lista mostra quantos alertas cada regra gerou nos últimos 7 dias.
 - No **Controle de acesso** a tela "Regras de alerta" vem liberada para o administrador; quem só enxerga alguns grupos mexe só nas regras desses grupos e veículos. Tudo fica na auditoria.
 - O **Dashboard** passa a contar o excesso de velocidade pelo limite da regra de cada veículo.
 
-## 3.9 Sessão e avisos
+## 3.9 Avisos no celular (com o painel fechado)
+
+Cada pessoa liga em **cada aparelho dela**: botão do som no topo › **Avisos no celular** › **Ativar neste aparelho** (o navegador pede permissão e chega um aviso de teste). Funciona no **Android** (Chrome, Samsung Internet), no **computador** (Chrome, Edge, Firefox, Safari) e no **iPhone/iPad pelo app instalado** (Safari › Compartilhar › Adicionar à Tela de Início, iOS 16.4 ou mais novo; a tela explica).
+
+- O aviso chega mesmo com o FrotaGest fechado, como notificação do aparelho (som e vibração dele); tocar abre o FrotaGest nos Alertas. Gravidade alta fica na tela até a pessoa tocar.
+- **Quais alertas:** só gravidade alta (padrão), alta e média, ou todos — vale para todos os aparelhos da pessoa. Chegam só os alertas dos veículos que ela vê no painel (empresa, grupos e o menu Alertas no Controle de acesso). Vários alertas de uma vez viram **um aviso só** com o resumo; o mesmo alerta que volta em seguida não avisa de novo; alerta que chegou atrasado (posições de área sem sinal) não vira aviso.
+- A janela mostra os aparelhos que recebem, com **Enviar teste** e a lixeira para tirar um aparelho (ex.: celular perdido). **Clicar em Sair desliga os avisos daquele aparelho**; a sessão que expira por falta de uso não desliga (o celular continua avisando). Aparelho que o navegador cancelou (app desinstalado, dados apagados) sai da lista sozinho.
+- No computador com o painel aberto e à vista, o próprio painel avisa (som e mensagem) e a notificação não se repete.
+- Como funciona: padrão **Web Push** dos navegadores. O servidor guarda um par de chaves próprio (na tabela `configuracoes`, criado sozinho na primeira vez) e manda cada aviso **criptografado** para o serviço de push do navegador (Google, Apple, Mozilla ou Microsoft), que só entrega. O servidor só aceita esses serviços como destino. Precisa de saída HTTPS liberada (o padrão da Oracle já libera).
+
+## 3.10 Sessão e avisos
 
 - **Sessão encerrada por falta de uso** depois do tempo de **Sistema › Configurações › Segurança** (padrão 60 min; 0 = nunca, só para telas de central/TV). Um minuto antes aparece “Você ainda está aí?”. Vale também se a janela foi fechada sem clicar em Sair.
 - **Tema claro ou escuro:** botão da lua/sol no topo; a escolha fica no navegador (sem escolha, segue o tema do sistema). No escuro, o mapa de ruas também escurece; o satélite fica como está.
@@ -297,6 +310,7 @@ Cada perfil também diz o **horário configurado no aparelho** (Brasília, ou UT
 - Criar conta exige o código da empresa e a aprovação do administrador; o código pode ser trocado a qualquer momento.
 - Verificação em duas etapas (Google Authenticator) feita no próprio FrotaGest, exigida pelo master por perfil ou por pessoa (seção 3.4).
 - Controle de acesso por usuário (menus e ações), conferido no servidor a cada pedido e no tempo real (seção 3.6).
+- Avisos no celular criptografados de ponta a ponta (Web Push, RFC 8291/8292): o serviço de push do navegador não lê o conteúdo, e o servidor só envia para os serviços de push conhecidos (seção 3.9).
 
 ## 9. Testar sem o DVR
 

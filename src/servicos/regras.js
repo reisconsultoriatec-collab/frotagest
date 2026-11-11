@@ -7,6 +7,7 @@
  *  fora_horario  veículo em uso (ignição ligada ou andando) fora dos dias/horário permitidos
  *  parada        parado há mais de N minutos fora das garagens (e, se marcado, dos pontos/terminais)
  *  ociosidade    motor ligado com o veículo parado há mais de N minutos
+ *  sem_comunicacao  o aparelho parou de falar há mais de N minutos (por padrão, só se estava ligado)
  *
  * Vale a regra mais específica para cada veículo: a do veículo, senão a do grupo mais próximo, senão
  * a da empresa toda. Dentro de uma cerca com limite próprio, vale o limite da cerca.
@@ -21,6 +22,7 @@ const TIPOS = {
   fora_horario: { nome: 'Uso fora do horário', gravidade: 'alta', tempoSeg: 60 },
   parada: { nome: 'Parada longa fora da garagem', gravidade: 'media', tempoSeg: 1800 },
   ociosidade: { nome: 'Motor ligado parado', gravidade: 'baixa', tempoSeg: 600 },
+  sem_comunicacao: { nome: 'Sem comunicação', gravidade: 'alta', tempoSeg: 600 },
 };
 
 const PARADO_KMH = 3; // igual aos relatórios
@@ -59,6 +61,7 @@ function daLinha(r) {
     limite: r.limite_kmh === null || r.limite_kmh === undefined ? null : Number(r.limite_kmh), tempoSeg: Number(r.tempo_seg) || 0,
     dias, inicio: r.horario_inicio || null, fim: r.horario_fim || null,
     ignorarGaragem: Boolean(r.ignorar_garagem), ignorarPonto: Boolean(r.ignorar_ponto),
+    soLigado: r.so_ligado === undefined || r.so_ligado === null ? true : Boolean(r.so_ligado),
     gravidade: r.gravidade || TIPOS[r.tipo].gravidade, ativo: Boolean(r.ativo),
   };
 }
@@ -237,7 +240,7 @@ class Regras {
     if (!st) return;
     st.online = online;
     if (online) st.contato = Date.now();
-    else this.avaliar(info, st, Date.now(), true, 'conexao');
+    this.avaliar(info, st, Date.now(), true, 'conexao');
   }
 
   tick() {
@@ -325,6 +328,15 @@ class Regras {
           quando = st.ociosoDesde + r.tempoSeg * 1000;
         }
         if (r) nome = `Motor ligado parado há mais de ${fmtTempo(r.tempoSeg)}`;
+      } else if (tipo === 'sem_comunicacao') {
+        const silencio = Date.now() - st.contato;
+        if (r && st.contato && (!r.soLigado || st.ign) && silencio >= r.tempoSeg * 1000) {
+          cond = true;
+          quando = st.contato + r.tempoSeg * 1000;
+          // calado há mais de 1 dia (aparelho retirado, veículo parado na oficina): fica para a Saúde dos aparelhos
+          if (!aberto(codigo) && silencio > PARADA_SEM_CONTATO_MS) cond = false;
+        }
+        if (r) nome = `Sem comunicação há mais de ${fmtTempo(r.tempoSeg)}${r.soLigado ? ' (estava ligado)' : ''}`;
       }
 
       // fecha os alertas deste tipo que não valem mais (situação acabou ou outra regra passou a valer)

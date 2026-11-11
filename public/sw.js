@@ -1,7 +1,9 @@
 /* FrotaGest — service worker do aplicativo (instalável no celular e no computador).
  * Só guarda os arquivos do próprio painel (telas, estilos, ícones), para abrir mais rápido no 4G.
  * Nunca guarda dados: nada de /api, tempo real, vídeo ou downloads passa por aqui.
- * Sem internet, mostra um aviso em vez de uma tela quebrada. Reis Tecnologia */
+ * Sem internet, mostra um aviso em vez de uma tela quebrada.
+ * Avisos no celular: recebe o alerta do servidor (Web Push, criptografado) e mostra a notificação,
+ * mesmo com o painel fechado; o toque abre o FrotaGest na tela dos alertas. Reis Tecnologia */
 'use strict';
 
 const VERSAO = 'frotagest-__VERSAO__';
@@ -24,6 +26,49 @@ const SEM_INTERNET = `<!doctype html><html lang="pt-BR"><head><meta charset="utf
 <h1 style="font-size:21px;margin:0 0 8px">Sem conexão com a internet</h1>
 <p style="margin:0 0 20px;color:#A8B3C9;max-width:320px">O FrotaGest mostra a frota ao vivo e precisa de internet. Confira o Wi-Fi ou os dados móveis.</p>
 <a href="/" style="display:inline-block;padding:12px 22px;border-radius:10px;background:#F59E0B;color:#1A2744;font-weight:700;text-decoration:none">Tentar de novo</a></div></body></html>`;
+
+/* ---------- avisos no celular ---------- */
+
+const ehIPhone = /iPhone|iPad|iPod/.test(self.navigator.userAgent || '');
+
+self.addEventListener('push', (ev) => {
+  let d = {};
+  try { d = ev.data ? ev.data.json() : {}; } catch { d = { b: ev.data ? ev.data.text() : '' }; }
+  ev.waitUntil((async () => {
+    // com o painel aberto e à vista no computador, o próprio painel já avisou (som e mensagem);
+    // no iPhone a notificação é obrigatória a cada aviso, então sempre mostra
+    if (!ehIPhone) {
+      const janelas = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      if (janelas.some((c) => c.visibilityState === 'visible' && c.focused)) return;
+    }
+    await self.registration.showNotification(d.t || 'FrotaGest', {
+      body: d.b || '',
+      tag: d.tag || 'fg-aviso',
+      renotify: true,
+      icon: '/img/icone-192.png',
+      badge: '/img/icone-aviso.png',
+      timestamp: d.em || Date.now(),
+      requireInteraction: d.g === 'alta',
+      vibrate: d.g === 'alta' ? [220, 90, 220, 90, 220] : [160],
+      data: { url: d.u || '/#/alertas' },
+    });
+  })());
+});
+
+self.addEventListener('notificationclick', (ev) => {
+  ev.notification.close();
+  const url = new URL((ev.notification.data && ev.notification.data.url) || '/', self.location.origin).href;
+  ev.waitUntil((async () => {
+    const janelas = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    const aberta = janelas.find((c) => new URL(c.url).origin === self.location.origin);
+    if (aberta) {
+      await aberta.focus().catch(() => {});
+      aberta.postMessage({ tipo: 'abrir', url });
+      return;
+    }
+    await self.clients.openWindow(url);
+  })());
+});
 
 self.addEventListener('fetch', (ev) => {
   const req = ev.request;

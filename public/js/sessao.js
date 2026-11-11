@@ -232,6 +232,7 @@ const notificacaoDisponivel = () => 'Notification' in window && window.isSecureC
 function notificarAlerta(a, nome) {
   if (!pref('notifAlertas', false) || !notificacaoDisponivel() || Notification.permission !== 'granted') return;
   if (!document.hidden && document.hasFocus()) return; // com a tela à vista, o aviso da própria página basta
+  if (S.pushAqui) return; // este navegador já recebe pelos avisos no celular (o service worker mostra)
   try {
     const n = new Notification(`FrotaGest · ${a.nome}`, {
       body: `${nome} · gravidade ${NOMES_GRAVIDADE[a.gravidade] || a.gravidade} · ${fmtCurto(a.inicio || textoServidor())}`,
@@ -278,10 +279,14 @@ function abrirMenuSom() {
     <small class="tb-pop-nota" id="som-notif-txt">${!disp ? 'Este navegador não permite notificações aqui (é preciso abrir pelo endereço com https).'
       : perm === 'denied' ? 'O navegador está bloqueando as notificações deste site. Libere no cadeado ao lado do endereço.'
         : 'Aparece mesmo com o FrotaGest minimizado ou em outra aba.'}</small>
-    <div class="tb-pop-acoes"><button class="btn btn-sm" type="button" id="som-testar">${ico('volume', 'i-sm')} Testar som</button></div>`;
+    <div class="tb-pop-acoes"><button class="btn btn-sm" type="button" id="som-testar">${ico('volume', 'i-sm')} Testar som</button></div>
+    ${podeTela('alertas') ? `<div class="tb-pop-sep"></div>
+    <button class="tb-pop-link" type="button" id="som-celular">${ico('device-mobile-message', 'i-sm')}<span><b>Avisos no celular</b><small>Receba os alertas com o FrotaGest fechado</small></span>${ico('chevron-right', 'i-sm')}</button>` : ''}`;
   pop.hidden = false;
   pop.querySelectorAll('[name=som-nivel]').forEach((r) => r.addEventListener('change', () => { salvarPref('somNivel', r.value); atualizarBotaoSom(); }));
   $('#som-testar').addEventListener('click', () => tocarAlerta(nivelSom() === 'nenhum' ? 'media' : 'alta', true));
+  const cel = $('#som-celular');
+  if (cel) cel.addEventListener('click', () => { pop.hidden = true; abrirAvisosCelular(); });
   const cb = $('#som-notif');
   cb.addEventListener('change', async () => {
     if (!cb.checked) { salvarPref('notifAlertas', false); return; }

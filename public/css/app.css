@@ -1241,3 +1241,37 @@ button.gr-lb-l:hover { background: var(--fundo-hover); }
 }
 .rg-sem-garagem { display: inline-flex; gap: 6px; align-items: flex-start; margin-top: 6px; color: var(--amber-ink); font-weight: 600; }
 .rg-sem-garagem .i { flex: none; margin-top: 2px; }
+
+/* ---------- 1.10 — Avisos no celular ---------- */
+.tb-pop-link { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 6px; border: 0; border-radius: 10px; background: none; color: var(--ink); text-align: left; cursor: pointer; font: inherit; }
+.tb-pop-link:hover { background: var(--fundo-hover); }
+.tb-pop-link > .i:first-child { color: var(--amber-600); flex: none; }
+.tb-pop-link > .i:last-child { color: var(--ink-3); flex: none; margin-left: auto; }
+.tb-pop-link span { display: flex; flex-direction: column; min-width: 0; }
+.tb-pop-link b { font-size: 13.5px; font-weight: 600; }
+.tb-pop-link small { font-size: 11.5px; color: var(--ink-3); }
+.av-aqui { display: flex; gap: 14px; align-items: flex-start; padding: 14px; border-radius: 12px; background: var(--fundo-suave); border: 1px solid var(--line); }
+.av-aqui-ico { width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; background: var(--card); color: var(--ink-2); flex: none; }
+.av-aqui.ativo { background: var(--ok-50); border-color: transparent; }
+.av-aqui.ativo .av-aqui-ico { color: var(--ok); }
+.av-aqui.inativo .av-aqui-ico { color: var(--amber-600); }
+.av-aqui.bloqueado, .av-aqui.sem { background: var(--err-suave); }
+.av-aqui.bloqueado .av-aqui-ico, .av-aqui.sem .av-aqui-ico { color: var(--err); }
+.av-aqui-txt { display: flex; flex-direction: column; gap: 3px; min-width: 0; line-height: 1.45; }
+.av-aqui-txt b { font-size: 14.5px; }
+.av-aqui-txt > span { color: var(--ink-2); font-size: 13.5px; }
+.av-botoes { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.av-niveis { display: flex; flex-direction: column; gap: 6px; }
+.av-nivel { display: flex; gap: 10px; align-items: flex-start; padding: 9px 10px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; }
+.av-nivel:has(input:checked) { border-color: var(--amber); background: var(--amber-50); }
+.av-nivel input { margin-top: 3px; accent-color: var(--amber-600); }
+.av-nivel span { display: flex; flex-direction: column; }
+.av-nivel b { font-size: 13.5px; font-weight: 600; }
+.av-nivel small { font-size: 12px; color: var(--ink-3); }
+.av-lista { display: flex; flex-direction: column; gap: 4px; }
+.av-item { display: flex; gap: 10px; align-items: center; padding: 8px 4px; border-bottom: 1px solid var(--line-2); }
+.av-item:last-child { border-bottom: 0; }
+.av-item > .i { color: var(--ink-3); flex: none; }
+.av-item-txt { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.av-item-txt b { font-size: 13.5px; font-weight: 600; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.av-item-txt small { font-size: 12px; color: var(--ink-3); }

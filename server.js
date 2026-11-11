@@ -21,6 +21,7 @@ const { Historico } = require('./src/servicos/historico');
 const { Monitor } = require('./src/servicos/monitor');
 const { Cercas } = require('./src/servicos/cercas');
 const { Regras } = require('./src/servicos/regras');
+const { Avisos } = require('./src/servicos/avisos');
 const { Configuracoes } = require('./src/servicos/configuracoes');
 const { Auditoria } = require('./src/servicos/auditoria');
 const { Retencao } = require('./src/servicos/retencao');
@@ -42,6 +43,7 @@ const { Logotipos } = require('./src/servicos/logotipos');
 const { Painel } = require('./src/servicos/painel');
 const apiPainel = require('./src/web/api-painel');
 const apiRegras = require('./src/web/api-regras');
+const apiAvisos = require('./src/web/api-avisos');
 const { definirFuso, gerarCodigo } = require('./src/util/comum');
 const { version } = require('./package.json');
 
@@ -193,6 +195,11 @@ async function main() {
   const firebase = new Firebase(cfg.firebase, fbOpcoes);
   const acesso = new Acesso({ banco, firebase, frota, proprietarios: cfg.proprietarios, log: (level, text) => log(level, text) });
   await acesso.carregarEncerradas();
+  const avisos = new Avisos({
+    banco, frota, acesso, publicUrl: cfg.web.publicUrl, log: (level, text) => log(level, text),
+    hostsTeste: process.env.FROTAGEST_TESTE_PUSH ? String(process.env.FROTAGEST_TESTE_PUSH).split(',') : [],
+  });
+  await avisos.iniciar();
   const doisFatores = new DoisFatores({ banco, config, dados: DATA, log: (level, text) => log(level, text) });
   await doisFatores.carregar();
 
@@ -202,6 +209,7 @@ async function main() {
     relatorios: new Relatorios({ banco, frota, acesso, cercas }),
     painel: new Painel({ banco, frota, regras, log: (level, text) => log(level, text) }),
     regras,
+    avisos,
   });
   apiOperacao.registrar(srv);
   apiConta.registrar(srv);
@@ -213,6 +221,7 @@ async function main() {
   apiAcessos.registrar(srv);
   apiPainel.registrar(srv);
   apiRegras.registrar(srv);
+  apiAvisos.registrar(srv);
   apiDoisFatores.registrar(srv);
   srv.onLog = (e) => log(e.level, e.text, { source: 'painel' });
 
@@ -271,6 +280,7 @@ async function main() {
   media.on('stream', (s) => srv.enviarStream(s));
   historico.on('alerta', (ev) => {
     srv.enviarAlerta(ev);
+    avisos.alerta(ev);
     if (ev.alerta && ev.alerta.ident) agendarItem(ev.alerta.ident);
   });
   recorder.on('job', (j) => {

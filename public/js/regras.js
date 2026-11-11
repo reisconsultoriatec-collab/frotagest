@@ -20,6 +20,10 @@ const TIPOS_REGRA = {
     nome: 'Motor ligado parado', ico: 'engine',
     desc: 'Avisa quando o motor fica ligado com o veículo parado: gasto de combustível e desgaste.',
   },
+  sem_comunicacao: {
+    nome: 'Sem comunicação', ico: 'antenna-bars-off',
+    desc: 'Avisa quando o aparelho para de se comunicar com o veículo ligado: antena ou cabo cortado, DVR desligado, falta de energia ou área sem sinal.',
+  },
 };
 const DIAS_SEMANA = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
@@ -48,6 +52,7 @@ function resumoRegra(r) {
   if (r.tipo === 'fora_horario') {
     return [`permitido <b>${H(textoDiasRegra(r.dias))}, ${H(r.inicio)}–${H(r.fim)}</b>`, r.tempoSeg ? `tolerância ${fmtTempoRegra(r.tempoSeg)}` : ''].filter(Boolean).join(' · ');
   }
+  if (r.tipo === 'sem_comunicacao') return `mais de <b>${fmtTempoRegra(r.tempoSeg)}</b> · ${r.soLigado ? 'só se estava ligado' : 'mesmo com o veículo desligado'}`;
   const fora = [r.ignorarGaragem ? 'garagens' : '', r.ignorarPonto ? 'pontos' : ''].filter(Boolean).join(' e ');
   return [`mais de <b>${fmtTempoRegra(r.tempoSeg)}</b>`, fora ? `não avisa em ${fora}` : 'avisa em qualquer lugar'].join(' · ');
 }
@@ -165,7 +170,7 @@ PAGINAS.regras = (() => {
     const q = qs({ empresa: empresaId });
     const [g, v, ce] = await Promise.all([
       api(`/api/grupos?${q}`), api(`/api/veiculos?${q}`),
-      tipo !== 'fora_horario' ? api(`/api/cercas?${q}`) : Promise.resolve({ cercas: [] }),
+      ['velocidade', 'parada', 'ociosidade'].includes(tipo) ? api(`/api/cercas?${q}`) : Promise.resolve({ cercas: [] }),
     ]);
     const t = TIPOS_REGRA[tipo];
     const veiculos = v.veiculos.filter((x) => x.ativo || (r && r.veiculoId === x.id))
@@ -201,6 +206,13 @@ PAGINAS.regras = (() => {
         { nome: 'minutos', rotulo: 'Tolerância (minutos)', tipo: 'numero', min: 0, max: 60, ajuda: 'Avisa depois deste tempo em uso fora do horário.' },
       );
       Object.assign(valores, { dias: r ? r.dias : [1, 2, 3, 4, 5, 6], inicio: r ? r.inicio : '05:00', fim: r ? r.fim : '23:00', minutos: r ? Math.round(r.tempoSeg / 60) : 1 });
+    } else if (tipo === 'sem_comunicacao') {
+      campos.push(
+        { nome: 'minutos', rotulo: 'Sem comunicação há mais de (minutos)', tipo: 'numero', min: 5, max: 1440, obrigatorio: true },
+        { nome: 'soLigado', rotulo: 'Só se o veículo estava ligado (recomendado)', tipo: 'check', cheio: true, ajuda: '' },
+        { tipo: 'info', html: 'Desmarcado, avisa também os veículos desligados: o DVR que desliga junto com a chave gera um alerta toda noite.', se: 'soLigado=false' },
+      );
+      Object.assign(valores, { minutos: r ? Math.round(r.tempoSeg / 60) : 10, soLigado: r ? r.soLigado : true });
     } else {
       const parada = tipo === 'parada';
       campos.push(
@@ -217,7 +229,7 @@ PAGINAS.regras = (() => {
       { nome: 'gravidade', rotulo: 'Gravidade do alerta', tipo: 'select', opcoes: [{ v: 'alta', t: 'Alta' }, { v: 'media', t: 'Média' }, { v: 'baixa', t: 'Baixa' }] },
       { nome: 'ativo', rotulo: 'Regra ligada', tipo: 'check' },
     );
-    if (!valores.gravidade) valores.gravidade = { velocidade: 'media', fora_horario: 'alta', parada: 'media', ociosidade: 'baixa' }[tipo];
+    if (!valores.gravidade) valores.gravidade = { velocidade: 'media', fora_horario: 'alta', parada: 'media', ociosidade: 'baixa', sem_comunicacao: 'alta' }[tipo];
     // parada longa sem nenhuma garagem desenhada: todo veículo parado contaria
     const semGaragem = tipo === 'parada' && !ce.cercas.some((x) => x.ativo && x.finalidade === 'garagem');
     const j = formulario({
@@ -252,5 +264,5 @@ PAGINAS.regras = (() => {
     }
   }
 
-  return { id: 'regras', titulo: 'Regras de alerta', sub: 'Velocidade, horário, parada longa e motor ligado parado: o que a empresa quer acompanhar', render, sair };
+  return { id: 'regras', titulo: 'Regras de alerta', sub: 'Velocidade, horário, parada longa, motor ligado parado e sem comunicação: o que a empresa quer acompanhar', render, sair };
 })();

@@ -10,7 +10,7 @@ const { TIPOS } = require('../servicos/regras');
 
 const MAX_POR_EMPRESA = 200;
 const COLUNAS = ['empresa_id', 'tipo', 'grupo_id', 'veiculo_id', 'cerca_id', 'limite_kmh', 'tempo_seg', 'dias', 'horario_inicio', 'horario_fim',
-  'ignorar_garagem', 'ignorar_ponto', 'gravidade', 'ativo'];
+  'ignorar_garagem', 'ignorar_ponto', 'so_ligado', 'gravidade', 'ativo'];
 
 function hora(v, nome) {
   const s = V.texto(v, `o ${nome}`, { max: 5, obrigatorio: true });
@@ -59,7 +59,7 @@ function registrar(srv) {
     const alcance = V.opcao(b.alcance, ['empresa', 'grupo', 'veiculo'], 'a quem a regra vale', 'empresa');
     const d = {
       empresa_id: empresaId, tipo, grupo_id: null, veiculo_id: null, cerca_id: null, limite_kmh: null, tempo_seg: 0,
-      dias: null, horario_inicio: null, horario_fim: null, ignorar_garagem: 1, ignorar_ponto: 0,
+      dias: null, horario_inicio: null, horario_fim: null, ignorar_garagem: 1, ignorar_ponto: 0, so_ligado: 1,
       gravidade: V.opcao(b.gravidade, ['alta', 'media', 'baixa'], 'a gravidade', TIPOS[tipo].gravidade),
       ativo: V.booleano(b.ativo, true) ? 1 : 0,
     };
@@ -88,6 +88,9 @@ function registrar(srv) {
       d.horario_fim = hora(b.fim, 'horário final');
       if (d.horario_inicio === d.horario_fim) throw new HttpErro(400, 'O horário inicial e o final não podem ser iguais.');
       d.tempo_seg = faixa(b.minutos, 'a tolerância', 0, 60, 'minutos', 1) * 60;
+    } else if (tipo === 'sem_comunicacao') {
+      d.tempo_seg = faixa(b.minutos, 'o tempo', 5, 1440, 'minutos', 10) * 60;
+      d.so_ligado = V.booleano(b.soLigado, true) ? 1 : 0;
     } else {
       const [min, max, padrao] = tipo === 'parada' ? [5, 1440, 30] : [2, 240, 10];
       d.tempo_seg = faixa(b.minutos, 'o tempo', min, max, 'minutos', padrao) * 60;
@@ -126,6 +129,7 @@ function registrar(srv) {
       cercaId: r.cerca_id, cerca: c ? c.nome : null, cercaSumiu: Boolean(r.cerca_id && !c),
       limite: r.limite_kmh, tempoSeg: r.tempo_seg, dias: r.dias ? r.dias.split(',').map(Number) : [],
       inicio: r.horario_inicio, fim: r.horario_fim, ignorarGaragem: Boolean(r.ignorar_garagem), ignorarPonto: Boolean(r.ignorar_ponto),
+      soLigado: r.so_ligado === undefined ? true : Boolean(r.so_ligado),
       gravidade: r.gravidade, ativo: Boolean(r.ativo), alertas7d: contagem.get(`r${r.id}`) || 0, atualizadoEm: r.atualizado_em,
     };
   }
