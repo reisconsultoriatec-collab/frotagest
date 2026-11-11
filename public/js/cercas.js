@@ -104,7 +104,7 @@ PAGINAS.cercas = (() => {
     offs.forEach((o) => o());
     offs = [];
     clearTimeout(veicTimer);
-    if (mapa) mapa.remove();
+    removerMapa(mapa);
     mapa = null;
     camadas = new Map();
     camadaVeic = null;

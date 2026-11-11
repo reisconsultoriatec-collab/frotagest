@@ -334,6 +334,7 @@ async function abrirApp() {
   atualizarResumoAlertas();
   atualizarPendentes();
   atualizarSaude();
+  atualizarManutencao();
   conectarEventos();
   iniciarSessao();
   atualizarBotaoSom();
@@ -432,6 +433,7 @@ async function iniciar() {
     atualizarStatusFrota();
     atualizarPendentes();
     atualizarSaude();
+    atualizarManutencao();
     atualizarLogoTopo();
     emit('empresa');
     abrirRota();

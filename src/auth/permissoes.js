@@ -41,6 +41,10 @@ const TELAS = [
   { id: 'historico', grupo: 'Operação', nome: 'Histórico', acoes: { ver: 'Ver o trajeto percorrido pelos veículos' } },
   { id: 'relatorios', grupo: 'Operação', nome: 'Relatórios', acoes: { ver: 'Gerar relatórios na tela, em Excel e em PDF' } },
   { id: 'gravacoes', grupo: 'Operação', nome: 'Gravações', acoes: { ver: 'Buscar e assistir as gravações do DVR', incluir: 'Baixar trechos das gravações (MP4)' } },
+  { id: 'manutencao', grupo: 'Operação', nome: 'Manutenção e documentos', acoes: {
+    ver: 'Ver o que está vencido ou perto de vencer (manutenções e documentos) e receber o resumo do dia',
+    incluir: 'Registrar manutenção feita e cadastrar planos e documentos', alterar: 'Editar planos, registros e documentos (renovar)',
+    excluir: 'Excluir planos, registros e documentos' } },
   { id: 'tv', grupo: 'Operação', nome: 'Modo TV', acoes: { ver: 'Tela cheia para a central de monitoramento' } },
   { id: 'saude', grupo: 'Controle', nome: 'Saúde dos aparelhos', acoes: { ver: 'Aparelhos com problema de câmera, cartão, GPS ou sinal' } },
   { id: 'comunicacoes', grupo: 'Controle', nome: 'Comunicações', acoes: { ver: 'Conexões dos aparelhos e comandos enviados' } },

@@ -114,7 +114,7 @@ PAGINAS.dashboard = (() => {
           </div>
         </div>
         <div class="db-avisos">
-          ${podeTela('usuarios') ? '<section class="card" id="ini-cad" hidden></section>' : ''}${podeTela('saude') ? '<section class="card" id="ini-saude" hidden></section>' : ''}
+          ${podeTela('usuarios') ? '<section class="card" id="ini-cad" hidden></section>' : ''}${podeTela('saude') ? '<section class="card" id="ini-saude" hidden></section>' : ''}${podeTela('manutencao') ? '<section class="card" id="ini-manut" hidden></section>' : ''}
           ${S.eu.perfil === 'master' ? '<section class="card" id="ini-pend" hidden></section>' : ''}
         </div>
 
@@ -231,12 +231,14 @@ PAGINAS.dashboard = (() => {
     offs.push(on('resumo-alertas', desenharTiles));
     offs.push(on('pendentes', desenharCadastros));
     offs.push(on('saude', desenharSaude));
+    offs.push(on('manut', desenharManut));
     offs.push(on('empresa', () => { dados = null; enquadrou = false; montarFiltro(); carregar(); carregarAlertas(); carregarCercas(true).then(() => { desenharAoVivo(); desenharGaragensMapa(); }).catch(() => {}); }));
     offs.push(on('tema', () => { desenharHora(); desenharDias(); desenharAlertasHora(); desenharTiposEgrupos(); desenharAoVivo(); }));
     timers.recarga = setInterval(() => { if (!document.hidden) carregar(); }, 60000);
     timers.relogio = setInterval(atualizarRelogio, 5000);
     desenharCadastros();
     desenharSaude();
+    desenharManut();
   }
 
   function tile(id, icone, rot, ir) {
@@ -258,7 +260,7 @@ PAGINAS.dashboard = (() => {
     Object.values(timers).forEach((t) => { clearTimeout(t); clearInterval(t); });
     timers = {};
     seq++;
-    if (mapa) { mapa.remove(); mapa = null; }
+    if (mapa) { removerMapa(mapa); mapa = null; }
     marcadores = new Map();
     Dica.esconder();
   }
@@ -691,6 +693,20 @@ PAGINAS.dashboard = (() => {
     box.innerHTML = `<div class="card-head"><h2>${ico('heartbeat')} ${sd.comProblema === 1 ? '1 aparelho precisa' : `${sd.comProblema} aparelhos precisam`} de atenção${sd.graves ? ` <span class="pill err">${sd.graves} grave${sd.graves > 1 ? 's' : ''}</span>` : ''}</h2>
       <button class="btn btn-sm" type="button" data-ir="saude">${ico('heartbeat', 'i-sm')} Ver a saúde dos aparelhos</button></div>
       <p class="hint">${H(partes.join(' · '))}. A lista pode ser baixada em PDF para a manutenção.</p>`;
+  }
+
+  /** Manutenção e documentos: só aparece se algo cadastrado está vencido ou perto de vencer. */
+  function desenharManut() {
+    const box = $('#ini-manut');
+    if (!box) return;
+    const m = S.manut;
+    box.hidden = !m || (!m.vencidos && !m.perto);
+    if (box.hidden) return;
+    const partes = [m.vencidos ? `${m.vencidos} vencido${m.vencidos > 1 ? 's' : ''}` : '', m.perto ? `${m.perto} vence${m.perto > 1 ? 'm' : ''} em breve` : ''].filter(Boolean).join(' e ');
+    const ex = m.itens.slice(0, 3).map((x) => `${x.nome} (${x.veiculo || x.motorista})`).join(' · ');
+    box.innerHTML = `<div class="card-head"><h2>${ico('tool')} Manutenção e documentos: ${H(partes)}${m.vencidos ? ` <span class="pill err">${m.vencidos} vencido${m.vencidos > 1 ? 's' : ''}</span>` : ''}</h2>
+      <button class="btn btn-sm" type="button" data-ir="manutencao">${ico('tool', 'i-sm')} Ver o que vence</button></div>
+      <p class="hint">${H(ex)}${m.itens.length > 3 ? ' …' : ''}</p>`;
   }
 
   function desenharCadastros() {

@@ -48,6 +48,8 @@ const apiRegras = require('./src/web/api-regras');
 const apiAvisos = require('./src/web/api-avisos');
 const apiComandos = require('./src/web/api-comandos');
 const apiMotoristas = require('./src/web/api-motoristas');
+const { Manutencao } = require('./src/servicos/manutencao');
+const apiManutencao = require('./src/web/api-manutencao');
 const { definirFuso, gerarCodigo } = require('./src/util/comum');
 const { version } = require('./package.json');
 
@@ -220,6 +222,7 @@ async function main() {
     fotos: new Fotos({ banco, frota, config, dados: DATA, log: (level, text) => log(level, text) }),
     motoristas,
   });
+  srv.manutencao = new Manutencao({ banco, frota, painel: srv.painel, motoristas, acesso, avisos, log: (level, text) => log(level, text) });
   apiOperacao.registrar(srv);
   apiConta.registrar(srv);
   apiCadastros.registrar(srv);
@@ -233,6 +236,7 @@ async function main() {
   apiAvisos.registrar(srv);
   apiComandos.registrar(srv);
   apiMotoristas.registrar(srv);
+  apiManutencao.registrar(srv);
   apiDoisFatores.registrar(srv);
   srv.onLog = (e) => log(e.level, e.text, { source: 'painel' });
 
@@ -296,6 +300,9 @@ async function main() {
     for (const id of ids) { const it = monitor.porVeiculo(id); if (it) srv.enviarItem(it); }
     srv.paraTodos({ type: 'motoristas' }, (u) => permite(u, 'motoristas') || permite(u, 'mapa'));
   });
+  // manutenção e documentos: plano, registro ou documento mudou (ou a CNH de um motorista)
+  srv.manutencao.on('mudou', (empresaId) => srv.paraTodos({ type: 'manutencao' }, (u) => permite(u, 'manutencao') && (u.perfil === 'master' || !empresaId || u.empresaId === empresaId)));
+  frota.on('recarregada', () => { srv.manutencao.cache = null; });
   motoristas.on('cartaoDesconhecido', (c) => srv.paraTodos({ type: 'motoristas' }, (u) => permite(u, 'motoristas') && (u.perfil === 'master' || u.empresaId === c.empresaId)));
   // foto que chegou das câmeras (pedida no painel ou mandada pelo aparelho): disco + registro, e avisa as telas
   gateway.on('midia', (md) => {
@@ -325,6 +332,7 @@ async function main() {
   retencao.iniciar();
   srv.painel.iniciar();
   regras.iniciar();
+  srv.manutencao.iniciar();
   srv.fotos.iniciar();
   limparLogs();
 

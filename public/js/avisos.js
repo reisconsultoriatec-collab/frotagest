@@ -132,6 +132,7 @@ async function abrirAvisosCelular() {
       <div class="form-sep">Quais alertas</div>
       <div class="av-niveis">${niveis.map(([v, t, d]) => `<label class="av-nivel"><input type="radio" name="av-nivel" value="${v}" ${s.nivel === v ? 'checked' : ''}><span><b>${t}</b>${d ? `<small>${d}</small>` : ''}</span></label>`).join('')}</div>
       <p class="small muted" style="margin:8px 0 0">Vale para todos os seus aparelhos. Chegam só os alertas dos veículos que você vê no painel; vários de uma vez viram um aviso só. Clicar em <b>Sair</b> desliga os avisos daquele aparelho.</p>
+      ${podeTela('manutencao') ? `<label class="check" style="margin-top:10px"><input type="checkbox" name="av-manut" ${s.manutencao ? 'checked' : ''}> Resumo do dia (7h) de manutenção e documentos vencidos ou vencendo</label>` : ''}
       <div class="form-sep">Seus aparelhos que recebem</div>
       ${s.aparelhos.length ? `<div class="av-lista">${s.aparelhos.map((a) => `
         <div class="av-item">
@@ -180,6 +181,14 @@ async function abrirAvisosCelular() {
   });
 
   corpo.addEventListener('change', async (e) => {
+    const m = e.target.closest('[name=av-manut]');
+    if (m) {
+      try {
+        await api('/api/push/manutencao', { metodo: 'PUT', corpo: { ligado: m.checked } });
+        toast(m.checked ? 'Resumo diário de manutenção ligado.' : 'Resumo diário de manutenção desligado.', 'ok');
+      } catch (err) { m.checked = !m.checked; erro(err.message); }
+      return;
+    }
     const r = e.target.closest('[name=av-nivel]');
     if (!r) return;
     try {

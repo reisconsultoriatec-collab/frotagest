@@ -92,7 +92,7 @@ PAGINAS.historico = (() => {
   function sair() {
     pausar();
     document.removeEventListener('keydown', teclas);
-    if (mapa) mapa.remove();
+    removerMapa(mapa);
     mapa = null;
     camada = null;
     rota = null;

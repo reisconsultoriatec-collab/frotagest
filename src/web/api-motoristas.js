@@ -95,6 +95,7 @@ function registrar(srv) {
     if (d.cartao) await banco.query('DELETE FROM motorista_cartoes_lidos WHERE empresa_id = ? AND cartao = ?', [d.empresa_id, d.cartao]);
     await motoristas.carregar();
     srv.paraTodos({ type: 'motoristas' });
+    if (srv.manutencao) srv.manutencao.mudou(); // a validade da CNH entra em Manutenção e documentos
     await auditoria.registrar(u, 'criar', { entidade: 'motorista', entidadeId: x.insertId, descricao: d.nome, ip, empresaId: d.empresa_id });
     return { id: x.insertId };
   }, { acesso: 'motoristas.incluir' });
@@ -115,6 +116,7 @@ function registrar(srv) {
       if (vid) await motoristas.vincular({ veiculoId: vid, motoristaId: null, usuarioId: u.id });
     }
     srv.paraTodos({ type: 'motoristas' });
+    if (srv.manutencao) srv.manutencao.mudou(); // a validade da CNH entra em Manutenção e documentos
     const acao = !!atual.ativo !== !!d.ativo ? (d.ativo ? 'reativar' : 'desativar') : 'editar';
     await auditoria.registrar(u, acao, { entidade: 'motorista', entidadeId: id, descricao: d.nome, ip, empresaId: atual.empresa_id });
     return { ok: true };
@@ -130,6 +132,7 @@ function registrar(srv) {
     await banco.query('DELETE FROM motoristas WHERE id = ?', [id]);
     await motoristas.carregar();
     srv.paraTodos({ type: 'motoristas' });
+    if (srv.manutencao) srv.manutencao.mudou(); // a validade da CNH entra em Manutenção e documentos
     await auditoria.registrar(u, 'excluir', { entidade: 'motorista', entidadeId: id, descricao: atual.nome, ip, empresaId: atual.empresa_id });
     return { ok: true };
   }, { acesso: 'motoristas.excluir' });
@@ -171,6 +174,7 @@ function registrar(srv) {
     const emp = u.perfil === 'master' ? V.id(query.empresa, 'a empresa') : u.empresaId;
     await banco.query('DELETE FROM motorista_cartoes_lidos WHERE empresa_id = ? AND cartao = ?', [emp, normCartao(params.cartao)]);
     srv.paraTodos({ type: 'motoristas' });
+    if (srv.manutencao) srv.manutencao.mudou(); // a validade da CNH entra em Manutenção e documentos
     return { ok: true };
   }, { acesso: 'motoristas.incluir' });
 }

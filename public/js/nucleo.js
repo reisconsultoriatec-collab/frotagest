@@ -12,7 +12,8 @@ const WS_PROTO = location.protocol === 'https:' ? 'wss' : 'ws';
    ico('volume-off') ico('volume') ico('sun') ico('moon') ico('antenna-bars-2') ico('camera-off') ico('device-sd-card') ico('gps') ico('plug-x') ico('wifi-off') ico('cpu') ico('wifi') ico('video') ico('check') ico('download') ico('alert-triangle') ico('bell-ringing')
    ico('building-warehouse') ico('map-pin') ico('shape') ico('ban') ico('device-mobile') ico('device-desktop') ico('device-tv') ico('arrows-minimize')
    ico('shield-lock') ico('shield-check') ico('lifebuoy') ico('device-mobile') ico('file-download') ico('copy') ico('login-2')
-   ico('dots-vertical') ico('photo') ico('upload') ico('bell-off') ico('device-mobile') ico('device-desktop') */
+   ico('dots-vertical') ico('photo') ico('upload') ico('bell-off') ico('device-mobile') ico('device-desktop')
+   ico('tool') ico('file-certificate') ico('list-check') ico('receipt') ico('circle-check') ico('user') ico('clock-exclamation') */
 
 /** Estado do painel. */
 const S = {
@@ -324,6 +325,10 @@ function tratarEvento(m) {
     case 'motoristas': // cadastro mudou, motorista trocado ou cartão novo lido pelo DVR
       emit('motoristas');
       break;
+    case 'manutencao': // plano, manutenção feita ou documento mudou
+      emit('manutencao');
+      atualizarManutencao();
+      break;
     case 'foto': // chegou uma foto das câmeras de um veículo
       emit('foto', m.foto);
       break;
@@ -371,6 +376,7 @@ const NAV = [
       { id: 'historico', nome: 'Histórico', ico: 'route' },
       { id: 'relatorios', nome: 'Relatórios', ico: 'file-analytics' },
       { id: 'gravacoes', nome: 'Gravações', ico: 'video' },
+      { id: 'manutencao', nome: 'Manutenção e documentos', ico: 'tool', badge: 'nav-manut', badgeCls: 'err' },
       { id: 'tv', nome: 'Modo TV', ico: 'device-tv' },
     ],
   },
@@ -431,6 +437,7 @@ async function recarregarAcessos() {
     atualizarResumoAlertas();
     atualizarPendentes();
     atualizarSaude();
+    atualizarManutencao();
     toast('O seu acesso ao FrotaGest foi atualizado pelo administrador.', '');
   } catch { /* tenta de novo no próximo aviso */ }
 }
@@ -556,6 +563,17 @@ function abrirRota() {
 }
 
 /* ---------- componentes ---------- */
+
+/**
+ * Tira um mapa Leaflet da tela. Sair no meio da animação de zoom (clicar no veículo e logo num botão
+ * que troca de tela) fazia o Leaflet terminar a animação num mapa que não existe mais (erro no console).
+ */
+function removerMapa(m) {
+  if (!m) return;
+  m._animatingZoom = false;
+  m.stop();
+  m.remove();
+}
 
 /** Janela sobre a tela. Retorna { el, fechar }. */
 function janela({ titulo, icone = null, corpo = '', rodape = '', tamanho = '', aoFechar = null }) {

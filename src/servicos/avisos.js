@@ -123,11 +123,20 @@ class Avisos {
   }
 
   async situacao(u) {
-    const row = await this.banco.um('SELECT push_nivel FROM usuarios WHERE id = ?', [u.id]);
+    const row = await this.banco.um('SELECT push_nivel, push_manutencao FROM usuarios WHERE id = ?', [u.id]);
     const aparelhos = [...this.inscricoes.values()].filter((i) => i.usuario_id === u.id)
       .sort((a, b) => String(b.criado_em).localeCompare(String(a.criado_em)))
       .map((i) => ({ id: i.id, nome: i.aparelho || 'Navegador', hash: i.endpoint_hash, criadoEm: i.criado_em, usadoEm: i.usado_em, falhas: i.falhas }));
-    return { disponivel: Boolean(this.chaves), chavePublica: this.chavePublica(), nivel: NIVEIS[row && row.push_nivel] ? row.push_nivel : 'alta', aparelhos };
+    return {
+      disponivel: Boolean(this.chaves), chavePublica: this.chavePublica(), nivel: NIVEIS[row && row.push_nivel] ? row.push_nivel : 'alta',
+      manutencao: !row || row.push_manutencao === undefined ? true : Boolean(row.push_manutencao), aparelhos,
+    };
+  }
+
+  /** Resumo diário de manutenção e documentos (7h): liga ou desliga para a pessoa. */
+  async definirManutencao(u, ligado) {
+    await this.banco.query('UPDATE usuarios SET push_manutencao = ? WHERE id = ?', [ligado ? 1 : 0, u.id]);
+    this.usuarios.delete(u.id);
   }
 
   async definirNivel(u, nivel) {
@@ -169,10 +178,10 @@ class Avisos {
     const c = this.usuarios.get(id);
     if (c && c.ate > Date.now()) return c.x;
     let x = null;
-    const row = await this.banco.um('SELECT id, firebase_uid, email, ativo, pendente, push_nivel FROM usuarios WHERE id = ?', [id]);
+    const row = await this.banco.um('SELECT id, firebase_uid, email, ativo, pendente, push_nivel, push_manutencao FROM usuarios WHERE id = ?', [id]);
     if (row && row.ativo && !row.pendente && row.firebase_uid) {
       try {
-        x = { u: await this.acesso.resolver({ uid: row.firebase_uid, email: row.email }), nivel: row.push_nivel };
+        x = { u: await this.acesso.resolver({ uid: row.firebase_uid, email: row.email }), nivel: row.push_nivel, manutencao: Boolean(row.push_manutencao) };
       } catch { x = null; } // desativado, empresa desativada...
     }
     this.usuarios.set(id, { x, ate: Date.now() + CACHE_USUARIO_MS });

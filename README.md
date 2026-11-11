@@ -60,6 +60,8 @@ A tabela acima é o **padrão** de cada perfil. Em **Controle › Controle de ac
 | `regras_alerta` | Regras de alerta da empresa (velocidade, horário, parada longa, motor ligado parado, sem comunicação, direção contínua) | sempre |
 | `motoristas`, `motorista_vinculos` | Motoristas (nome, matrícula, CNH, cartão) e quem dirigiu cada veículo, de quando até quando (escolhido no painel ou pelo cartão no DVR) | sempre |
 | `motorista_cartoes_lidos` | Cartões passados no DVR que ainda não estão no cadastro | até cadastrar ou esquecer |
+| `manutencao_planos`, `manutencoes` | Planos de manutenção (a cada X km e/ou tempo) e as manutenções feitas (data, hodômetro, custo, oficina) | sempre |
+| `documentos` | Documentos com vencimento do veículo (licenciamento, seguro, tacógrafo…) e do motorista (exame toxicológico, cursos…) | sempre |
 | `fotos` | Fotos das câmeras: veículo, câmera, hora, posição e quem pediu (o JPEG fica em `data/fotos`) | 30 dias (configurável) |
 | `push_inscricoes`, `usuarios.push_nivel` | Avisos no celular: os aparelhos de cada pessoa (endereço do serviço de push e as chaves públicas do aparelho) e quais alertas ela quer | até a pessoa tirar o aparelho ou sair |
 | `codigos_recuperacao`, `sessoes_2fa` | Verificação em duas etapas: códigos de recuperação (só o resumo SHA-256) e os logins que já passaram pela segunda etapa | até zerar / 90 dias |
@@ -209,6 +211,17 @@ Em **Cadastros › Motoristas**: nome (só ele é obrigatório), matrícula, tel
 - **Relatórios "Jornada dos motoristas" e "Resumo por motorista"** contam só os trechos em que cada motorista estava no veículo. Jornada nova começa depois de 8 h sem dirigir.
 - Histórico de cada motorista (veículos que dirigiu, de quando até quando, quem trocou) no cadastro dele; trocas e cadastros na auditoria. Motorista que já dirigiu não pode ser excluído (desative).
 - Controle de acesso: tela **Motoristas** (Cadastros). Ver = lista e quem está no veículo; Incluir = cadastrar; Alterar = editar e **trocar o motorista do veículo**; Excluir. Padrão: administrador tudo; operador e visualizador não entram na tela (o menu deles não muda), mas veem no Monitoramento quem está dirigindo cada veículo. O administrador libera mais no Controle de acesso.
+
+## 3.13 Manutenção e documentos (opcional)
+
+Em **Operação › Manutenção e documentos**. **Nada aqui é obrigatório**: sem plano nem documento cadastrado a tela só explica para que serve, nenhum aviso aparece e nada muda na operação (veículos, alertas e relatórios funcionam igual). Cadastre só o que quiser acompanhar.
+
+- **Planos de manutenção:** "troca de óleo a cada 10.000 km ou 6 meses" (km, tempo em meses ou dias, ou os dois — vence no que chegar primeiro). Vale para a empresa toda, um grupo (com os subgrupos) ou um veículo. Avisa antes: por padrão faltando 10% do intervalo de km ou 15 dias (ajustável em cada plano). O botão ligar/desligar tira o plano da situação sem apagar nada.
+- **Km pelo GPS:** os km rodados de cada dia (os mesmos do Dashboard) desde o dia seguinte à última manutenção registrada; sem registro, desde o dia em que o plano foi criado. Informando o hodômetro na manutenção, a tela mostra o **hodômetro estimado** de hoje.
+- **Registrar manutenção feita:** do plano (a próxima conta dali) ou avulsa (ex.: pastilhas de freio), com data, hodômetro, custo e oficina (tudo opcional menos a data). Já fez há pouco ou está atrasado quando criou o plano? Registre com a data em que foi feita. A aba **Manutenções feitas** mostra o histórico e o total gasto.
+- **Documentos com vencimento:** do veículo (licenciamento, IPVA, seguro, aferição do tacógrafo, vistoria, autorização de transporte, extintor) ou do motorista (exame toxicológico, curso obrigatório, ASO), com número e "avisar X dias antes" (padrão 30). **Renovar** = mudar a data de vencimento (fica na auditoria com a data antiga e a nova). A **validade da CNH** vem do cadastro do motorista (avisa 30 dias antes).
+- **Avisos** (só quando há algo cadastrado vencido ou perto de vencer, e só para quem tem a tela): selo vermelho no menu com o número de vencidos, aviso no Dashboard, linha no painel do veículo (Monitoramento) e um **resumo por dia às 7h no celular** para quem ativou os avisos no celular (cada pessoa pode desligar o resumo na janela "Avisos no celular").
+- Controle de acesso: tela **Manutenção e documentos** (Operação). Ver = situação e resumo do dia; Incluir = registrar feitas e cadastrar planos e documentos; Alterar = editar e renovar; Excluir. Padrão: administrador tudo; operador e visualizador não têm (o menu deles não muda). Quem só enxerga alguns grupos vê só os veículos e motoristas deles e não cria plano para a empresa toda.
 
 ---
 

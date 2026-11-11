@@ -116,7 +116,7 @@ PAGINAS.tv = (() => {
     [redesenho, alertasTimer, piscaTimer, ociosoTimer].forEach((t) => clearTimeout(t));
     redesenho = null;
     if (travaTela) { travaTela.release().catch(() => {}); travaTela = null; }
-    if (mapa) mapa.remove();
+    removerMapa(mapa);
     mapa = null;
     marcadores = new Map();
     camadaCercas = null;

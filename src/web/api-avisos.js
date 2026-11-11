@@ -35,6 +35,11 @@ function registrar(srv) {
     return { ok: true };
   }, { acesso: 'alertas.ver' });
 
+  srv.rota('PUT', '/api/push/manutencao', async ({ u, body }) => {
+    await avisos.definirManutencao(u, V.booleano(body && body.ligado, true));
+    return { ok: true };
+  }, { acesso: 'manutencao.ver' });
+
   srv.rota('POST', '/api/push/teste', async ({ u, body }) => avisos.teste(u, body && body.id ? V.id(body.id, 'o aparelho') : null),
     { acesso: 'alertas.ver', limite: { chave: 'push-teste', max: 10, minutos: 10 } });
 }

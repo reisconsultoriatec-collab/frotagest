@@ -16,11 +16,13 @@ const NOMES_ACAO = {
   '2fa_zerada': 'Zerou a verificação em 2 etapas', alterar_acesso: 'Alterou o controle de acesso',
   ativar_avisos: 'Ligou avisos no celular', mensagem_motorista: 'Mandou mensagem ao motorista', foto_agora: 'Pediu foto das câmeras',
   reiniciar_aparelho: 'Reiniciou o aparelho', parametros_aparelho: 'Alterou parâmetros do aparelho', trocar_motorista: 'Trocou o motorista do veículo',
+  registrar_manutencao: 'Registrou manutenção feita', renovar_documento: 'Renovou documento',
 };
 const NOMES_ENTIDADE = {
   empresa: 'Empresa', usuario: 'Usuário', grupo: 'Grupo', veiculo: 'Veículo', aparelho: 'Aparelho', aparelho_pendente: 'Aparelho pendente',
   perfil_protocolo: 'Perfil de protocolo', configuracoes: 'Configurações', alerta: 'Alerta', download: 'Download',
   cerca: 'Cerca', regra_alerta: 'Regra de alerta', motorista: 'Motorista',
+  plano_manutencao: 'Plano de manutenção', manutencao: 'Manutenção feita', documento: 'Documento',
 };
 
 /* ---------------- comunicações ---------------- */

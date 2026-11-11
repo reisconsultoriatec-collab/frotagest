@@ -177,6 +177,7 @@ PAGINAS.mapa = (() => {
       agendarLista();
     }));
     offs.push(on('cercas', desenharCercas));
+    offs.push(on('manut', () => { if (selecionado) desenharDetalhe(); }));
     offs.push(on('empresa', () => { S.cercas = null; }));
     relogio = setInterval(() => { agendarLista(); if (selecionado) desenharDetalhe(); }, 15000);
     if (params.v) selecionar(params.v, true);
@@ -190,7 +191,7 @@ PAGINAS.mapa = (() => {
     if (mosaico) mosaico.fecharTodos();
     clearTimeout(agrupaTimer);
     agrupaTimer = null;
-    if (mapa) mapa.remove();
+    removerMapa(mapa);
     mapa = null;
     camadaGrupos = null;
     camadaCercas = null;
@@ -573,6 +574,7 @@ PAGINAS.mapa = (() => {
       </div>
       <div class="det-status">${status}</div>
       ${i.pendente ? '' : htmlMotoristaVeiculo(i)}
+      ${i.pendente ? '' : htmlManutVeiculo(i)}
       ${naCerca}
       ${p ? `<div class="det-grid">${grid}</div>` : '<p class="small muted" style="margin:0">Sem posição registrada ainda.</p>'}
       ${alertas}
@@ -594,6 +596,8 @@ PAGINAS.mapa = (() => {
     if (cmd) cmd.onclick = () => abrirComandos(i);
     const mot = box.querySelector('[data-trocar-mot]');
     if (mot) mot.onclick = () => trocarMotorista(i);
+    const man = box.querySelector('[data-manut]');
+    if (man) man.onclick = () => navegar('manutencao');
   }
 
   function abrirCanal(i, ch) {
