@@ -307,6 +307,10 @@ function registrar(srv) {
 
   r('POST', '/api/sistema/limpeza', async ({ u, ip }) => {
     const resumo = await retencao.rodar();
+    if (resumo && srv.fotos) {
+      const n = await srv.fotos.limpar().catch(() => 0);
+      if (n) resumo.fotos = n;
+    }
     await auditoria.registrar(u, 'limpeza', { descricao: JSON.stringify(resumo || {}), ip, empresaId: null });
     return { resumo };
   }, { pode: 'sistema' });

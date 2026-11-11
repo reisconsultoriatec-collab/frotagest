@@ -663,6 +663,12 @@ class Servidor {
     }, (u) => v && this.acesso.veVeiculo(u, v));
   }
 
+  /** Foto nova: para quem enxerga o aparelho e tem os comandos ao veículo. */
+  enviarFoto(f) {
+    this.paraTodos({ type: 'foto', foto: { id: f.id, ident: f.ident, aparelhoId: f.aparelhoId, veiculoId: f.veiculoId, canal: f.canal, dataHora: f.dataHora, pedida: f.pedida, usuarioId: f.usuarioId } },
+      (u) => permite(u, 'comandos') && this.acesso.aparelhoVisivel(u, f.ident));
+  }
+
   enviarStream(info) {
     this.paraTodos({ type: 'stream', stream: info }, (u) => this.acesso.aparelhoVisivel(u, info.id));
   }

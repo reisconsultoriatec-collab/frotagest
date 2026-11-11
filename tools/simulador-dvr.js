@@ -37,6 +37,11 @@ const PT = H265 ? 99 : 98; // tipo de carga JT/T 1078: 98 = H.264, 99 = H.265
 const PLAYBACK_MODE = opt('reproducao', 'normal');
 const INTERVALO_MS = Math.max(1, Number(opt('intervalo', 5))) * 1000;
 
+// foto de teste (pedido de foto 0x8801) e os parâmetros que a plataforma pode ler e mudar (0x8104/0x8103)
+const FOTO = fs.readFileSync(path.join(__dirname, 'amostra-foto.jpg'));
+const PARAMETROS = { 0x0001: 30, 0x0010: 'zap.vivo.com.br', 0x0011: 'vivo', 0x0012: 'vivo', 0x0013: V2019 ? `${HOST}:${PORT}` : HOST, 0x0018: PORT, 0x0027: 3600, 0x0029: 10, 0x0055: 90, 0x0056: 10, 0x0083: 'ABC1D23' };
+if (!V2019) PARAMETROS[0x0018] = PORT;
+
 const phoneBcd = J.stringToBcd(ID, V2019 ? 10 : 6);
 const simBcd = J.stringToBcd(ID, SIM10 ? 10 : 6);
 let serial = 0;
@@ -437,6 +442,62 @@ function connect() {
         case J.MSG.QUERY_AV_ATTRIBUTES:
           send(sock, J.MSG.AV_ATTRIBUTES_RESP, Buffer.from([6, 1, 0, 1, 0x01, 0x40, 0, PT, 1, CHANNELS]));
           break;
+        /* ---------- comandos ao veículo (1.11) ---------- */
+        case J.MSG.TEXT_MESSAGE: {
+          const flags = m.body[0];
+          const texto = m.body.subarray(V2019 ? 2 : 1).toString('latin1');
+          log(`mensagem ao motorista${flags & 8 ? ' (voz)' : ''}${flags & 4 ? ' (tela)' : ''}${flags & 1 ? ' URGENTE' : ''}: "${texto}"`);
+          reply(0);
+          break;
+        }
+        case J.MSG.CAMERA_SHOT: {
+          const channel = m.body[0];
+          if (!(channel >= 1 && channel <= CHANNELS)) {
+            const r = Buffer.alloc(3); r.writeUInt16BE(m.serial, 0); r[2] = 2;
+            send(sock, J.MSG.CAMERA_RESP, r);
+            break;
+          }
+          const mediaId = (Date.now() / 1000 >>> 0) + channel;
+          const r = Buffer.alloc(9); r.writeUInt16BE(m.serial, 0); r[2] = 0; r.writeUInt16BE(1, 3); r.writeUInt32BE(mediaId >>> 0, 5);
+          send(sock, J.MSG.CAMERA_RESP, r);
+          log(`foto pedida do canal ${channel}: enviando em 1 s`);
+          setTimeout(() => {
+            const cab = Buffer.from([0, 0, 0, 0, 0, 0, 0, channel]);
+            cab.writeUInt32BE(mediaId >>> 0, 0);
+            send(sock, J.MSG.MEDIA_EVENT, cab);
+            const corpo = Buffer.concat([cab, locationBody().subarray(0, 28), FOTO]);
+            sendLong(sock, J.MSG.MEDIA_UPLOAD, corpo);
+          }, 1000);
+          break;
+        }
+        case J.MSG.MEDIA_UPLOAD_RESP:
+          log(`plataforma confirmou a mídia nº ${m.body.readUInt32BE(0)} (${m.body[4] ? `faltam ${m.body[4]} pacote(s)` : 'inteira'})`);
+          break;
+        case J.MSG.TERMINAL_CONTROL:
+          reply(0);
+          if (m.body[0] === 4) { log('reiniciar pedido pela plataforma: desconectando por 3 s'); setTimeout(() => sock.destroy(), 300); }
+          break;
+        case J.MSG.QUERY_PARAMS: {
+          const itens = Object.entries(PARAMETROS).map(([id, v]) => {
+            const cab = Buffer.alloc(5); cab.writeUInt32BE(Number(id), 0);
+            let val; if (typeof v === 'number') { val = Buffer.alloc(4); val.writeUInt32BE(v, 0); } else val = Buffer.from(v, 'latin1');
+            cab[4] = val.length;
+            return Buffer.concat([cab, val]);
+          });
+          const head = Buffer.alloc(3); head.writeUInt16BE(m.serial, 0); head[2] = itens.length;
+          send(sock, J.MSG.PARAMS_RESP, Buffer.concat([head, ...itens]));
+          break;
+        }
+        case J.MSG.SET_PARAMS: {
+          let o = 1;
+          for (let k = 0; k < m.body[0] && o + 5 <= m.body.length; k++) {
+            const id = m.body.readUInt32BE(o); const len = m.body[o + 4]; const v = m.body.subarray(o + 5, o + 5 + len); o += 5 + len;
+            PARAMETROS[id] = typeof PARAMETROS[id] === 'string' || len !== 4 ? v.toString('latin1') : v.readUInt32BE(0);
+            log(`parâmetro 0x${id.toString(16).padStart(4, '0')} = ${PARAMETROS[id]}`);
+          }
+          reply(0);
+          break;
+        }
         default:
           reply(3);
       }

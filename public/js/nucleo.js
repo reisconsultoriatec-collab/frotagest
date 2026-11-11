@@ -321,6 +321,9 @@ function tratarEvento(m) {
     case 'regras': // alguém mudou as regras de alerta
       emit('regras');
       break;
+    case 'foto': // chegou uma foto das câmeras de um veículo
+      emit('foto', m.foto);
+      break;
     case 'sessao_encerrada':
       sessaoEncerradaPorAdmin();
       break;

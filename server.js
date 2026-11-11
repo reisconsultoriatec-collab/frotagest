@@ -22,6 +22,7 @@ const { Monitor } = require('./src/servicos/monitor');
 const { Cercas } = require('./src/servicos/cercas');
 const { Regras } = require('./src/servicos/regras');
 const { Avisos } = require('./src/servicos/avisos');
+const { Fotos } = require('./src/servicos/fotos');
 const { Configuracoes } = require('./src/servicos/configuracoes');
 const { Auditoria } = require('./src/servicos/auditoria');
 const { Retencao } = require('./src/servicos/retencao');
@@ -44,6 +45,7 @@ const { Painel } = require('./src/servicos/painel');
 const apiPainel = require('./src/web/api-painel');
 const apiRegras = require('./src/web/api-regras');
 const apiAvisos = require('./src/web/api-avisos');
+const apiComandos = require('./src/web/api-comandos');
 const { definirFuso, gerarCodigo } = require('./src/util/comum');
 const { version } = require('./package.json');
 
@@ -210,6 +212,7 @@ async function main() {
     painel: new Painel({ banco, frota, regras, log: (level, text) => log(level, text) }),
     regras,
     avisos,
+    fotos: new Fotos({ banco, frota, config, dados: DATA, log: (level, text) => log(level, text) }),
   });
   apiOperacao.registrar(srv);
   apiConta.registrar(srv);
@@ -222,6 +225,7 @@ async function main() {
   apiPainel.registrar(srv);
   apiRegras.registrar(srv);
   apiAvisos.registrar(srv);
+  apiComandos.registrar(srv);
   apiDoisFatores.registrar(srv);
   srv.onLog = (e) => log(e.level, e.text, { source: 'painel' });
 
@@ -276,6 +280,10 @@ async function main() {
   // entrou/saiu de cerca: as telas abertas na lista de cercas e no modo TV atualizam a ocupação
   cercas.on('evento', (ev) => srv.enviarCerca(ev));
   gateway.on('commandSent', (c) => historico.comando(c));
+  // foto que chegou das câmeras (pedida no painel ou mandada pelo aparelho): disco + registro, e avisa as telas
+  gateway.on('midia', (md) => {
+    srv.fotos.salvar(md).then((f) => { if (f) srv.enviarFoto(f); }).catch((e) => log('erro', `Foto do aparelho ${md.id}: ${e.message}`));
+  });
   gateway.on('command', (c) => historico.resposta(c));
   media.on('stream', (s) => srv.enviarStream(s));
   historico.on('alerta', (ev) => {
@@ -300,6 +308,7 @@ async function main() {
   retencao.iniciar();
   srv.painel.iniciar();
   regras.iniciar();
+  srv.fotos.iniciar();
   limparLogs();
 
   let saindo = false;

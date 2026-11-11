@@ -31,6 +31,9 @@ const TELAS = [
     ver: 'Ver os usuários e os cadastros aguardando aprovação', incluir: 'Convidar por e-mail e aprovar cadastros', alterar: 'Editar perfil e grupos, desativar, reenviar convite e gerar código novo', excluir: 'Recusar cadastros' } },
   { id: 'mapa', grupo: 'Operação', nome: 'Monitoramento', acoes: { ver: 'Mapa com a frota ao vivo' } },
   { id: 'cameras', grupo: 'Operação', nome: 'Câmeras ao vivo', acoes: { ver: 'Abrir o vídeo ao vivo dos veículos' } },
+  { id: 'comandos', grupo: 'Operação', nome: 'Comandos ao veículo', acoes: {
+    ver: 'Ver as fotos tiradas e os comandos enviados (no veículo, pelo Monitoramento)', incluir: 'Mandar mensagem ao motorista e tirar foto na hora',
+    alterar: 'Reiniciar o aparelho e mudar os intervalos de posição e o limite de velocidade do aparelho' } },
   { id: 'alertas', grupo: 'Operação', nome: 'Alertas', acoes: { ver: 'Ver os alertas e receber o aviso de alerta novo', alterar: 'Tratar alertas (em tratamento / tratado)' } },
   { id: 'historico', grupo: 'Operação', nome: 'Histórico', acoes: { ver: 'Ver o trajeto percorrido pelos veículos' } },
   { id: 'relatorios', grupo: 'Operação', nome: 'Relatórios', acoes: { ver: 'Gerar relatórios na tela, em Excel e em PDF' } },
@@ -51,8 +54,8 @@ const tudo = (filtro = () => true) => Object.fromEntries(TELAS.filter(filtro).ma
 /** Padrão de cada perfil = o que ele já tinha antes do controle de acesso. */
 const PADRAO = {
   admin: tudo((t) => !t.soMaster),
-  operador: { dashboard: ['ver'], mapa: ['ver'], cameras: ['ver'], alertas: ['ver', 'alterar'], historico: ['ver'], relatorios: ['ver'], gravacoes: ['ver', 'incluir'], tv: ['ver'] },
-  visualizador: { dashboard: ['ver'], mapa: ['ver'], cameras: ['ver'], alertas: ['ver'], historico: ['ver'], relatorios: ['ver'], tv: ['ver'] },
+  operador: { dashboard: ['ver'], mapa: ['ver'], cameras: ['ver'], comandos: ['ver', 'incluir'], alertas: ['ver', 'alterar'], historico: ['ver'], relatorios: ['ver'], gravacoes: ['ver', 'incluir'], tv: ['ver'] },
+  visualizador: { dashboard: ['ver'], mapa: ['ver'], cameras: ['ver'], comandos: ['ver'], alertas: ['ver'], historico: ['ver'], relatorios: ['ver'], tv: ['ver'] },
 };
 
 /** Ações válidas de uma tela, na ordem, com "ver" sempre junto (sem ver não há como fazer o resto). */

@@ -58,6 +58,7 @@ A tabela acima é o **padrão** de cada perfil. Em **Controle › Controle de ac
 | `usuarios.acessos` | Controle de acesso: só os menus e ações que diferem do padrão do perfil (vazio = padrão) | sempre |
 | `painel_dias`, `painel_dias_ok` | Dashboard: totais de cada dia por veículo (km, km por hora, tempos, excessos, alertas), calculados das posições uma vez por dia | sempre (o dia de hoje é calculado ao vivo) |
 | `regras_alerta` | Regras de alerta da empresa (velocidade, horário, parada longa, motor ligado parado, sem comunicação) | sempre |
+| `fotos` | Fotos das câmeras: veículo, câmera, hora, posição e quem pediu (o JPEG fica em `data/fotos`) | 30 dias (configurável) |
 | `push_inscricoes`, `usuarios.push_nivel` | Avisos no celular: os aparelhos de cada pessoa (endereço do serviço de push e as chaves públicas do aparelho) e quais alertas ela quer | até a pessoa tirar o aparelho ou sair |
 | `codigos_recuperacao`, `sessoes_2fa` | Verificação em duas etapas: códigos de recuperação (só o resumo SHA-256) e os logins que já passaram pela segunda etapa | até zerar / 90 dias |
 | `eventos_aparelho`, `comandos` | Comunicações: conexões/desconexões e comandos enviados com a resposta | 180 dias |
@@ -175,7 +176,18 @@ Cada pessoa liga em **cada aparelho dela**: botão do som no topo › **Avisos n
 - No computador com o painel aberto e à vista, o próprio painel avisa (som e mensagem) e a notificação não se repete.
 - Como funciona: padrão **Web Push** dos navegadores. O servidor guarda um par de chaves próprio (na tabela `configuracoes`, criado sozinho na primeira vez) e manda cada aviso **criptografado** para o serviço de push do navegador (Google, Apple, Mozilla ou Microsoft), que só entrega. O servidor só aceita esses serviços como destino. Precisa de saída HTTPS liberada (o padrão da Oracle já libera).
 
-## 3.10 Sessão e avisos
+## 3.10 Comandos para o veículo
+
+No **Monitoramento**, clique no veículo e em **Comandos**:
+
+- **Foto agora:** marque as câmeras e a qualidade; o DVR tira a foto e manda em alguns segundos (depende do sinal do chip). As fotos ficam na janela (com hora, câmera, velocidade e quem pediu), ampliam com um clique e podem ser baixadas. O arquivo fica **em disco** (`data/fotos`, uma pasta por mês) e o banco guarda só o registro; são apagadas depois de **Sistema › Configurações › Guardar fotos das câmeras por** (padrão 30 dias). Fotos que o próprio DVR mandar por alarme também ficam guardadas.
+- **Mensagem ao motorista:** aparece na tela do DVR e/ou é falada no alto-falante (se o aparelho tiver), com a opção "urgente" e frases prontas. Vai **sem acentos**, porque os aparelhos usam a codificação chinesa (a tela mostra como vai ficar).
+- **Aparelho** (quem tem "alterar"): **reiniciar** o DVR (some por 1 a 3 minutos e volta) e **ler/gravar parâmetros** — intervalo de posição ligado e desligado, sinal de vida, velocidade máxima e tempo do alarme do próprio DVR. Só vai para o aparelho o que mudou. **APN e servidor só o master**, digitando ALTERAR para confirmar (um valor errado tira o aparelho do ar até alguém ir ao veículo); a senha do APN nunca aparece na tela nem na auditoria.
+- **Histórico:** os últimos comandos, com a resposta do aparelho e quem mandou. Tudo também em Comunicações e na auditoria.
+- Controle de acesso: tela **Comandos ao veículo** (Operação). Ver = ver fotos e histórico; Incluir = foto e mensagem; Alterar = reiniciar e parâmetros. Padrão: administrador tudo, operador ver e incluir, visualizador só ver.
+- Com o aparelho offline os botões ficam desligados (o comando não fica guardado para depois).
+
+## 3.11 Sessão e avisos
 
 - **Sessão encerrada por falta de uso** depois do tempo de **Sistema › Configurações › Segurança** (padrão 60 min; 0 = nunca, só para telas de central/TV). Um minuto antes aparece “Você ainda está aí?”. Vale também se a janela foi fechada sem clicar em Sair.
 - **Tema claro ou escuro:** botão da lua/sol no topo; a escolha fica no navegador (sem escolha, segue o tema do sistema). No escuro, o mapa de ruas também escurece; o satélite fica como está.
@@ -318,6 +330,8 @@ Cada perfil também diz o **horário configurado no aparelho** (Brasília, ou UT
 node tools/simulador-dvr.js --id 20250703            # DVR simulado (posições, alarmes, vídeo H.264)
 node tools/simulador-dvr.js --id 20250703 --h265     # vídeo H.265
 ```
+
+O simulador também responde aos comandos da seção 3.10: foto (manda `tools/amostra-foto.jpg` em vários pacotes, como o DVR real), mensagem ao motorista (mostra no terminal), reiniciar (desconecta e volta) e parâmetros (lê e grava).
 
 ## 10. Problemas comuns
 

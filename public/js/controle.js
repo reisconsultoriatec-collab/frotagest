@@ -373,7 +373,7 @@ PAGINAS.sistema = (() => {
           <option value="listar">Aceitar a conexão e listar em "Aparelhos pendentes" (recomendado durante a implantação)</option>
           <option value="recusar">Recusar a conexão (mais seguro depois que toda a frota estiver cadastrada)</option></select></label>
         <div class="form-sep">Quanto tempo guardar o histórico</div>
-        ${num('retencao_posicoes_dias')}${num('retencao_eventos_dias')}${num('retencao_alertas_dias')}${num('retencao_auditoria_dias')}
+        ${num('retencao_posicoes_dias')}${num('retencao_eventos_dias')}${num('retencao_alertas_dias')}${num('retencao_auditoria_dias')}${num('retencao_fotos_dias')}
         <div class="field full"><small>Nenhum vídeo é guardado no banco. As posições são o que mais ocupa espaço: com 363 veículos, cada 30 dias somam alguns GB.</small></div>
         <div class="form-sep">Segurança</div>
         ${num('sessao_inatividade_min')}

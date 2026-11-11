@@ -173,7 +173,9 @@ class Gateway808 extends EventEmitter {
       this.reply(dev, m, 0);
       const key = `${m.msgId}`;
       let p = ctx.parts.get(key);
-      if (!p || p.total !== m.total) { p = { total: m.total, items: new Map(), at: Date.now() }; ctx.parts.set(key, p); }
+      // partes de um envio que parou no meio (mais de 2 min sem chegar nada) não se misturam com o próximo
+      if (!p || p.total !== m.total || Date.now() - p.at > 120000) { p = { total: m.total, items: new Map(), at: Date.now() }; ctx.parts.set(key, p); }
+      p.at = Date.now();
       p.items.set(m.index, m.body);
       this.logMsg('in', dev, m, `parte ${m.index} de ${m.total}`);
       if (p.items.size < p.total) return;
@@ -264,6 +266,47 @@ class Gateway808 extends EventEmitter {
         this.logMsg('in', dev, m, r ? `para "${name}": ${r.resultName}` : 'resposta incompleta', r);
         if (r) this.emit('command', { id, msgId: r.replyId, replySerial: r.replySerial, name, result: r.result, resultName: r.resultName, at: Date.now(), elapsedMs: cmd ? Date.now() - cmd.at : null });
         if (r && r.result !== 0) this.settle(id, r.replySerial, new Error(`${name}: ${r.resultName}`));
+        else if (r) this.settle(id, r.replySerial, null, r, ['geral', 'foto']); // só quem espera a resposta geral
+        return;
+      }
+      case J.MSG.PARAMS_RESP: {
+        const r = J.parseParamsResponse(m.body);
+        this.logMsg('in', dev, m, `${r.itens.length} parâmetro(s)`, { total: r.total, itens: r.itens.filter((x) => x.chave !== 'apnSenha') });
+        this.reply(dev, m, 0);
+        const cmd = dev.pending.get(r.replySerial);
+        if (cmd) {
+          dev.pending.delete(r.replySerial);
+          this.emit('command', { id, msgId: cmd.msgId, replySerial: r.replySerial, name: J.MSG_NAMES[cmd.msgId], result: 0, resultName: `${r.itens.length} parâmetro(s)`, at: Date.now(), elapsedMs: Date.now() - cmd.at });
+        }
+        this.settle(id, r.replySerial, null, r);
+        return;
+      }
+      case J.MSG.CAMERA_RESP: {
+        const r = J.parseCameraResponse(m.body);
+        this.logMsg('in', dev, m, r ? `foto: ${r.resultName}${r.ids.length ? ` (nº ${r.ids.join(', ')})` : ''}` : 'resposta incompleta', r);
+        this.reply(dev, m, 0);
+        if (!r) return;
+        const cmd = dev.pending.get(r.replySerial);
+        if (cmd) {
+          dev.pending.delete(r.replySerial);
+          this.emit('command', { id, msgId: J.MSG.CAMERA_SHOT, replySerial: r.replySerial, name: J.MSG_NAMES[J.MSG.CAMERA_SHOT], result: r.result, resultName: r.resultName, at: Date.now(), elapsedMs: Date.now() - cmd.at });
+        }
+        if (r.result !== 0) this.settle(id, r.replySerial, new Error(`Foto: ${r.resultName}`));
+        else this.settle(id, r.replySerial, null, r);
+        return;
+      }
+      case J.MSG.MEDIA_EVENT: {
+        const e = J.parseMediaEvent(m.body);
+        this.logMsg('in', dev, m, e ? `mídia nº ${e.mediaId} (${['foto', 'áudio', 'vídeo'][e.type] || e.type}, canal ${e.channel})` : 'incompleto', e);
+        this.reply(dev, m, 0);
+        return;
+      }
+      case J.MSG.MEDIA_UPLOAD: {
+        const md = J.parseMediaUpload(m.body);
+        this.logMsg('in', dev, m, `mídia nº ${md.mediaId}: ${['foto', 'áudio', 'vídeo'][md.type] || md.type} do canal ${md.channel}, ${Math.round(md.data.length / 1024)} KB`,
+          { mediaId: md.mediaId, type: md.type, format: md.format, event: md.event, channel: md.channel, bytes: md.data.length });
+        this.send(dev, J.MSG.MEDIA_UPLOAD_RESP, J.bodyMediaUploadResponse(md.mediaId), `mídia nº ${md.mediaId} recebida inteira`, true);
+        this.emit('midia', { id, ...md, recebidoEm: Date.now() });
         return;
       }
       case J.MSG.RESOURCE_LIST: {
@@ -409,21 +452,23 @@ class Gateway808 extends EventEmitter {
 
   /* ---------- gravações no cartão do aparelho ---------- */
 
-  wait(id, serial, ms) {
+  /** tipo: o que resolve a espera ('geral' = resposta geral 0x0001, 'foto' = 0x0805 ou 0x0001; sem tipo = resposta própria). */
+  wait(id, serial, ms, tipo = null) {
     const key = `${J.normalizeId(id)}:${serial}`;
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         this.waiters.delete(key);
         reject(new Error(`o aparelho não respondeu em ${Math.round(ms / 1000)}s`));
       }, ms);
-      this.waiters.set(key, { resolve, reject, timer });
+      this.waiters.set(key, { resolve, reject, timer, tipo });
     });
   }
 
-  settle(id, serial, err, value) {
+  settle(id, serial, err, value, soTipos = null) {
     const key = `${id}:${serial}`;
     const w = this.waiters.get(key);
     if (!w) return;
+    if (soTipos && !soTipos.includes(w.tipo)) return;
     this.waiters.delete(key);
     clearTimeout(w.timer);
     if (err) w.reject(err); else w.resolve(value);
@@ -451,6 +496,50 @@ class Gateway808 extends EventEmitter {
   controlPlayback(id, { channel, control, speed = 0 }) {
     const names = ['continuar', 'pausar', 'encerrar', 'avanço rápido', 'retroceder', 'ir para', 'só quadros I'];
     return this.command(id, J.MSG.PLAYBACK_CONTROL, J.bodyPlaybackControl({ channel, control, speed }), `canal ${channel}: ${names[control] || control}${speed ? ` (${[0, 1, 2, 4, 8, 16][speed]}x)` : ''}`);
+  }
+
+  /* ---------- comandos ao veículo ---------- */
+
+  dispositivo(id) {
+    const dev = this.devices.get(J.normalizeId(id));
+    if (!dev || !dev.online) throw new Error('aparelho offline ou desconhecido');
+    return dev;
+  }
+
+  /** 0x8300 → espera a resposta geral. */
+  mensagem(id, { texto, tela = true, voz = true, urgente = false }) {
+    const dev = this.dispositivo(id);
+    const body = J.bodyTextMessage({ texto, tela, voz, urgente, v2019: dev.v2019 });
+    const serial = this.command(id, J.MSG.TEXT_MESSAGE, body, `"${J.semAcentos(texto).slice(0, 60)}"${[tela && 'tela', voz && 'voz', urgente && 'urgente'].filter(Boolean).map((x) => ` · ${x}`).join('')}`);
+    return this.wait(id, serial, 20000, 'geral');
+  }
+
+  /** 0x8801 → espera 0x0805 (ou a resposta geral); a foto chega depois pelo 0x0801 (evento 'midia'). */
+  foto(id, { channel, resolution = 2, quality = 3 }) {
+    this.dispositivo(id);
+    const serial = this.command(id, J.MSG.CAMERA_SHOT, J.bodyCameraShot({ channel, resolution, quality }), `canal ${channel}, enviar agora`);
+    return this.wait(id, serial, 20000, 'foto');
+  }
+
+  /** 0x8105 comando 4 → reiniciar. */
+  reiniciar(id) {
+    this.dispositivo(id);
+    const serial = this.command(id, J.MSG.TERMINAL_CONTROL, J.bodyTerminalControl(4), 'reiniciar o aparelho');
+    return this.wait(id, serial, 20000, 'geral');
+  }
+
+  /** 0x8104 → espera 0x0104 com todos os parâmetros. */
+  lerParametros(id) {
+    this.dispositivo(id);
+    const serial = this.command(id, J.MSG.QUERY_PARAMS, Buffer.alloc(0), 'todos os parâmetros');
+    return this.wait(id, serial, 30000);
+  }
+
+  /** 0x8103 → espera a resposta geral. lista: [{ id, valor, texto }] */
+  gravarParametros(id, lista) {
+    this.dispositivo(id);
+    const serial = this.command(id, J.MSG.SET_PARAMS, J.bodySetParams(lista), lista.map((x) => x.texto || `0x${x.id.toString(16)}`).join(', '));
+    return this.wait(id, serial, 20000, 'geral');
   }
 
   /* ---------- estado para o painel ---------- */

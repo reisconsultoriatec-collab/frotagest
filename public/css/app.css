@@ -1275,3 +1275,45 @@ button.gr-lb-l:hover { background: var(--fundo-hover); }
 .av-item-txt { display: flex; flex-direction: column; flex: 1; min-width: 0; }
 .av-item-txt b { font-size: 13.5px; font-weight: 600; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .av-item-txt small { font-size: 12px; color: var(--ink-3); }
+
+/* ---------- 1.11 — Comandos para o veículo ---------- */
+.cmd-status { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13.5px; margin-bottom: 10px; flex-wrap: wrap; }
+.cmd-corpo { padding-top: 16px; display: flex; flex-direction: column; gap: 14px; }
+.cmd-bloco { display: flex; flex-direction: column; gap: 12px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--fundo-cab); }
+.cmd-linha { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.cmd-canais { display: flex; flex-wrap: wrap; gap: 8px; }
+.cmd-canal { display: inline-flex; align-items: center; gap: 7px; padding: 7px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); font-size: 13.5px; cursor: pointer; }
+.cmd-canal:has(input:checked) { border-color: var(--amber); background: var(--amber-50); font-weight: 600; }
+.cmd-canal input { accent-color: var(--amber-600); }
+.cmd-pendentes:empty { display: none; }
+.cmd-pend { display: flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--ink-2); padding: 4px 2px; }
+.gira { animation: spin 1s linear infinite; }
+.cmd-fotos { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.cmd-foto { display: flex; flex-direction: column; gap: 6px; padding: 0; border: 1px solid var(--line); border-radius: 10px; background: var(--card); overflow: hidden; cursor: pointer; text-align: left; font: inherit; color: inherit; }
+.cmd-foto:hover { border-color: var(--linha-forte); }
+.cmd-foto-img { aspect-ratio: 4 / 3; display: grid; place-items: center; background: var(--fundo-suave); color: var(--ink-3); }
+.cmd-foto-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.cmd-foto-txt { display: flex; flex-direction: column; padding: 0 10px 8px; }
+.cmd-foto-txt b { font-size: 13px; }
+.cmd-foto-txt small { font-size: 12px; color: var(--ink-3); }
+.cmd-foto-grande { display: grid; place-items: center; background: #000; border-radius: 10px; min-height: 240px; color: #fff; overflow: hidden; }
+.cmd-foto-grande img { max-width: 100%; max-height: 70vh; display: block; }
+.cmd-frases { display: flex; flex-wrap: wrap; gap: 6px; }
+.cmd-frases .chip { border: 0; cursor: pointer; font: inherit; font-size: 12.5px; padding: 5px 11px; }
+.cmd-frases .chip:hover { background: var(--amber-100); color: var(--amber-ink); }
+.cmd-opcoes { display: flex; flex-wrap: wrap; gap: 8px 18px; }
+.cmd-hist { display: flex; flex-direction: column; }
+.cmd-hist-item { display: flex; justify-content: space-between; gap: 12px; padding: 10px 2px; border-bottom: 1px solid var(--line-2); font-size: 13.5px; }
+.cmd-hist-item:last-child { border-bottom: 0; }
+.cmd-hist-item .sub { display: block; color: var(--ink-3); font-size: 12px; margin-top: 2px; word-break: break-word; }
+.cmd-hist-lado { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; flex: none; text-align: right; }
+.cmd-hist-lado small { color: var(--ink-3); font-size: 12px; }
+@media (max-width: 560px) {
+  .cmd-fotos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cmd-hist-item { flex-direction: column; }
+  .cmd-hist-lado { align-items: flex-start; text-align: left; }
+}
+@media (max-width: 560px) {
+  #cmd-abas .tab { padding-left: 10px; padding-right: 10px; }
+  #cmd-abas .tab .i { display: none; }
+}

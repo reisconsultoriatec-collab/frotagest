@@ -25,6 +25,15 @@ const MSG = {
   PLAYBACK_REQUEST: 0x9201,
   PLAYBACK_CONTROL: 0x9202,
   QUERY_RESOURCES: 0x9205,
+  MEDIA_EVENT: 0x0800,
+  MEDIA_UPLOAD: 0x0801,
+  CAMERA_RESP: 0x0805,
+  SET_PARAMS: 0x8103,
+  QUERY_PARAMS: 0x8104,
+  TERMINAL_CONTROL: 0x8105,
+  TEXT_MESSAGE: 0x8300,
+  MEDIA_UPLOAD_RESP: 0x8800,
+  CAMERA_SHOT: 0x8801,
 };
 
 const MSG_NAMES = {
@@ -39,6 +48,7 @@ const MSG_NAMES = {
   0x0704: 'Posições em lote',
   0x0800: 'Evento de mídia',
   0x0801: 'Envio de mídia',
+  0x0805: 'Resposta da foto',
   0x0900: 'Dados transparentes',
   0x1003: 'Atributos de áudio e vídeo',
   0x1005: 'Contagem de passageiros',
@@ -46,7 +56,12 @@ const MSG_NAMES = {
   0x1206: 'Resultado de envio de arquivo',
   0x8001: 'Resposta geral da plataforma',
   0x8100: 'Resposta de registro',
+  0x8103: 'Alteração de parâmetros',
   0x8104: 'Consulta de parâmetros',
+  0x8105: 'Controle do aparelho',
+  0x8300: 'Mensagem ao motorista',
+  0x8800: 'Resposta de envio de mídia',
+  0x8801: 'Pedido de foto',
   0x8107: 'Consulta de atributos',
   0x9003: 'Consulta de atributos de áudio e vídeo',
   0x9101: 'Pedido de vídeo ao vivo',
@@ -498,6 +513,140 @@ function parseResourceList(body) {
   return { replySerial, total, items };
 }
 
+/* ---------- comandos ao veículo (1.11) ---------- */
+
+/**
+ * 0x8300 — mensagem de texto ao motorista. flags: bit0 urgente, bit2 mostrar na tela, bit3 ler em voz alta (TTS).
+ * O aparelho lê em GBK (chinês): o texto vai sem acentos (só ASCII, que é igual em GBK).
+ * 2019: flags + tipo do texto (1 = aviso) + texto; 2013: flags + texto.
+ */
+function semAcentos(texto) {
+  return String(texto || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[ºª°]/g, (c) => ({ 'º': 'o', 'ª': 'a', '°': 'o' }[c]))
+    .replace(/[^\x20-\x7e]/g, '').replace(/\s+/g, ' ').trim();
+}
+
+function bodyTextMessage({ texto, tela = true, voz = true, urgente = false, v2019 = true }) {
+  const flags = (urgente ? 1 : 0) | (tela ? 1 << 2 : 0) | (voz ? 1 << 3 : 0);
+  const t = Buffer.from(semAcentos(texto), 'latin1');
+  return Buffer.concat([Buffer.from(v2019 ? [flags, 1] : [flags]), t]);
+}
+
+/**
+ * 0x8801 — foto na hora. count: quantas fotos (1); save 0 = enviar já (0x0801), 1 = só guardar no aparelho.
+ * resolution: 1 = 320x240, 2 = 640x480, 3 = 800x600, 4 = 1024x768, 8 = 704x576. quality 1 (melhor) a 10.
+ */
+function bodyCameraShot({ channel, count = 1, interval = 0, save = 0, resolution = 2, quality = 3 }) {
+  const b = Buffer.alloc(12);
+  b[0] = channel;
+  b.writeUInt16BE(count, 1);
+  b.writeUInt16BE(interval, 3);
+  b[5] = save;
+  b[6] = resolution;
+  b[7] = quality;
+  b[8] = 128; // brilho
+  b[9] = 64; // contraste
+  b[10] = 64; // saturação
+  b[11] = 128; // cor
+  return b;
+}
+
+/** 0x0805 — resposta ao pedido de foto: resultado (0 ok, 1 falhou, 2 canal não existe) e os números das fotos. */
+function parseCameraResponse(body) {
+  if (body.length < 3) return null;
+  const result = body[2];
+  const ids = [];
+  if (body.length >= 5) {
+    const n = body.readUInt16BE(3);
+    for (let i = 0; i < n && 5 + i * 4 + 4 <= body.length; i++) ids.push(body.readUInt32BE(5 + i * 4));
+  }
+  return { replySerial: body.readUInt16BE(0), result, resultName: ['sucesso', 'falhou', 'canal não existe'][result] || `código ${result}`, ids };
+}
+
+/** 0x0800 — evento de mídia (antes do envio): número, tipo (0 foto, 1 áudio, 2 vídeo), formato (0 JPEG), evento, canal. */
+function parseMediaEvent(body) {
+  if (body.length < 8) return null;
+  return { mediaId: body.readUInt32BE(0), type: body[4], format: body[5], event: body[6], channel: body[7] };
+}
+
+/** 0x0801 — envio de mídia (já com os subpacotes juntos): cabeçalho, posição na hora e o arquivo (JPEG). */
+function parseMediaUpload(body) {
+  if (body.length < 8 + 28) throw new Error('envio de mídia incompleto');
+  const r = { mediaId: body.readUInt32BE(0), type: body[4], format: body[5], event: body[6], channel: body[7] };
+  try { r.position = parseLocation(body.subarray(8, 36)); } catch { r.position = null; }
+  r.data = body.subarray(36);
+  return r;
+}
+
+/** 0x8800 — resposta ao envio de mídia: recebido inteiro (sem pacotes para reenviar). */
+function bodyMediaUploadResponse(mediaId, retransmitir = []) {
+  const b = Buffer.alloc(5 + retransmitir.length * 2);
+  b.writeUInt32BE(mediaId >>> 0, 0);
+  b[4] = retransmitir.length;
+  retransmitir.forEach((x, i) => b.writeUInt16BE(x, 5 + i * 2));
+  return b;
+}
+
+/** 0x8105 — controle do aparelho. 4 = reiniciar. */
+function bodyTerminalControl(command, params = '') {
+  return Buffer.concat([Buffer.from([command]), Buffer.from(String(params), 'latin1')]);
+}
+
+/** Parâmetros conhecidos (JT/T 808): id → { nome, tipo }. */
+const PARAMS = {
+  0x0001: { chave: 'batimento', nome: 'Sinal de vida (heartbeat)', tipo: 'dword', unidade: 's' },
+  0x0010: { chave: 'apn', nome: 'APN do chip', tipo: 'string' },
+  0x0011: { chave: 'apnUsuario', nome: 'Usuário do APN', tipo: 'string' },
+  0x0012: { chave: 'apnSenha', nome: 'Senha do APN', tipo: 'string', oculto: true },
+  0x0013: { chave: 'servidor', nome: 'Servidor principal', tipo: 'string' },
+  0x0018: { chave: 'porta', nome: 'Porta do servidor (TCP)', tipo: 'dword' },
+  0x0020: { chave: 'estrategia', nome: 'Estratégia de envio de posição', tipo: 'dword' },
+  0x0027: { chave: 'intervaloDormindo', nome: 'Posição com o veículo desligado (dormindo)', tipo: 'dword', unidade: 's' },
+  0x0029: { chave: 'intervaloPosicao', nome: 'Posição com o veículo ligado', tipo: 'dword', unidade: 's' },
+  0x0055: { chave: 'velocidadeMax', nome: 'Velocidade máxima no aparelho', tipo: 'dword', unidade: 'km/h' },
+  0x0056: { chave: 'tempoExcesso', nome: 'Tempo acima da velocidade para o aparelho alarmar', tipo: 'dword', unidade: 's' },
+  0x0080: { chave: 'odometro', nome: 'Odômetro do aparelho', tipo: 'dword', unidade: '0,1 km' },
+  0x0083: { chave: 'placa', nome: 'Placa no aparelho', tipo: 'string' },
+};
+const PARAM_POR_CHAVE = Object.fromEntries(Object.entries(PARAMS).map(([id, p]) => [p.chave, Number(id)]));
+
+/** 0x0104 — resposta à consulta de parâmetros. */
+function parseParamsResponse(body) {
+  if (body.length < 3) throw new Error('resposta de parâmetros incompleta');
+  const replySerial = body.readUInt16BE(0);
+  const total = body[2];
+  const itens = [];
+  let o = 3;
+  while (o + 5 <= body.length) {
+    const id = body.readUInt32BE(o);
+    const len = body[o + 4];
+    const v = body.subarray(o + 5, o + 5 + len);
+    o += 5 + len;
+    if (v.length < len) break;
+    const def = PARAMS[id];
+    let valor;
+    if (len === 4 && (!def || def.tipo === 'dword')) valor = v.readUInt32BE(0);
+    else if (len === 2 && (!def || def.tipo !== 'string')) valor = v.readUInt16BE(0);
+    else if (len === 1 && (!def || def.tipo !== 'string')) valor = v[0];
+    else valor = cleanString(v);
+    itens.push({ id, hexId: `0x${id.toString(16).padStart(4, '0')}`, chave: def ? def.chave : null, nome: def ? def.nome : null, valor });
+  }
+  return { replySerial, total, itens };
+}
+
+/** 0x8103 — altera parâmetros: [{ id, valor }] (número = DWORD; texto = STRING). */
+function bodySetParams(lista) {
+  const partes = [Buffer.from([lista.length])];
+  for (const { id, valor } of lista) {
+    const cab = Buffer.alloc(5);
+    cab.writeUInt32BE(id >>> 0, 0);
+    let v;
+    if (typeof valor === 'number') { v = Buffer.alloc(4); v.writeUInt32BE(valor >>> 0, 0); } else v = Buffer.from(String(valor), 'latin1');
+    cab[4] = v.length;
+    partes.push(cab, v);
+  }
+  return Buffer.concat(partes);
+}
+
 module.exports = {
   MSG, MSG_NAMES, RESULT_NAMES, AV_CODECS,
   FrameSplitter, decode, encode, unescape, escape, xor,
@@ -505,4 +654,6 @@ module.exports = {
   bodyGeneralResponse, bodyRegisterResponse, bodyVideoRequest, bodyVideoControl,
   timeToBcd, bodyQueryResources, bodyPlaybackRequest, bodyPlaybackControl, parseResourceList, VIDEO_ALARM_BITS, ALARM_BITS,
   parseTerminalResponse, parseRegister, parseAuth, parseLocation, parseBatchLocation, parseAttributes, parseAvAttributes,
+  semAcentos, bodyTextMessage, bodyCameraShot, parseCameraResponse, parseMediaEvent, parseMediaUpload, bodyMediaUploadResponse,
+  bodyTerminalControl, PARAMS, PARAM_POR_CHAVE, parseParamsResponse, bodySetParams,
 };

@@ -562,6 +562,7 @@ PAGINAS.mapa = (() => {
     if (i.pendente && S.eu.perfil === 'master') acoes.push(`<button class="btn btn-primary btn-sm" type="button" data-cadastrar>${ico('plus', 'i-sm')} Cadastrar aparelho</button>`);
     if (i.aparelhoId && podeTela('historico')) acoes.push(`<button class="btn btn-sm" type="button" data-hist>${ico('route', 'i-sm')} Histórico</button>`);
     if (i.aparelhoId && podeTela('gravacoes')) acoes.push(`<button class="btn btn-sm" type="button" data-grav>${ico('video', 'i-sm')} Gravações</button>`);
+    if (i.aparelhoId && i.ident && podeTela('comandos')) acoes.push(`<button class="btn btn-sm" type="button" data-cmd>${ico('terminal-2', 'i-sm')} Comandos</button>`);
     box.innerHTML = `
       <div class="det-head">
         <div class="info-ico">${ico(i.pendente ? 'device-cctv' : 'bus')}</div>
@@ -588,6 +589,8 @@ PAGINAS.mapa = (() => {
     if (hist) hist.onclick = () => navegar('historico', qs({ v: i.chave }));
     const grav = box.querySelector('[data-grav]');
     if (grav) grav.onclick = () => navegar('gravacoes', qs({ v: i.chave }));
+    const cmd = box.querySelector('[data-cmd]');
+    if (cmd) cmd.onclick = () => abrirComandos(i);
   }
 
   function abrirCanal(i, ch) {
