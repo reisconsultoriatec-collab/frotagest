@@ -38,6 +38,10 @@ const TELAS = [
     ver: 'Ver as fotos tiradas e os comandos enviados (no veículo, pelo Monitoramento)', incluir: 'Mandar mensagem ao motorista e tirar foto na hora',
     alterar: 'Reiniciar o aparelho e mudar os intervalos de posição e o limite de velocidade do aparelho' } },
   { id: 'alertas', grupo: 'Operação', nome: 'Alertas', acoes: { ver: 'Ver os alertas e receber o aviso de alerta novo', alterar: 'Tratar alertas (em tratamento / tratado)' } },
+  { id: 'ocorrencias', grupo: 'Operação', nome: 'Ocorrências', acoes: {
+    ver: 'Ver as ocorrências, as provas e gerar o dossiê em PDF',
+    incluir: 'Abrir ocorrência, anotar e anexar provas (baixar as câmeras do momento pede também baixar gravações)',
+    alterar: 'Editar, mudar a situação, encerrar ou reabrir e tirar provas', excluir: 'Excluir ocorrências (com todas as provas)' } },
   { id: 'historico', grupo: 'Operação', nome: 'Histórico', acoes: { ver: 'Ver o trajeto percorrido pelos veículos' } },
   { id: 'relatorios', grupo: 'Operação', nome: 'Relatórios', acoes: { ver: 'Gerar relatórios na tela, em Excel e em PDF' } },
   { id: 'gravacoes', grupo: 'Operação', nome: 'Gravações', acoes: { ver: 'Buscar e assistir as gravações do DVR', incluir: 'Baixar trechos das gravações (MP4)' } },
@@ -61,8 +65,8 @@ const tudo = (filtro = () => true) => Object.fromEntries(TELAS.filter(filtro).ma
 /** Padrão de cada perfil = o que ele já tinha antes do controle de acesso. */
 const PADRAO = {
   admin: tudo((t) => !t.soMaster),
-  operador: { dashboard: ['ver'], mapa: ['ver'], cameras: ['ver'], comandos: ['ver', 'incluir'], alertas: ['ver', 'alterar'], historico: ['ver'], relatorios: ['ver'], gravacoes: ['ver', 'incluir'], tv: ['ver'] },
-  visualizador: { dashboard: ['ver'], mapa: ['ver'], cameras: ['ver'], comandos: ['ver'], alertas: ['ver'], historico: ['ver'], relatorios: ['ver'], tv: ['ver'] },
+  operador: { dashboard: ['ver'], mapa: ['ver'], cameras: ['ver'], comandos: ['ver', 'incluir'], alertas: ['ver', 'alterar'], ocorrencias: ['ver', 'incluir', 'alterar'], historico: ['ver'], relatorios: ['ver'], gravacoes: ['ver', 'incluir'], tv: ['ver'] },
+  visualizador: { dashboard: ['ver'], mapa: ['ver'], cameras: ['ver'], comandos: ['ver'], alertas: ['ver'], ocorrencias: ['ver'], historico: ['ver'], relatorios: ['ver'], tv: ['ver'] },
 };
 
 /** Ações válidas de uma tela, na ordem, com "ver" sempre junto (sem ver não há como fazer o resto). */

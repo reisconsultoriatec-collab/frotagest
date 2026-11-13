@@ -371,6 +371,15 @@ class Servidor {
     return { url: `/baixar/${ticket}`, validoSeg: TICKET_MS / 1000 };
   }
 
+  /** Link de uso curto para um arquivo qualquer do servidor (anexo de ocorrência): { caminho, nome, mime }. */
+  novoLinkArquivo(arq, u) {
+    const now = Date.now();
+    for (const [t, v] of this.tickets) if (v.until < now) this.tickets.delete(t);
+    const ticket = crypto.randomBytes(18).toString('base64url');
+    this.tickets.set(ticket, { arquivo: arq, until: now + TICKET_MS, usuarioId: u.id });
+    return { url: `/baixar/${ticket}`, validoSeg: TICKET_MS / 1000 };
+  }
+
   onTicket(req, res, url) {
     const ip = this.clientIp(req);
     if (this.blocked(ip)) return this.send(res, 429, { erro: 'muitas tentativas; aguarde 15 minutos' });
@@ -381,6 +390,7 @@ class Servidor {
       else this.fail(ip);
       return this.send(res, 404, { erro: 'link de download expirado; clique em Salvar de novo no painel' });
     }
+    if (t.arquivo) return this.enviarArquivo(req, res, t.arquivo);
     const job = this.recorder.get(t.jobId);
     if (!job) return this.send(res, 404, { erro: 'download não encontrado' });
     return this.sendFile(req, res, job);
@@ -388,9 +398,20 @@ class Servidor {
 
   sendFile(req, res, job) {
     if (job.status !== 'pronto') return this.send(res, 409, { erro: 'o arquivo ainda não está pronto' });
-    const file = this.recorder.filePath(job);
+    return this.enviarArquivo(req, res, { caminho: this.recorder.filePath(job), nome: job.name, mime: job.file.endsWith('.mp4') ? 'video/mp4' : 'application/octet-stream' });
+  }
+
+  /**
+   * Envia um arquivo do disco, com suporte a pedaços (Range) para o vídeo andar no player.
+   * Devolve uma promessa resolvida quando o cabeçalho já foi escrito (uma rota da API pode esperar por ela).
+   */
+  enviarArquivo(req, res, arq) {
+    return new Promise((resolve) => this.enviarArquivoAgora(req, res, arq, resolve));
+  }
+
+  enviarArquivoAgora(req, res, { caminho: file, nome, mime, inline = false }, pronto = () => {}) {
     fs.stat(file, (err, st) => {
-      if (err) return this.send(res, 404, { erro: 'arquivo não encontrado no servidor' });
+      if (err) { this.send(res, 404, { erro: 'arquivo não encontrado no servidor' }); pronto(); return; }
       let start = 0;
       let end = st.size - 1;
       let status = 200;
@@ -403,17 +424,20 @@ class Servidor {
         if (start > end || start >= st.size) {
           res.writeHead(416, this.cabecalhos({ 'Content-Range': `bytes */${st.size}` }));
           res.end();
+          pronto();
           return;
         }
         status = 206;
       }
+      const seguro = String(nome || 'arquivo').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\w.-]/g, '_');
       res.writeHead(status, this.cabecalhos({
-        'Content-Type': job.file.endsWith('.mp4') ? 'video/mp4' : 'application/octet-stream',
+        'Content-Type': mime || 'application/octet-stream',
         'Content-Length': end - start + 1,
         'Accept-Ranges': 'bytes',
-        'Content-Disposition': `attachment; filename="${job.name.replace(/[^\w.-]/g, '_')}"`,
+        'Content-Disposition': `${inline ? 'inline' : 'attachment'}; filename="${seguro}"; filename*=UTF-8''${encodeURIComponent(String(nome || 'arquivo'))}`,
         ...(status === 206 ? { 'Content-Range': `bytes ${start}-${end}/${st.size}` } : {}),
       }));
+      pronto();
       if (req.method === 'HEAD') { res.end(); return; }
       fs.createReadStream(file, { start, end }).pipe(res);
     });

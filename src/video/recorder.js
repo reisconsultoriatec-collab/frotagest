@@ -143,6 +143,7 @@ class Recorder extends EventEmitter {
     const job = {
       id, deviceId, channel, start, end, key: stream.key, totalMs: t1 - t0,
       empresaId: meta.empresaId || null, usuarioId: meta.usuarioId || null, rotulo: meta.rotulo || null,
+      ocorrenciaId: meta.ocorrenciaId || null, nomeCanal: meta.nomeCanal || null, // pedido pela ocorrência: entra nela quando ficar pronto
       status: 'aguardando', note: 'pedindo a gravação ao aparelho', codec: null,
       frames: 0, bytes: 0, durationMs: 0, durations: [], createdAt: Date.now(), startedAt: null, finishedAt: null,
       raw: `${base}_${id}.h264`, file: `${base}.mp4`, name: `${base}.mp4`, size: 0,

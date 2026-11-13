@@ -17,12 +17,13 @@ const NOMES_ACAO = {
   ativar_avisos: 'Ligou avisos no celular', mensagem_motorista: 'Mandou mensagem ao motorista', foto_agora: 'Pediu foto das câmeras',
   reiniciar_aparelho: 'Reiniciou o aparelho', parametros_aparelho: 'Alterou parâmetros do aparelho', trocar_motorista: 'Trocou o motorista do veículo',
   registrar_manutencao: 'Registrou manutenção feita', renovar_documento: 'Renovou documento',
+  situacao_ocorrencia: 'Mudou a situação da ocorrência', gerar_dossie: 'Gerou dossiê da ocorrência', baixar_anexo: 'Baixou prova da ocorrência',
 };
 const NOMES_ENTIDADE = {
   empresa: 'Empresa', usuario: 'Usuário', grupo: 'Grupo', veiculo: 'Veículo', aparelho: 'Aparelho', aparelho_pendente: 'Aparelho pendente',
   perfil_protocolo: 'Perfil de protocolo', configuracoes: 'Configurações', alerta: 'Alerta', download: 'Download',
   cerca: 'Cerca', regra_alerta: 'Regra de alerta', motorista: 'Motorista',
-  plano_manutencao: 'Plano de manutenção', manutencao: 'Manutenção feita', documento: 'Documento',
+  plano_manutencao: 'Plano de manutenção', manutencao: 'Manutenção feita', documento: 'Documento', ocorrencia: 'Ocorrência',
 };
 
 /* ---------------- comunicações ---------------- */

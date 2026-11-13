@@ -79,9 +79,15 @@ class Fotos extends EventEmitter {
   }
 
   async arquivo(foto) {
+    return fs.promises.readFile(await this.caminho(foto));
+  }
+
+  /** Caminho do JPEG no disco (para anexar numa ocorrência). */
+  async caminho(foto) {
     const alvo = path.resolve(this.pasta, foto.arquivo);
     if (!alvo.startsWith(path.resolve(this.pasta) + path.sep)) throw new Error('caminho inválido');
-    return fs.promises.readFile(alvo);
+    await fs.promises.access(alvo);
+    return alvo;
   }
 
   async limpar() {

@@ -62,6 +62,7 @@ A tabela acima é o **padrão** de cada perfil. Em **Controle › Controle de ac
 | `motorista_cartoes_lidos` | Cartões passados no DVR que ainda não estão no cadastro | até cadastrar ou esquecer |
 | `manutencao_planos`, `manutencoes` | Planos de manutenção (a cada X km e/ou tempo) e as manutenções feitas (data, hodômetro, custo, oficina) | sempre |
 | `documentos` | Documentos com vencimento do veículo (licenciamento, seguro, tacógrafo…) e do motorista (exame toxicológico, cursos…) | sempre |
+| `ocorrencias`, `ocorrencia_eventos`, `ocorrencia_anexos` | Ocorrências (número por empresa e ano), o andamento e a lista das provas com o SHA-256 de cada arquivo. Os arquivos ficam em disco, em `data/ocorrencias/<id>/` | até excluir a ocorrência |
 | `fotos` | Fotos das câmeras: veículo, câmera, hora, posição e quem pediu (o JPEG fica em `data/fotos`) | 30 dias (configurável) |
 | `push_inscricoes`, `usuarios.push_nivel` | Avisos no celular: os aparelhos de cada pessoa (endereço do serviço de push e as chaves públicas do aparelho) e quais alertas ela quer | até a pessoa tirar o aparelho ou sair |
 | `codigos_recuperacao`, `sessoes_2fa` | Verificação em duas etapas: códigos de recuperação (só o resumo SHA-256) e os logins que já passaram pela segunda etapa | até zerar / 90 dias |
@@ -222,6 +223,21 @@ Em **Operação › Manutenção e documentos**. **Nada aqui é obrigatório**: 
 - **Documentos com vencimento:** do veículo (licenciamento, IPVA, seguro, aferição do tacógrafo, vistoria, autorização de transporte, extintor) ou do motorista (exame toxicológico, curso obrigatório, ASO), com número e "avisar X dias antes" (padrão 30). **Renovar** = mudar a data de vencimento (fica na auditoria com a data antiga e a nova). A **validade da CNH** vem do cadastro do motorista (avisa 30 dias antes).
 - **Avisos** (só quando há algo cadastrado vencido ou perto de vencer, e só para quem tem a tela): selo vermelho no menu com o número de vencidos, aviso no Dashboard, linha no painel do veículo (Monitoramento) e um **resumo por dia às 7h no celular** para quem ativou os avisos no celular (cada pessoa pode desligar o resumo na janela "Avisos no celular").
 - Controle de acesso: tela **Manutenção e documentos** (Operação). Ver = situação e resumo do dia; Incluir = registrar feitas e cadastrar planos e documentos; Alterar = editar e renovar; Excluir. Padrão: administrador tudo; operador e visualizador não têm (o menu deles não muda). Quem só enxerga alguns grupos vê só os veículos e motoristas deles e não cria plano para a empresa toda.
+
+## 3.14 Ocorrências (com dossiê em PDF)
+
+Em **Operação › Ocorrências**. Cada caso (acidente, assalto, avaria, conduta do motorista, reclamação de passageiro, infração, vandalismo) fica num lugar só, com as provas e o andamento.
+
+- **Abrir:** pelo alerta (Alertas › **Abrir ocorrência**: título, hora, gravidade e local vêm do alerta; o alerta passa a "em tratamento" e fica ligado à ocorrência), pelo veículo (Monitoramento › painel do veículo › **Ocorrência**) ou do zero (**Nova ocorrência**, com ou sem veículo). Número por empresa e ano (ex.: 2026/0007).
+- **O sistema preenche sozinho:** o local (posição do GPS mais perto da hora do fato), o motorista que estava no veículo naquela hora, a cerca onde ficou (garagem, ponto, área), o **trajeto** de 30 min antes a 15 min depois (ajustável) e os **alertas do veículo** nesse período.
+- **Provas:**
+  - **Baixar as câmeras do momento:** escolha as câmeras e o trecho (até 30 min); o servidor pede ao DVR e cada gravação **entra sozinha** na ocorrência quando fica pronta (o aparelho precisa estar online; pede também a permissão de baixar gravações).
+  - **Anexar download** já feito em Gravações, **anexar fotos** das câmeras (até 6 h antes e depois do fato) e **enviar arquivos** (BO, fotos do celular, laudo, áudio; PDF, JPG, PNG, MP4, MOV, Word, Excel, TXT, ZIP; até 20 MB cada).
+  - Cada prova guarda o **SHA-256**: quem recebe o arquivo confere que é exatamente o que estava na ocorrência. A prova fica guardada mesmo quando o download ou a foto original vencem (retenção) ou são excluídos.
+- **Andamento:** abertura, anotações, provas que entraram ou saíram, mudança de situação e dossiê gerado, com quem e quando. **Situação:** aberta → em análise → **encerrada** (pede a conclusão; para mexer nas provas, reabre com o motivo).
+- **Dossiê em PDF:** dados do caso, descrição, trajeto desenhado com o local e os alertas, alertas do período, as fotos dentro do PDF, a lista das provas com o SHA-256 de cada uma, o andamento e a conclusão, com o logotipo da empresa.
+- Controle de acesso: tela **Ocorrências** (Operação). Ver = ver e gerar o dossiê; Incluir = abrir, anotar e anexar provas; Alterar = editar, mudar a situação e tirar provas; Excluir = apagar a ocorrência com as provas. Padrão: administrador tudo; operador ver, incluir e alterar; visualizador só ver. Quem só enxerga alguns grupos vê as ocorrências dos veículos dele (e as sem veículo da empresa).
+- Espaço em disco: as provas ficam em `data/ocorrencias/`. Gravação vinda de um download usa o mesmo arquivo no disco (link físico), sem ocupar o dobro.
 
 ---
 

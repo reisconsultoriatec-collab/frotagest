@@ -13,7 +13,8 @@ const WS_PROTO = location.protocol === 'https:' ? 'wss' : 'ws';
    ico('building-warehouse') ico('map-pin') ico('shape') ico('ban') ico('device-mobile') ico('device-desktop') ico('device-tv') ico('arrows-minimize')
    ico('shield-lock') ico('shield-check') ico('lifebuoy') ico('device-mobile') ico('file-download') ico('copy') ico('login-2')
    ico('dots-vertical') ico('photo') ico('upload') ico('bell-off') ico('device-mobile') ico('device-desktop')
-   ico('tool') ico('file-certificate') ico('list-check') ico('receipt') ico('circle-check') ico('user') ico('clock-exclamation') */
+   ico('tool') ico('file-certificate') ico('list-check') ico('receipt') ico('circle-check') ico('user') ico('clock-exclamation')
+   ico('file-alert') ico('paperclip') ico('video') ico('photo') ico('progress') ico('file-type-pdf') ico('list-details') ico('message-plus') ico('eye') ico('loader-2') */
 
 /** Estado do painel. */
 const S = {
@@ -325,6 +326,9 @@ function tratarEvento(m) {
     case 'motoristas': // cadastro mudou, motorista trocado ou cartão novo lido pelo DVR
       emit('motoristas');
       break;
+    case 'ocorrencias': // ocorrência aberta, anotada, com prova nova ou mudou de situação
+      emit('ocorrencias', m);
+      break;
     case 'manutencao': // plano, manutenção feita ou documento mudou
       emit('manutencao');
       atualizarManutencao();
@@ -373,6 +377,7 @@ const NAV = [
     itens: [
       { id: 'mapa', nome: 'Monitoramento', ico: 'map-2' },
       { id: 'alertas', nome: 'Alertas', ico: 'bell-ringing', badge: 'nav-alertas' },
+      { id: 'ocorrencias', nome: 'Ocorrências', ico: 'file-alert' },
       { id: 'historico', nome: 'Histórico', ico: 'route' },
       { id: 'relatorios', nome: 'Relatórios', ico: 'file-analytics' },
       { id: 'gravacoes', nome: 'Gravações', ico: 'video' },

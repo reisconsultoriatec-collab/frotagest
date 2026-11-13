@@ -89,8 +89,17 @@ class Pagina {
       + `${n2(x)} ${n2(y + r)} l ${n2(x)} ${n2(y + r - k)} ${n2(x + r - k)} ${n2(y)} ${n2(x + r)} ${n2(y)} c ${contorno ? 'B' : 'f'}`);
   }
 
-  /** Imagem (o logotipo da empresa cliente) já registrada como /Im1. */
-  imagem(x, y, w, h) { this.ops.push(`q ${n2(w)} 0 0 ${n2(h)} ${n2(x)} ${n2(y)} cm /Im1 Do Q`); }
+  /** Imagem JPEG já registrada no documento (o logotipo da empresa é /Im1). */
+  imagem(x, y, w, h, nome = 'Im1') { this.ops.push(`q ${n2(w)} 0 0 ${n2(h)} ${n2(x)} ${n2(y)} cm /${nome} Do Q`); }
+
+  /** Linha com vários pontos (trajeto), cor e espessura. */
+  polilinha(pts, c, esp = 1.4) {
+    if (pts.length < 2) return;
+    this.ops.push(`${cor(c)} ${n2(esp)} w 1 J 1 j ${pts.map(([x, y], i) => `${n2(x)} ${n2(y)} ${i ? 'l' : 'm'}`).join(' ')} S`);
+  }
+
+  /** Contorno de retângulo. */
+  moldura(x, y, w, h, c, esp = 0.6) { this.ops.push(`${cor(c)} ${n2(esp)} w ${n2(x)} ${n2(y)} ${n2(w)} ${n2(h)} re S`); }
 
   circulo(cx, cy, r, c) {
     const k = r * 0.5523;
@@ -236,27 +245,33 @@ function gerarPdf(rel) {
     pg.texto(L - M, M + 2, `Página ${i + 1} de ${paginas.length}`, { tam: 7, c: COR.cinzaClaro, alinhar: 'd' });
   });
 
-  // objetos do PDF
+  return montarPdf(paginas, { largura: L, altura: A, titulo: rel.titulo, imagens: logo ? [{ nome: 'Im1', jpeg: logo.jpeg, largura: logo.largura, altura: logo.altura }] : [] });
+}
+
+/**
+ * Junta as páginas num arquivo PDF. imagens: [{ nome: 'Im1', jpeg, largura, altura }] (JPEG entra como
+ * está, DCTDecode: uma vez só no arquivo, usado por todas as páginas que o desenharem).
+ */
+function montarPdf(paginas, { largura: LP = L, altura: AP = A, titulo = 'FrotaGest', imagens = [] } = {}) {
   const objs = [];
   const add = (corpo) => { objs.push(corpo); return objs.length; };
   const catalogo = add(null);
   const raiz = add(null);
   const f1 = add(Buffer.from('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>'));
   const f2 = add(Buffer.from('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>'));
-  // o JPEG entra como está (DCTDecode): uma vez só no arquivo, usado por todas as páginas
-  const im = logo ? add(Buffer.concat([
-    Buffer.from(`<< /Type /XObject /Subtype /Image /Width ${logo.largura} /Height ${logo.altura} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${logo.jpeg.length} >>\nstream\n`),
-    logo.jpeg, Buffer.from('\nendstream')])) : null;
-  const recursos = `/Font << /F1 ${f1} 0 R /F2 ${f2} 0 R >>${im ? ` /XObject << /Im1 ${im} 0 R >>` : ''}`;
+  const ims = imagens.map((im) => [im.nome, add(Buffer.concat([
+    Buffer.from(`<< /Type /XObject /Subtype /Image /Width ${im.largura} /Height ${im.altura} /ColorSpace /${im.cinza ? 'DeviceGray' : 'DeviceRGB'} /BitsPerComponent 8 /Filter /DCTDecode /Length ${im.jpeg.length} >>\nstream\n`),
+    im.jpeg, Buffer.from('\nendstream')]))]);
+  const recursos = `/Font << /F1 ${f1} 0 R /F2 ${f2} 0 R >>${ims.length ? ` /XObject << ${ims.map(([n, o]) => `/${n} ${o} 0 R`).join(' ')} >>` : ''}`;
   const kids = [];
   for (const pg of paginas) {
     const dados = zlib.deflateSync(Buffer.from(pg.ops.join('\n'), 'latin1'));
     const conteudo = add(Buffer.concat([Buffer.from(`<< /Length ${dados.length} /Filter /FlateDecode >>\nstream\n`), dados, Buffer.from('\nendstream')]));
-    kids.push(add(Buffer.from(`<< /Type /Page /Parent ${raiz} 0 R /MediaBox [0 0 ${L} ${A}] /Resources << ${recursos} >> /Contents ${conteudo} 0 R >>`)));
+    kids.push(add(Buffer.from(`<< /Type /Page /Parent ${raiz} 0 R /MediaBox [0 0 ${LP} ${AP}] /Resources << ${recursos} >> /Contents ${conteudo} 0 R >>`)));
   }
   objs[catalogo - 1] = Buffer.from(`<< /Type /Catalog /Pages ${raiz} 0 R >>`);
   objs[raiz - 1] = Buffer.from(`<< /Type /Pages /Kids [${kids.map((k) => `${k} 0 R`).join(' ')}] /Count ${kids.length} >>`);
-  const info = add(Buffer.from(`<< /Title ${literal(winAnsi(rel.titulo))} /Producer (FrotaGest - Reis Tecnologia) /Creator (FrotaGest) >>`));
+  const info = add(Buffer.from(`<< /Title ${literal(winAnsi(titulo))} /Producer (FrotaGest - Reis Tecnologia) /Creator (FrotaGest) >>`));
 
   const partes = [Buffer.from('%PDF-1.4\n%\xE2\xE3\xCF\xD3\n', 'latin1')];
   let pos = partes[0].length;
@@ -272,4 +287,4 @@ function gerarPdf(rel) {
   return Buffer.concat(partes);
 }
 
-module.exports = { gerarPdf, winAnsi, largura };
+module.exports = { gerarPdf, montarPdf, Pagina, COR, winAnsi, largura, caber };

@@ -49,6 +49,10 @@ PAGINAS.alertas = (() => {
     $('#al-tabela').addEventListener('click', (e) => {
       const t = e.target.closest('[data-tratar]');
       if (t) { tratar(dados.find((a) => String(a.id) === t.dataset.tratar)); return; }
+      const oc = e.target.closest('[data-oc]');
+      if (oc) { navegar('ocorrencias', qs({ id: oc.dataset.oc })); return; }
+      const no = e.target.closest('[data-nova-oc]');
+      if (no) { novaOcorrencia({ alerta: dados.find((a) => String(a.id) === no.dataset.novaOc) }); return; }
       const v = e.target.closest('[data-ver]');
       if (v) navegar('mapa', qs({ v: v.dataset.ver }));
     });
@@ -90,7 +94,9 @@ PAGINAS.alertas = (() => {
       {
         t: '', cls: 'acts', v: (a) => {
           const item = podeTela('mapa') && [...S.itens.values()].find((i) => i.aparelhoId === a.aparelho_id);
-          return `${item ? `<button class="btn" type="button" data-ver="${H(item.chave)}">${ico('map-pin', 'i-sm')} Mapa</button>` : ''}${podeTela('alertas', 'alterar') && a.situacao !== 'tratado' ? `<button class="btn btn-primary" type="button" data-tratar="${a.id}">Tratar</button>` : ''}`;
+          const oc = a.ocorrencia_id && podeTela('ocorrencias') ? `<button class="btn" type="button" data-oc="${a.ocorrencia_id}" title="Abrir a ocorrência deste alerta">${ico('file-alert', 'i-sm')} Ocorrência</button>`
+            : !a.ocorrencia_id && podeTela('ocorrencias', 'incluir') ? `<button class="btn" type="button" data-nova-oc="${a.id}" title="Abrir ocorrência com as provas deste alerta">${ico('file-alert', 'i-sm')} Abrir ocorrência</button>` : '';
+          return `${item ? `<button class="btn" type="button" data-ver="${H(item.chave)}">${ico('map-pin', 'i-sm')} Mapa</button>` : ''}${oc}${podeTela('alertas', 'alterar') && a.situacao !== 'tratado' ? `<button class="btn btn-primary" type="button" data-tratar="${a.id}">Tratar</button>` : ''}`;
         },
       },
     ], dados, { vazio: f.situacao === 'pendentes' ? 'Nenhum alerta pendente.' : 'Nenhum alerta com esses filtros.' });

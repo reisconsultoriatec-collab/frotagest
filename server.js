@@ -50,6 +50,8 @@ const apiComandos = require('./src/web/api-comandos');
 const apiMotoristas = require('./src/web/api-motoristas');
 const { Manutencao } = require('./src/servicos/manutencao');
 const apiManutencao = require('./src/web/api-manutencao');
+const { Ocorrencias } = require('./src/servicos/ocorrencias');
+const apiOcorrencias = require('./src/web/api-ocorrencias');
 const { definirFuso, gerarCodigo } = require('./src/util/comum');
 const { version } = require('./package.json');
 
@@ -223,6 +225,7 @@ async function main() {
     motoristas,
   });
   srv.manutencao = new Manutencao({ banco, frota, painel: srv.painel, motoristas, acesso, avisos, log: (level, text) => log(level, text) });
+  srv.ocorrencias = new Ocorrencias({ banco, frota, recorder, fotos: srv.fotos, dataDir: DATA, log: (level, text) => log(level, text) });
   apiOperacao.registrar(srv);
   apiConta.registrar(srv);
   apiCadastros.registrar(srv);
@@ -237,6 +240,7 @@ async function main() {
   apiComandos.registrar(srv);
   apiMotoristas.registrar(srv);
   apiManutencao.registrar(srv);
+  apiOcorrencias.registrar(srv);
   apiDoisFatores.registrar(srv);
   srv.onLog = (e) => log(e.level, e.text, { source: 'painel' });
 
@@ -301,6 +305,8 @@ async function main() {
     srv.paraTodos({ type: 'motoristas' }, (u) => permite(u, 'motoristas') || permite(u, 'mapa'));
   });
   // manutenção e documentos: plano, registro ou documento mudou (ou a CNH de um motorista)
+  // ocorrências: quem tem a tela (e enxerga a empresa) atualiza a lista e o detalhe aberto
+  srv.ocorrencias.on('mudou', (empresaId, id) => srv.paraTodos({ type: 'ocorrencias', id }, (u) => permite(u, 'ocorrencias') && (u.perfil === 'master' || u.empresaId === empresaId)));
   srv.manutencao.on('mudou', (empresaId) => srv.paraTodos({ type: 'manutencao' }, (u) => permite(u, 'manutencao') && (u.perfil === 'master' || !empresaId || u.empresaId === empresaId)));
   frota.on('recarregada', () => { srv.manutencao.cache = null; });
   motoristas.on('cartaoDesconhecido', (c) => srv.paraTodos({ type: 'motoristas' }, (u) => permite(u, 'motoristas') && (u.perfil === 'master' || u.empresaId === c.empresaId)));
@@ -317,6 +323,7 @@ async function main() {
   });
   recorder.on('job', (j) => {
     srv.enviarDownload(j);
+    if (j.ocorrenciaId) srv.ocorrencias.aoDownload(j).catch((e) => log('erro', `Ocorrências: ${e.message}`));
     if (j.status === 'pronto' || j.status === 'erro') log(j.status === 'pronto' ? 'ok' : 'erro', j.status === 'pronto' ? `Download pronto: ${j.name}${j.note ? ` (${j.note})` : ''}` : `Download falhou (${j.deviceId}): ${j.note}`);
   });
 
