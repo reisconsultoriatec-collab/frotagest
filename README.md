@@ -63,6 +63,8 @@ A tabela acima é o **padrão** de cada perfil. Em **Controle › Controle de ac
 | `manutencao_planos`, `manutencoes` | Planos de manutenção (a cada X km e/ou tempo) e as manutenções feitas (data, hodômetro, custo, oficina) | sempre |
 | `documentos` | Documentos com vencimento do veículo (licenciamento, seguro, tacógrafo…) e do motorista (exame toxicológico, cursos…) | sempre |
 | `ocorrencias`, `ocorrencia_eventos`, `ocorrencia_anexos` | Ocorrências (número por empresa e ano), o andamento e a lista das provas com o SHA-256 de cada arquivo. Os arquivos ficam em disco, em `data/ocorrencias/<id>/` | até excluir a ocorrência |
+| `linhas`, `linha_pontos`, `linha_partidas` | Linhas (pontos na ordem com o tempo previsto, percurso, tolerâncias, avisos) e os horários de partida (dias da semana e veículo da escala) | sempre |
+| `viagens`, `viagem_pontos` | Viagens de cada dia (uma por partida): situação, saída e chegada reais, a hora em cada ponto e a diferença para o horário, fora da rota | sempre |
 | `fotos` | Fotos das câmeras: veículo, câmera, hora, posição e quem pediu (o JPEG fica em `data/fotos`) | 30 dias (configurável) |
 | `push_inscricoes`, `usuarios.push_nivel` | Avisos no celular: os aparelhos de cada pessoa (endereço do serviço de push e as chaves públicas do aparelho) e quais alertas ela quer | até a pessoa tirar o aparelho ou sair |
 | `codigos_recuperacao`, `sessoes_2fa` | Verificação em duas etapas: códigos de recuperação (só o resumo SHA-256) e os logins que já passaram pela segunda etapa | até zerar / 90 dias |
@@ -238,6 +240,24 @@ Em **Operação › Ocorrências**. Cada caso (acidente, assalto, avaria, condut
 - **Dossiê em PDF:** dados do caso, descrição, trajeto desenhado com o local e os alertas, alertas do período, as fotos dentro do PDF, a lista das provas com o SHA-256 de cada uma, o andamento e a conclusão, com o logotipo da empresa.
 - Controle de acesso: tela **Ocorrências** (Operação). Ver = ver e gerar o dossiê; Incluir = abrir, anotar e anexar provas; Alterar = editar, mudar a situação e tirar provas; Excluir = apagar a ocorrência com as provas. Padrão: administrador tudo; operador ver, incluir e alterar; visualizador só ver. Quem só enxerga alguns grupos vê as ocorrências dos veículos dele (e as sem veículo da empresa).
 - Espaço em disco: as provas ficam em `data/ocorrencias/`. Gravação vinda de um download usa o mesmo arquivo no disco (link físico), sem ocupar o dobro.
+
+## 3.15 Linhas e horários (opcional)
+
+Em **Operação › Linhas e horários**. Sem linha cadastrada nada muda no sistema; cadastre quando quiser acompanhar o cumprimento dos horários (ônibus de linha, fretamento, escolar).
+
+- **Linha:** os **pontos na ordem** (garagem, pontos, escolas, terminal), marcados clicando no mapa, cada um com o **tempo previsto desde a partida** (minutos; o sistema sugere pela distância) e o raio. Opcional: o **percurso**, tirado do GPS de uma viagem feita (botão **Percurso de uma viagem**: veículo e período).
+- **Horários de partida:** hora, dias da semana e o veículo da escala (ou sem veículo fixo). **Vários de uma vez** cria, por exemplo, das 05:00 às 23:00 a cada 20 min.
+- **Viagens do dia:** cada partida vira uma viagem acompanhada pelo GPS do veículo:
+  - começa quando o veículo **sai do primeiro ponto** perto do horário (até 30 min antes);
+  - em cada ponto, a hora real × a prevista: **no horário**, **adiantado** ou **atrasado** (tolerâncias da linha, padrão 2 e 5 min). Quem passa rápido por um ponto entre duas posições do GPS conta como passou;
+  - o veículo chegou ao ponto seguinte sem passar por um: **não passou** naquele ponto;
+  - com o percurso gravado, saiu do corredor (padrão 200 m) por 30 s: **fora da rota** (alerta, que encerra quando volta);
+  - não saiu até 1 h depois do horário: **não realizada**; não chegou ao fim: **incompleta**.
+- **Avisos (opcionais, por linha):** fora da rota (ligado), atraso acima de X minutos (um por viagem) e ponto em que não passou. Entram em **Alertas** e no celular, como os outros.
+- No quadro do dia: o andamento de cada viagem, o próximo ponto com o horário estimado, o atraso agora e os pontos (clique na viagem). **Trocar o veículo** de uma viagem (só aquela) e **cancelar** com o motivo.
+- **Relatório "Cumprimento das viagens":** cada viagem com a saída, a chegada, as diferenças, os pontos, o maior atraso e o tempo fora da rota, em Excel e PDF.
+- Mudar a linha vale para as viagens de hoje que ainda não começaram (a troca de veículo feita no dia continua). Linha que já rodou não se exclui: desligue.
+- Controle de acesso: tela **Linhas e horários** (Operação). Ver = quadro do dia, linhas e o relatório; Incluir = cadastrar linhas; Alterar = editar, trocar o veículo e cancelar viagens; Excluir = excluir linhas que não rodaram. Padrão: administrador tudo; operador e visualizador só ver. Quem só enxerga alguns grupos vê as linhas da empresa toda e as dos seus grupos, e só mexe nas dos seus grupos.
 
 ---
 

@@ -32,8 +32,8 @@ function nomeAlarme(codigo) {
 }
 
 const r6 = (n) => Math.round(Number(n) * 1e6) / 1e6;
-/** Alerta que não vem dos bits de alarme do DVR (cercas: c12e, c12s, c12p; regras de alerta: r7). */
-const externo = (codigo) => /^[cr]\d/.test(String(codigo));
+/** Alerta que não vem dos bits de alarme do DVR (cercas: c12e, c12s, c12p; regras de alerta: r7; linhas: l3r, l3a, l3p). */
+const externo = (codigo) => /^[crl]\d/.test(String(codigo));
 const limita = (n, min, max) => Math.max(min, Math.min(max, Math.round(Number(n) || 0)));
 
 class Historico extends EventEmitter {

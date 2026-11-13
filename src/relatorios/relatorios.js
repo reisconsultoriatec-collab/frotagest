@@ -6,7 +6,7 @@
  * Reis Tecnologia
  */
 const { HttpErro, validar: V, paraMs, formatar } = require('../util/comum');
-const { empresaAlvo } = require('../auth/acesso');
+const { empresaAlvo, limitado, permite } = require('../auth/acesso');
 const { Rastreio, distM, FOLGA_M } = require('../servicos/geo');
 
 const PARADO_KMH = 3; // até 3 km/h conta como parado (o GPS oscila com o veículo parado)
@@ -28,6 +28,7 @@ const TIPOS = {
   cercas: { titulo: 'Entradas e saídas das cercas', arquivo: 'entradas-e-saidas-das-cercas' },
   jornada: { titulo: 'Jornada dos motoristas', arquivo: 'jornada-dos-motoristas' },
   motoristas: { titulo: 'Resumo por motorista', arquivo: 'resumo-por-motorista' },
+  viagens: { titulo: 'Cumprimento das viagens', arquivo: 'cumprimento-das-viagens' },
 };
 const NOVA_JORNADA_SEG = 8 * 3600; // sem dirigir por 8 h ou mais: começa outra jornada (Lei do Motorista: 8 h seguidas do descanso de 11 h)
 const DESCANSO_DIARIO_SEG = 11 * 3600;
@@ -310,7 +311,7 @@ class Relatorios {
   async gerar(u, tipo, q) {
     if (!TIPOS[tipo]) throw new HttpErro(404, 'Relatório não encontrado.');
     const chave = JSON.stringify([tipo, q.de, q.ate, q.empresa || '', q.grupo || '', q.veiculo || '', q.limite || '', q.minutos || '', q.gravidade || '', q.situacao || '', q.cerca || '', q.finalidade || '',
-      q.motorista || '', q.continua || '', q.descanso || '']);
+      q.motorista || '', q.continua || '', q.descanso || '', q.linha || '']);
     const c = this.cache.get(u.id);
     if (c && c.chave === chave && Date.now() - c.em < CACHE_MS) return c.resultado;
     if (this.rodando.has(u.id)) throw new HttpErro(429, 'Já há um relatório sendo gerado para você. Aguarde ele terminar.');
@@ -866,6 +867,97 @@ class Relatorios {
       ],
       vazio: 'Nenhum motorista dirigiu os veículos escolhidos no período (o motorista é escolhido no painel do veículo, no Monitoramento, ou pelo cartão no DVR).',
       observacao: `Contado só nos trechos em que cada motorista estava no veículo. Km e tempos pelo GPS; jornadas como no relatório de jornada (descanso de ${par.descanso} min, 8 h sem dirigir começa outra).`,
+    };
+  }
+
+  /** Viagens das linhas no período: saída e chegada comparadas com o horário, pontos passados e pulados, fora da rota. */
+  async viagens(u, q) {
+    if (!permite(u, 'linhas')) throw new HttpErro(403, 'Sem acesso a Linhas e horários.');
+    const { de, ate } = this.periodo(q, MAX_DIAS_ALERTAS);
+    const emp = empresaAlvo(u, q.empresa ? V.id(q.empresa, 'a empresa') : null);
+    const onde = ['v.previsto_inicio BETWEEN ? AND ?'];
+    const args = [de, ate];
+    if (emp) { onde.push('v.empresa_id = ?'); args.push(emp); }
+    let linha = null;
+    if (q.linha) {
+      linha = await this.banco.um('SELECT id, empresa_id, grupo_id, codigo, nome FROM linhas WHERE id = ?', [V.id(q.linha, 'a linha')]);
+      if (!linha || (u.perfil !== 'master' && linha.empresa_id !== u.empresaId) || (limitado(u) && linha.grupo_id && !u.grupos.has(linha.grupo_id))) throw new HttpErro(404, 'Linha não encontrada.');
+      onde.push('v.linha_id = ?'); args.push(linha.id);
+    }
+    let veiculo = null;
+    if (q.veiculo) {
+      veiculo = this.frota.veiculos.get(V.id(q.veiculo, 'o veículo'));
+      if (!veiculo || !this.acesso.veVeiculo(u, veiculo)) throw new HttpErro(404, 'Veículo não encontrado.');
+      onde.push('v.veiculo_id = ?'); args.push(veiculo.id);
+    }
+    if (q.situacao) {
+      const sit = V.opcao(q.situacao, ['concluida', 'incompleta', 'nao_realizada', 'cancelada', 'atrasadas'], 'a situação');
+      if (sit === 'atrasadas') onde.push('v.atraso_max_seg > l.tolerancia_atraso_min * 60');
+      else { onde.push('v.situacao = ?'); args.push(sit); }
+    }
+    const rows = await this.banco.query(`
+      SELECT v.*, l.codigo, l.nome AS linha_nome, l.grupo_id, l.tolerancia_adiantado_min AS tol_ad, l.tolerancia_atraso_min AS tol_at,
+             (SELECT p.diferenca_seg FROM viagem_pontos p WHERE p.viagem_id = v.id AND p.ordem = 1 AND p.situacao <> 'pulado') AS dif_saida,
+             (SELECT p.diferenca_seg FROM viagem_pontos p WHERE p.viagem_id = v.id AND p.ordem = v.pontos_total AND p.situacao <> 'pulado') AS dif_chegada
+        FROM viagens v JOIN linhas l ON l.id = v.linha_id
+       WHERE ${onde.join(' AND ')} ORDER BY v.previsto_inicio, l.codigo, l.nome, v.id LIMIT ?`, [...args, MAX_LINHAS + 1]);
+    if (rows.length > MAX_LINHAS) throw new HttpErro(400, 'Resultado grande demais: escolha um período menor ou uma linha.');
+    const lista = rows.filter((r) => !limitado(u) || !r.grupo_id || u.grupos.has(r.grupo_id));
+    const SIT = { prevista: 'Prevista', em_andamento: 'Em andamento', concluida: 'Concluída', incompleta: 'Incompleta', nao_realizada: 'Não realizada', cancelada: 'Cancelada' };
+    const min = (seg) => {
+      if (seg === null || seg === undefined) return '';
+      const m = Math.round(Number(seg) / 60);
+      return `${m > 0 ? '+' : m < 0 ? '−' : ''}${Math.abs(m)} min`;
+    };
+    const cont = { total: 0, feitas: 0, concl: 0, inc: 0, nao: 0, canc: 0, saidas: 0, saidaOk: 0, chegadas: 0, somaCheg: 0 };
+    const linhas = lista.map((r) => {
+      const ve = r.veiculo_id ? this.frota.veiculos.get(r.veiculo_id) : null;
+      if (r.situacao === 'cancelada') cont.canc++; else cont.total++;
+      if (r.situacao === 'concluida') cont.concl++;
+      if (r.situacao === 'incompleta') cont.inc++;
+      if (r.situacao === 'nao_realizada') cont.nao++;
+      if (['concluida', 'incompleta', 'em_andamento'].includes(r.situacao)) cont.feitas++;
+      if (r.dif_saida !== null && r.dif_saida !== undefined) {
+        cont.saidas++;
+        if (r.dif_saida >= -r.tol_ad * 60 && r.dif_saida <= r.tol_at * 60) cont.saidaOk++;
+      }
+      if (r.dif_chegada !== null && r.dif_chegada !== undefined) { cont.chegadas++; cont.somaCheg += Number(r.dif_chegada); }
+      return [r.previsto_inicio, `${r.codigo ? `${r.codigo} · ` : ''}${r.linha_nome}`, ve ? this.nomeVeiculo(ve) : '', SIT[r.situacao] || r.situacao,
+        r.inicio_real, min(r.dif_saida), r.fim_real, min(r.dif_chegada), `${r.pontos_passados}/${r.pontos_total}`, r.pontos_pulados,
+        r.atraso_max_seg !== null && r.atraso_max_seg > 0 ? min(r.atraso_max_seg) : '', r.fora_rota_seg || null, r.observacao || ''];
+    });
+    const nomeEmp = emp ? this.nomeEmpresa(emp) : (u.perfil === 'master' ? 'Todas as empresas' : u.empresaNome);
+    const quem = linha ? `Linha ${linha.codigo ? `${linha.codigo} · ` : ''}${linha.nome}` : 'Todas as linhas';
+    const pct = (a, b) => (b ? `${fmtNum((a / b) * 100, 0)}%` : '—');
+    return {
+      titulo: TIPOS.viagens.titulo,
+      subtitulo: [`${nomeEmp} · ${quem}${veiculo ? ` · Veículo ${this.nomeVeiculo(veiculo)}` : ''}`, `Período: ${fmtDataHora(de, false)} a ${fmtDataHora(ate, false)}`],
+      colunas: [
+        { titulo: 'Partida prevista', tipo: 'dataHora', largura: 19, peso: 1.25 },
+        { titulo: 'Linha', tipo: 'texto', largura: 26, peso: 1.6 },
+        { titulo: 'Veículo', tipo: 'texto', largura: 18, peso: 1.2 },
+        { titulo: 'Situação', tipo: 'texto', largura: 14, peso: 0.95 },
+        { titulo: 'Saída', tipo: 'dataHora', largura: 19, peso: 1.25 },
+        { titulo: 'Dif. saída', tipo: 'texto', largura: 10, peso: 0.7, alinhar: 'd' },
+        { titulo: 'Chegada', tipo: 'dataHora', largura: 19, peso: 1.25 },
+        { titulo: 'Dif. chegada', tipo: 'texto', largura: 11, peso: 0.75, alinhar: 'd' },
+        { titulo: 'Pontos', tipo: 'texto', largura: 8, peso: 0.6, alinhar: 'd' },
+        { titulo: 'Pulados', tipo: 'inteiro', largura: 8, peso: 0.6, alinhar: 'd' },
+        { titulo: 'Maior atraso', tipo: 'texto', largura: 11, peso: 0.75, alinhar: 'd' },
+        { titulo: 'Fora da rota', tipo: 'duracao', largura: 11, peso: 0.75, alinhar: 'd' },
+        { titulo: 'Observação', tipo: 'texto', largura: 30, peso: 1.4 }],
+      linhas, totais: null,
+      resumo: [
+        { rotulo: 'Viagens previstas', valor: fmtNum(cont.total) },
+        { rotulo: 'Concluídas', valor: fmtNum(cont.concl) },
+        { rotulo: 'Incompletas', valor: fmtNum(cont.inc) },
+        { rotulo: 'Não realizadas', valor: fmtNum(cont.nao) },
+        { rotulo: 'Saída no horário', valor: pct(cont.saidaOk, cont.saidas) },
+        { rotulo: 'Chegada (média)', valor: cont.chegadas ? min(Math.round(cont.somaCheg / cont.chegadas)) : '—' },
+        ...(cont.canc ? [{ rotulo: 'Canceladas', valor: fmtNum(cont.canc) }] : []),
+      ],
+      vazio: 'Nenhuma viagem no período (as viagens saem das partidas cadastradas em Linhas e horários).',
+      observacao: 'Diferença: + atrasado, − adiantado, comparado ao horário previsto (partida + minutos de cada ponto). No horário = dentro da tolerância da linha.',
     };
   }
 }

@@ -52,6 +52,8 @@ const { Manutencao } = require('./src/servicos/manutencao');
 const apiManutencao = require('./src/web/api-manutencao');
 const { Ocorrencias } = require('./src/servicos/ocorrencias');
 const apiOcorrencias = require('./src/web/api-ocorrencias');
+const { Linhas } = require('./src/servicos/linhas');
+const apiLinhas = require('./src/web/api-linhas');
 const { definirFuso, gerarCodigo } = require('./src/util/comum');
 const { version } = require('./package.json');
 
@@ -226,6 +228,9 @@ async function main() {
   });
   srv.manutencao = new Manutencao({ banco, frota, painel: srv.painel, motoristas, acesso, avisos, log: (level, text) => log(level, text) });
   srv.ocorrencias = new Ocorrencias({ banco, frota, recorder, fotos: srv.fotos, dataDir: DATA, log: (level, text) => log(level, text) });
+  const linhas = new Linhas({ banco, frota, historico, log: (level, text) => log(level, text) });
+  await linhas.iniciar();
+  srv.linhas = linhas;
   apiOperacao.registrar(srv);
   apiConta.registrar(srv);
   apiCadastros.registrar(srv);
@@ -241,6 +246,7 @@ async function main() {
   apiMotoristas.registrar(srv);
   apiManutencao.registrar(srv);
   apiOcorrencias.registrar(srv);
+  apiLinhas.registrar(srv);
   apiDoisFatores.registrar(srv);
   srv.onLog = (e) => log(e.level, e.text, { source: 'painel' });
 
@@ -290,6 +296,7 @@ async function main() {
     const r = historico.posicao(id, position, position.receivedAt);
     try { cercas.posicao(id, position, r); } catch (e) { log('erro', `Cercas: ${e.message}`); }
     try { regras.posicao(id, position, r); } catch (e) { log('erro', `Regras de alerta: ${e.message}`); }
+    try { linhas.posicao(id, position, r); } catch (e) { log('erro', `Linhas: ${e.message}`); }
     agendarItem(id);
   });
   // entrou/saiu de cerca: as telas abertas na lista de cercas e no modo TV atualizam a ocupação
@@ -309,6 +316,16 @@ async function main() {
   srv.ocorrencias.on('mudou', (empresaId, id) => srv.paraTodos({ type: 'ocorrencias', id }, (u) => permite(u, 'ocorrencias') && (u.perfil === 'master' || u.empresaId === empresaId)));
   srv.manutencao.on('mudou', (empresaId) => srv.paraTodos({ type: 'manutencao' }, (u) => permite(u, 'manutencao') && (u.perfil === 'master' || !empresaId || u.empresaId === empresaId)));
   frota.on('recarregada', () => { srv.manutencao.cache = null; });
+  // viagens das linhas: o quadro do dia atualiza (no máximo a cada 2 s por empresa)
+  const viagensPendentes = new Map();
+  linhas.on('mudou', (empresaId) => {
+    const k = empresaId || 0;
+    if (viagensPendentes.has(k)) return;
+    viagensPendentes.set(k, setTimeout(() => {
+      viagensPendentes.delete(k);
+      srv.paraTodos({ type: 'viagens' }, (u) => permite(u, 'linhas') && (u.perfil === 'master' || !empresaId || u.empresaId === empresaId));
+    }, 2000));
+  });
   motoristas.on('cartaoDesconhecido', (c) => srv.paraTodos({ type: 'motoristas' }, (u) => permite(u, 'motoristas') && (u.perfil === 'master' || u.empresaId === c.empresaId)));
   // foto que chegou das câmeras (pedida no painel ou mandada pelo aparelho): disco + registro, e avisa as telas
   gateway.on('midia', (md) => {

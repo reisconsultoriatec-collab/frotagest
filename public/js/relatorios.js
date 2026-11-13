@@ -12,10 +12,13 @@ PAGINAS.relatorios = (() => {
     { id: 'cercas', nome: 'Entradas e saídas das cercas', ico: 'fence', desc: 'Cada passagem pelos pontos, terminais e áreas: entrada, saída e tempo dentro.' },
     { id: 'jornada', nome: 'Jornada dos motoristas', ico: 'steering-wheel', desc: 'Cada jornada de cada motorista: tempo dirigindo, maior direção sem descanso, pausas e o descanso entre jornadas.' },
     { id: 'motoristas', nome: 'Resumo por motorista', ico: 'id-badge-2', desc: 'Km, tempo dirigindo, velocidade, excessos e alertas de cada motorista no período.' },
+    { id: 'viagens', nome: 'Cumprimento das viagens', ico: 'calendar-time', desc: 'Cada viagem das linhas: saída e chegada comparadas com o horário, pontos pulados e fora da rota.', tela: 'linhas' },
   ];
+  const tipos = () => TIPOS.filter((t) => !t.tela || podeTela(t.tela));
   const DE_MOTORISTA = ['jornada', 'motoristas'];
-  const f = { tipo: 'resumo', de: '', ate: '', grupo: '', veiculo: '', limite: '80', minutos: '5', gravidade: '', situacao: '', cerca: '', finalidade: '', motorista: '', continua: '330', descanso: '30' };
+  const f = { tipo: 'resumo', de: '', ate: '', grupo: '', veiculo: '', limite: '80', minutos: '5', gravidade: '', situacao: '', cerca: '', finalidade: '', motorista: '', continua: '330', descanso: '30', linha: '', sitViagem: '' };
   let motoristas = null; // lista para o filtro (carregada quando abre um relatório de motorista)
+  let linhasFiltro = null; // linhas para o filtro do relatório de viagens
   let seq = 0;
   let offs = [];
 
@@ -68,7 +71,8 @@ PAGINAS.relatorios = (() => {
   }
 
   function render(c, params) {
-    if (params.tipo && TIPOS.some((t) => t.id === params.tipo)) f.tipo = params.tipo;
+    if (params.tipo && tipos().some((t) => t.id === params.tipo)) f.tipo = params.tipo;
+    if (!tipos().some((t) => t.id === f.tipo)) f.tipo = 'resumo';
     if (params.cerca) { f.cerca = params.cerca; f.finalidade = ''; }
     // vindo do dashboard: período e grupo já escolhidos
     const dh = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
@@ -80,7 +84,7 @@ PAGINAS.relatorios = (() => {
     }
     c.innerHTML = `
       <div class="page">
-        <div class="rel-tipos" id="rl-tipos" role="tablist">${TIPOS.map((t) => `
+        <div class="rel-tipos" id="rl-tipos" role="tablist">${tipos().map((t) => `
           <button class="rel-tipo${t.id === f.tipo ? ' active' : ''}" type="button" role="tab" aria-selected="${t.id === f.tipo}" data-tipo="${t.id}">
             <span class="rel-tipo-ico">${ico(t.ico)}</span><span><b>${H(t.nome)}</b><small>${H(t.desc)}</small></span></button>`).join('')}</div>
         <section class="card">
@@ -88,7 +92,9 @@ PAGINAS.relatorios = (() => {
             <label class="field">De<input type="datetime-local" id="rl-de"></label>
             <label class="field">Até<input type="datetime-local" id="rl-ate"></label>
             <div class="seg" id="rl-rapido"><button class="seg-btn" type="button" data-p="hoje">Hoje</button><button class="seg-btn" type="button" data-p="ontem">Ontem</button><button class="seg-btn" type="button" data-p="7">7 dias</button><button class="seg-btn" type="button" data-p="mes">Este mês</button></div>
-            <label class="field">Grupo<select id="rl-grupo"></select></label>
+            <label class="field" data-nao="viagens">Grupo<select id="rl-grupo"></select></label>
+            <label class="field" data-so="viagens">Linha<select id="rl-linha"><option value="">Todas as linhas</option></select></label>
+            <label class="field" data-so="viagens">Situação<select id="rl-sitv"><option value="">Todas</option><option value="concluida">Concluídas</option><option value="incompleta">Incompletas</option><option value="nao_realizada">Não realizadas</option><option value="atrasadas">Com atraso</option><option value="cancelada">Canceladas</option></select></label>
             <label class="field">Veículo<select id="rl-veic"></select></label>
             <label class="field" data-so="resumo velocidade">Limite (km/h)<input type="number" id="rl-limite" min="20" max="200" step="5" style="width:110px"></label>
             <label class="field" data-so="resumo paradas">Parada mínima (min)<input type="number" id="rl-min" min="1" max="720" style="width:130px"></label>
@@ -131,7 +137,9 @@ PAGINAS.relatorios = (() => {
     $('#rl-limite2').value = f.limite;
     $('#rl-cont').value = f.continua;
     $('#rl-desc').value = f.descanso;
+    $('#rl-sitv').value = f.sitViagem;
     preencherMotoristas();
+    preencherLinhas();
     preencherCercas();
     carregarCercas().then(preencherCercas).catch(() => {});
     mostrarCampos();
@@ -144,6 +152,7 @@ PAGINAS.relatorios = (() => {
       mostrarCampos();
       preencherCercas();
       preencherMotoristas();
+      preencherLinhas();
       limpar();
     });
     $('#rl-mot').addEventListener('change', () => { f.motorista = $('#rl-mot').value; });
@@ -173,7 +182,7 @@ PAGINAS.relatorios = (() => {
     $('#rl-xlsx').addEventListener('click', () => baixar('xlsx'));
     $('#rl-pdf').addEventListener('click', () => baixar('pdf'));
     // a empresa escolhida no topo mudou: grupos e veículos mudam junto
-    offs.push(on('empresa', () => { f.grupo = ''; f.veiculo = ''; f.cerca = ''; f.motorista = ''; S.cercas = null; motoristas = null; }));
+    offs.push(on('empresa', () => { f.grupo = ''; f.veiculo = ''; f.cerca = ''; f.motorista = ''; f.linha = ''; S.cercas = null; motoristas = null; linhasFiltro = null; preencherLinhas(); }));
     offs.push(on('motoristas', () => { motoristas = null; preencherMotoristas(); }));
     offs.push(on('cercas', () => carregarCercas().then(preencherCercas).catch(() => {})));
     offs.push(on('frota', () => {
@@ -207,8 +216,24 @@ PAGINAS.relatorios = (() => {
       .catch(() => {});
   }
 
+  /** Linhas para o filtro: só busca quando abre o relatório de viagens. */
+  function preencherLinhas() {
+    const sel = $('#rl-linha');
+    if (!sel || f.tipo !== 'viagens') return;
+    const desenhar = () => {
+      if (!$('#rl-linha')) return;
+      const l = linhasFiltro || [];
+      sel.innerHTML = `<option value="">Todas as linhas${l.length ? ` (${l.length})` : ''}</option>${l.map((x) => `<option value="${x.id}">${H(`${x.codigo ? `${x.codigo} · ` : ''}${x.nome}`)}</option>`).join('')}`;
+      sel.value = f.linha;
+      if (sel.value !== String(f.linha)) { f.linha = ''; sel.value = ''; }
+    };
+    if (linhasFiltro) { desenhar(); return; }
+    api(`/api/linhas${S.empresa ? `?${qs({ empresa: S.empresa })}` : ''}`).then((r) => { linhasFiltro = r.linhas; desenhar(); }).catch(() => {});
+  }
+
   function mostrarCampos() {
     $$('[data-so]').forEach((el) => { el.hidden = !el.dataset.so.split(' ').includes(f.tipo); });
+    $$('[data-nao]').forEach((el) => { el.hidden = el.dataset.nao.split(' ').includes(f.tipo); });
   }
 
   function limpar() {
@@ -240,6 +265,12 @@ PAGINAS.relatorios = (() => {
       Object.assign(q, { motorista: f.motorista, continua: f.continua, descanso: f.descanso });
     }
     if (f.tipo === 'motoristas') { f.limite = $('#rl-limite2').value; q.limite = f.limite; }
+    if (f.tipo === 'viagens') {
+      f.linha = $('#rl-linha').value;
+      f.sitViagem = $('#rl-sitv').value;
+      delete q.grupo;
+      Object.assign(q, { linha: f.linha, situacao: f.sitViagem });
+    }
     return `/api/relatorios/${f.tipo}?${qs(q)}`;
   }
 
@@ -281,7 +312,7 @@ PAGINAS.relatorios = (() => {
     k.innerHTML = r.resumo.map((q, i) => `<div class="kpi ${['', 'ok', 'neutral', 'warn', 'err', 'neutral'][i] || ''}"><div class="kpi-body"><div class="kpi-label">${H(q.rotulo)}</div><div class="kpi-value rel-kpi">${H(q.valor)}</div></div></div>`).join('');
     k.style.gridTemplateColumns = `repeat(${Math.min(r.resumo.length, 6)}, minmax(0, 1fr))`;
     k.hidden = false;
-    $('#rl-titulo').innerHTML = `${ico(TIPOS.find((t) => t.id === r.tipo).ico)} ${H(r.titulo)}`;
+    $('#rl-titulo').innerHTML = `${ico((TIPOS.find((t) => t.id === r.tipo) || { ico: 'file-analytics' }).ico)} ${H(r.titulo)}`;
     $('#rl-sub').textContent = r.subtitulo.join(' · ');
     $('#rl-n').textContent = r.totalLinhas > r.linhas.length
       ? `mostrando ${fmtNum(r.linhas.length)} de ${fmtNum(r.totalLinhas)} linhas · o arquivo traz todas`
@@ -297,5 +328,5 @@ PAGINAS.relatorios = (() => {
     $('#rl-res').hidden = false;
   }
 
-  return { id: 'relatorios', titulo: 'Relatórios', sub: 'Resumo da frota, velocidade, paradas, alertas, garagem, cercas e motoristas em Excel e PDF', render, sair };
+  return { id: 'relatorios', titulo: 'Relatórios', sub: 'Resumo da frota, velocidade, paradas, alertas, garagem, cercas, motoristas e viagens em Excel e PDF', render, sair };
 })();
