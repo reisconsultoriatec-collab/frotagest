@@ -1498,3 +1498,9 @@ button.gr-lb-l:hover { background: var(--fundo-hover); }
   .ln-ativo span { display: inline; }
   .ln-mapa { height: 320px; }
 }
+
+/* ---------- Links de acompanhamento (1.16) ---------- */
+.lk-alvo { display: inline-flex; gap: 9px; align-items: flex-start; }
+.lk-alvo > .i { color: var(--ink-2); margin-top: 2px; flex: none; }
+.lk-acoes { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+#lk-url { width: 100%; font-family: var(--mono); font-size: 12.5px; }

@@ -226,6 +226,9 @@ class Servidor {
     try { url = new URL(req.url, 'http://local'); } catch { return this.send(res, 400, { erro: 'endereço inválido' }); }
 
     if ((req.method === 'GET' || req.method === 'HEAD') && this.estaticos[url.pathname]) return this.estatico(req, res, this.estaticos[url.pathname]);
+    // página pública de acompanhamento (link enviado ao cliente/passageiro) e o manifesto dela (instalar no celular)
+    const pa = /^\/a\/([A-Za-z0-9_-]{16,64})(\/manifest\.webmanifest)?$/.exec(url.pathname);
+    if ((req.method === 'GET' || req.method === 'HEAD') && pa) return pa[2] ? this.manifestoAcompanhar(res, pa[1]) : this.estatico(req, res, path.join(PUBLIC, 'acompanhar.html'), { 'X-Robots-Tag': 'noindex, nofollow', 'Referrer-Policy': 'no-referrer' });
     if (req.method === 'GET' && url.pathname.startsWith('/baixar/')) return this.onTicket(req, res, url);
     if (url.pathname.startsWith('/api/')) {
       this.onApi(req, res, url).catch((e) => {
@@ -238,17 +241,30 @@ class Servidor {
   }
 
   /** Arquivos do painel com ETag (o navegador revalida e só baixa de novo o que mudou). */
-  estatico(req, res, arquivo) {
+  /** Manifesto da página de acompanhamento: instalada no celular, abre direto no link (e recebe o aviso de chegada no iPhone). */
+  manifestoAcompanhar(res, token) {
+    const l = this.acompanhamento ? this.acompanhamento.doToken(token) : null;
+    const nome = l ? this.acompanhamento.titulo(l) : 'Acompanhamento';
+    const m = {
+      name: `${nome} · Acompanhamento`, short_name: nome.length > 24 ? `${nome.slice(0, 23)}…` : nome, lang: 'pt-BR',
+      id: `/a/${token}`, start_url: `/a/${token}`, scope: `/a/${token}`, display: 'standalone', background_color: '#0B1324', theme_color: '#1A2744',
+      icons: [{ src: '/img/icone-192.png', sizes: '192x192', type: 'image/png' }, { src: '/img/icone-512.png', sizes: '512x512', type: 'image/png' },
+        { src: '/img/icone-512-maskable.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }],
+    };
+    this.send(res, 200, JSON.stringify(m), 'application/manifest+json', { 'Cache-Control': 'no-cache', 'X-Robots-Tag': 'noindex' });
+  }
+
+  estatico(req, res, arquivo, extras = {}) {
     fs.stat(arquivo, (err, st) => {
       if (err) {
         const vendor = arquivo.startsWith(MODULES);
         return this.send(res, 404, { erro: 'arquivo não encontrado', dica: vendor ? 'rode "npm install" na pasta do FrotaGest' : undefined });
       }
       // a página e o service worker levam a versão dentro: ela entra na etiqueta (atualizar troca a etiqueta)
-      const comVersao = arquivo.endsWith('index.html') || arquivo.endsWith(`${path.sep}sw.js`);
+      const comVersao = arquivo.endsWith('index.html') || arquivo.endsWith('acompanhar.html') || arquivo.endsWith(`${path.sep}sw.js`);
       const etag = `"${st.size.toString(16)}-${Math.floor(st.mtimeMs).toString(16)}${comVersao ? `-${this.versao}` : ''}"`;
       const tipo = TIPOS[path.extname(arquivo)] || 'application/octet-stream';
-      const cache = { 'Cache-Control': 'no-cache', ETag: etag };
+      const cache = { 'Cache-Control': 'no-cache', ETag: etag, ...extras };
       if (req.headers['if-none-match'] === etag) {
         res.writeHead(304, this.cabecalhos(cache));
         res.end();

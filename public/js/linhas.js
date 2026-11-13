@@ -365,6 +365,7 @@ PAGINAS.linhas = (() => {
           <div class="oc-cab-txt"><h2>${l ? H(nomeLinha(l)) : 'Nova linha'}</h2>
             <div class="muted" style="font-size:12.5px">${l ? (ed.editavel ? 'Mudanças nos pontos e horários valem para as viagens de hoje que ainda não começaram.' : 'Só para consulta.') : 'Marque os pontos no mapa, na ordem, e informe os horários de partida.'}</div></div>
           <div class="oc-acoes">
+            ${l && l.ativo && podeTela('acompanhamento', 'incluir') ? `<button class="btn" type="button" data-link-linha>${ico('share', 'i-sm')} Link para passageiros</button>` : ''}
             ${l && pode('excluir') && l.editavel ? `<button class="btn btn-ghost" type="button" data-excluir-linha title="Excluir linha" aria-label="Excluir linha">${ico('trash', 'i-sm')}</button>` : ''}
             ${ed.editavel ? `<a class="btn" href="#/linhas?aba=linhas">Cancelar</a><button class="btn btn-primary" type="button" data-salvar-linha>${ico('check', 'i-sm')} Salvar linha</button>` : ''}
           </div>
@@ -598,6 +599,7 @@ PAGINAS.linhas = (() => {
       return;
     }
     if (t.closest('[data-salvar-linha]')) { salvar(); return; }
+    if (t.closest('[data-link-linha]')) { novoLinkAcompanhamento({ tipo: 'linha', linhaId: ed.id }); return; }
     if (t.closest('[data-excluir-linha]')) excluir();
   }
 

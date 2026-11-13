@@ -15,7 +15,8 @@ const WS_PROTO = location.protocol === 'https:' ? 'wss' : 'ws';
    ico('dots-vertical') ico('photo') ico('upload') ico('bell-off') ico('device-mobile') ico('device-desktop')
    ico('tool') ico('file-certificate') ico('list-check') ico('receipt') ico('circle-check') ico('user') ico('clock-exclamation')
    ico('file-alert') ico('paperclip') ico('video') ico('photo') ico('progress') ico('file-type-pdf') ico('list-details') ico('message-plus') ico('eye') ico('loader-2')
-   ico('calendar-time') ico('route') ico('route-2') ico('bus') ico('ban') ico('circle-check') ico('chevron-down') ico('chevron-right') */
+   ico('calendar-time') ico('route') ico('route-2') ico('bus') ico('ban') ico('circle-check') ico('chevron-down') ico('chevron-right')
+   ico('share') ico('link') ico('link-off') ico('copy') ico('brand-whatsapp') ico('external-link') */
 
 /** Estado do painel. */
 const S = {
@@ -383,6 +384,7 @@ const NAV = [
       { id: 'alertas', nome: 'Alertas', ico: 'bell-ringing', badge: 'nav-alertas' },
       { id: 'ocorrencias', nome: 'Ocorrências', ico: 'file-alert' },
       { id: 'linhas', nome: 'Linhas e horários', ico: 'route-2' },
+      { id: 'acompanhamento', nome: 'Links de acompanhamento', ico: 'share' },
       { id: 'historico', nome: 'Histórico', ico: 'route' },
       { id: 'relatorios', nome: 'Relatórios', ico: 'file-analytics' },
       { id: 'gravacoes', nome: 'Gravações', ico: 'video' },

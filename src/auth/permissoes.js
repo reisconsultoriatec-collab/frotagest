@@ -46,6 +46,10 @@ const TELAS = [
     ver: 'Ver as viagens do dia (no horário, atrasada, fora da rota) e as linhas cadastradas',
     incluir: 'Cadastrar linhas (pontos, horários e percurso)', alterar: 'Editar linhas, trocar o veículo de uma viagem e cancelar viagens',
     excluir: 'Excluir linhas que ainda não rodaram' } },
+  { id: 'acompanhamento', grupo: 'Operação', nome: 'Links de acompanhamento', acoes: {
+    ver: 'Ver os links enviados (para quem, até quando, quantos acessos)',
+    incluir: 'Criar link público da posição de um veículo ou das viagens de uma linha (para clientes e passageiros)',
+    excluir: 'Cancelar links' } },
   { id: 'historico', grupo: 'Operação', nome: 'Histórico', acoes: { ver: 'Ver o trajeto percorrido pelos veículos' } },
   { id: 'relatorios', grupo: 'Operação', nome: 'Relatórios', acoes: { ver: 'Gerar relatórios na tela, em Excel e em PDF' } },
   { id: 'gravacoes', grupo: 'Operação', nome: 'Gravações', acoes: { ver: 'Buscar e assistir as gravações do DVR', incluir: 'Baixar trechos das gravações (MP4)' } },

@@ -3,7 +3,8 @@
  * Nunca guarda dados: nada de /api, tempo real, vídeo ou downloads passa por aqui.
  * Sem internet, mostra um aviso em vez de uma tela quebrada.
  * Avisos no celular: recebe o alerta do servidor (Web Push, criptografado) e mostra a notificação,
- * mesmo com o painel fechado; o toque abre o FrotaGest na tela dos alertas. Reis Tecnologia */
+ * mesmo com o painel fechado; o toque abre o FrotaGest na tela dos alertas. Também o aviso "está chegando"
+ * da página pública de acompanhamento (/a/<código>): o toque abre a própria página. Reis Tecnologia */
 'use strict';
 
 const VERSAO = 'frotagest-__VERSAO__';
@@ -60,7 +61,14 @@ self.addEventListener('notificationclick', (ev) => {
   const url = new URL((ev.notification.data && ev.notification.data.url) || '/', self.location.origin).href;
   ev.waitUntil((async () => {
     const janelas = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-    const aberta = janelas.find((c) => new URL(c.url).origin === self.location.origin);
+    // aviso de um link de acompanhamento ("está chegando"): abre ou traz a própria página do link
+    if (new URL(url).pathname.startsWith('/a/')) {
+      const mesma = janelas.find((c) => new URL(c.url).pathname === new URL(url).pathname);
+      if (mesma) { await mesma.focus().catch(() => {}); return; }
+      await self.clients.openWindow(url);
+      return;
+    }
+    const aberta = janelas.find((c) => new URL(c.url).origin === self.location.origin && !new URL(c.url).pathname.startsWith('/a/'));
     if (aberta) {
       await aberta.focus().catch(() => {});
       aberta.postMessage({ tipo: 'abrir', url });

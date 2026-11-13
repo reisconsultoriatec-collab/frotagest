@@ -54,6 +54,8 @@ const { Ocorrencias } = require('./src/servicos/ocorrencias');
 const apiOcorrencias = require('./src/web/api-ocorrencias');
 const { Linhas } = require('./src/servicos/linhas');
 const apiLinhas = require('./src/web/api-linhas');
+const { Acompanhamento } = require('./src/servicos/acompanhamento');
+const apiAcompanhamento = require('./src/web/api-acompanhamento');
 const { definirFuso, gerarCodigo } = require('./src/util/comum');
 const { version } = require('./package.json');
 
@@ -231,6 +233,8 @@ async function main() {
   const linhas = new Linhas({ banco, frota, historico, log: (level, text) => log(level, text) });
   await linhas.iniciar();
   srv.linhas = linhas;
+  srv.acompanhamento = new Acompanhamento({ banco, frota, monitor, linhas, avisos, log: (level, text) => log(level, text) });
+  await srv.acompanhamento.iniciar();
   apiOperacao.registrar(srv);
   apiConta.registrar(srv);
   apiCadastros.registrar(srv);
@@ -247,6 +251,7 @@ async function main() {
   apiManutencao.registrar(srv);
   apiOcorrencias.registrar(srv);
   apiLinhas.registrar(srv);
+  apiAcompanhamento.registrar(srv);
   apiDoisFatores.registrar(srv);
   srv.onLog = (e) => log(e.level, e.text, { source: 'painel' });
 

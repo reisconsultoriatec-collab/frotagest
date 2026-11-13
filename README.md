@@ -65,6 +65,7 @@ A tabela acima é o **padrão** de cada perfil. Em **Controle › Controle de ac
 | `ocorrencias`, `ocorrencia_eventos`, `ocorrencia_anexos` | Ocorrências (número por empresa e ano), o andamento e a lista das provas com o SHA-256 de cada arquivo. Os arquivos ficam em disco, em `data/ocorrencias/<id>/` | até excluir a ocorrência |
 | `linhas`, `linha_pontos`, `linha_partidas` | Linhas (pontos na ordem com o tempo previsto, percurso, tolerâncias, avisos) e os horários de partida (dias da semana e veículo da escala) | sempre |
 | `viagens`, `viagem_pontos` | Viagens de cada dia (uma por partida): situação, saída e chegada reais, a hora em cada ponto e a diferença para o horário, fora da rota | sempre |
+| `links_acompanhamento`, `links_avisos` | Links públicos de acompanhamento (veículo ou linha, para quem, validade, acessos) e os avisos "está chegando" pedidos na página (ponto escolhido e o endereço de push do navegador) | até 30 dias depois de vencer ou ser cancelado |
 | `fotos` | Fotos das câmeras: veículo, câmera, hora, posição e quem pediu (o JPEG fica em `data/fotos`) | 30 dias (configurável) |
 | `push_inscricoes`, `usuarios.push_nivel` | Avisos no celular: os aparelhos de cada pessoa (endereço do serviço de push e as chaves públicas do aparelho) e quais alertas ela quer | até a pessoa tirar o aparelho ou sair |
 | `codigos_recuperacao`, `sessoes_2fa` | Verificação em duas etapas: códigos de recuperação (só o resumo SHA-256) e os logins que já passaram pela segunda etapa | até zerar / 90 dias |
@@ -258,6 +259,17 @@ Em **Operação › Linhas e horários**. Sem linha cadastrada nada muda no sist
 - **Relatório "Cumprimento das viagens":** cada viagem com a saída, a chegada, as diferenças, os pontos, o maior atraso e o tempo fora da rota, em Excel e PDF.
 - Mudar a linha vale para as viagens de hoje que ainda não começaram (a troca de veículo feita no dia continua). Linha que já rodou não se exclui: desligue.
 - Controle de acesso: tela **Linhas e horários** (Operação). Ver = quadro do dia, linhas e o relatório; Incluir = cadastrar linhas; Alterar = editar, trocar o veículo e cancelar viagens; Excluir = excluir linhas que não rodaram. Padrão: administrador tudo; operador e visualizador só ver. Quem só enxerga alguns grupos vê as linhas da empresa toda e as dos seus grupos, e só mexe nas dos seus grupos.
+
+## 3.16 Links de acompanhamento e aviso "está chegando" (opcional)
+
+Em **Operação › Links de acompanhamento** (ou **Compartilhar localização** no painel do veículo, no Monitoramento, e **Link para passageiros** na linha). Um endereço do tipo `https://frotagest.../a/<código>` que abre **sem login**, no celular ou no computador:
+
+- **Link de veículo:** só a posição ao vivo daquele veículo (e a velocidade), por um prazo de 1 hora a 7 dias. Para o cliente do fretamento, uma viagem avulsa, uma entrega.
+- **Link de linha:** as viagens da linha **enquanto estão rodando** (fora delas o veículo não aparece), com o percurso, os pontos e a **hora estimada em cada ponto** (horário previsto + o atraso de agora). Vale até cancelar ou até a data escolhida (ex.: fim do semestre). Um link só para a linha toda: manda no grupo dos pais ou dos passageiros.
+- **"Está chegando":** na página da linha, a pessoa escolhe **o seu ponto** (fica guardado no celular) e toca em **Avisar quando estiver chegando** (2 a 30 min antes). O aviso chega no celular mesmo com a página fechada, uma vez por viagem. No iPhone, a página precisa ser adicionada à Tela de Início (a própria página explica).
+- A página mostra **só** isso: nada de motorista, câmeras, alertas ou outros veículos. Pode esconder o prefixo e a placa. Não aparece em buscadores.
+- Na lista: para quem é, até quando vale, quantos acessos e quantos avisos de chegada estão ligados; **copiar**, **enviar pelo WhatsApp** ou **cancelar** (para de funcionar na hora). Vencidos e cancelados saem depois de 30 dias; criar e cancelar ficam na Auditoria.
+- Controle de acesso: tela **Links de acompanhamento** (Operação). Ver = a lista; Incluir = criar links; Excluir = cancelar. Padrão: só o administrador (o operador e o visualizador não têm até você liberar).
 
 ---
 

@@ -376,6 +376,30 @@ class Linhas extends EventEmitter {
     return mudou;
   }
 
+  /* ---------- horário estimado (links de acompanhamento) ---------- */
+
+  /** Viagens da linha que ainda podem acontecer agora (em andamento primeiro, depois as previstas pelo horário). */
+  viagensDaLinha(linhaId) {
+    const l = [...this.viagens.values()].filter((v) => v.linha_id === linhaId);
+    return l.sort((a, b) => (a.situacao === b.situacao ? a.inicio - b.inicio : a.situacao === 'em_andamento' ? -1 : 1));
+  }
+
+  /**
+   * Hora estimada no ponto k da viagem: a prevista mais o atraso de agora. Antes de sair, o atraso é o
+   * quanto já passou do horário; no caminho, o do último ponto — ou mais, se o próximo ponto já devia ter
+   * sido alcançado. Devolve { passou: ms } (já passou), { pulado: true } ou { estimado: ms }.
+   */
+  estimar(v, k, agoraMs = Date.now()) {
+    const p = v.pontos[k];
+    if (!p) return null;
+    if (p.realizado !== null && p.realizado !== undefined) return { passou: p.realizado };
+    if (p.situacao === 'pulado' || k < v.idx) return { pulado: true };
+    let atraso = v.situacao === 'em_andamento' ? (v.atraso_atual_seg || 0) * 1000 : Math.max(0, agoraMs - v.inicio);
+    const prox = v.pontos[v.idx];
+    if (v.situacao === 'em_andamento' && prox && agoraMs > prox.previsto + atraso) atraso = agoraMs - prox.previsto;
+    return { estimado: Math.max(agoraMs, p.previsto + atraso) };
+  }
+
   /* ---------- gravar e relógio ---------- */
 
   resumo(v) {

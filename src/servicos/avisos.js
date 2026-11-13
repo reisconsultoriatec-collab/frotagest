@@ -271,6 +271,26 @@ class Avisos {
     return { ok: false, status, erro: texto };
   }
 
+  /**
+   * Aviso para uma inscrição que não é de um usuário do painel (ex.: quem acompanha uma linha pelo link
+   * público). Quem chama guarda a inscrição: aqui só envia e diz se ela ainda existe.
+   */
+  async enviarAvulso(insc, conteudo, { ttl = 900, urgencia = 'high' } = {}) {
+    if (!this.chaves) return { ok: false, status: 0, erro: 'sem chaves' };
+    let status = 0;
+    let texto = '';
+    try {
+      ({ status, texto } = await webpush.enviar(insc, JSON.stringify(conteudo), {
+        chaves: this.chaves, assunto: this.assunto, ttl, urgencia, jwts: this.jwts, buscar: this.buscar,
+      }));
+    } catch (e) {
+      texto = e.message;
+    }
+    if (status >= 200 && status < 300) { this.enviados++; return { ok: true, status }; }
+    this.falhas++;
+    return { ok: false, status, expirou: status === 404 || status === 410, erro: texto };
+  }
+
   /** Aviso de teste para os aparelhos da pessoa (ou um só). */
   async teste(u, id = null) {
     const destinos = [...this.inscricoes.values()].filter((i) => i.usuario_id === u.id && (!id || i.id === id));

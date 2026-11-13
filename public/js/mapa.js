@@ -565,6 +565,7 @@ PAGINAS.mapa = (() => {
     if (i.aparelhoId && podeTela('gravacoes')) acoes.push(`<button class="btn btn-sm" type="button" data-grav>${ico('video', 'i-sm')} Gravações</button>`);
     if (i.aparelhoId && i.ident && podeTela('comandos')) acoes.push(`<button class="btn btn-sm" type="button" data-cmd>${ico('terminal-2', 'i-sm')} Comandos</button>`);
     if (i.veiculoId && podeTela('ocorrencias', 'incluir')) acoes.push(`<button class="btn btn-sm" type="button" data-ocorrencia>${ico('file-alert', 'i-sm')} Ocorrência</button>`);
+    if (i.veiculoId && i.aparelhoId && podeTela('acompanhamento', 'incluir')) acoes.push(`<button class="btn btn-sm" type="button" data-compartilhar>${ico('share', 'i-sm')} Compartilhar localização</button>`);
     box.innerHTML = `
       <div class="det-head">
         <div class="info-ico">${ico(i.pendente ? 'device-cctv' : 'bus')}</div>
@@ -599,6 +600,8 @@ PAGINAS.mapa = (() => {
     if (mot) mot.onclick = () => trocarMotorista(i);
     const oc = box.querySelector('[data-ocorrencia]');
     if (oc) oc.onclick = () => novaOcorrencia({ veiculoId: i.veiculoId, empresaId: i.empresaId });
+    const comp = box.querySelector('[data-compartilhar]');
+    if (comp) comp.onclick = () => novoLinkAcompanhamento({ tipo: 'veiculo', veiculoId: i.veiculoId });
     const man = box.querySelector('[data-manut]');
     if (man) man.onclick = () => navegar('manutencao');
   }
