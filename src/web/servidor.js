@@ -226,9 +226,10 @@ class Servidor {
     try { url = new URL(req.url, 'http://local'); } catch { return this.send(res, 400, { erro: 'endereço inválido' }); }
 
     if ((req.method === 'GET' || req.method === 'HEAD') && this.estaticos[url.pathname]) return this.estatico(req, res, this.estaticos[url.pathname]);
-    // página pública de acompanhamento (link enviado ao cliente/passageiro) e o manifesto dela (instalar no celular)
+    // página pública de acompanhamento (link enviado ao cliente/passageiro) e o manifesto dela (instalar no celular).
+    // Referer: só a origem (o código do link nunca sai daqui), mas presente — os mapas (OpenStreetMap) bloqueiam pedido sem Referer.
     const pa = /^\/a\/([A-Za-z0-9_-]{16,64})(\/manifest\.webmanifest)?$/.exec(url.pathname);
-    if ((req.method === 'GET' || req.method === 'HEAD') && pa) return pa[2] ? this.manifestoAcompanhar(res, pa[1]) : this.estatico(req, res, path.join(PUBLIC, 'acompanhar.html'), { 'X-Robots-Tag': 'noindex, nofollow', 'Referrer-Policy': 'no-referrer' });
+    if ((req.method === 'GET' || req.method === 'HEAD') && pa) return pa[2] ? this.manifestoAcompanhar(res, pa[1]) : this.estatico(req, res, path.join(PUBLIC, 'acompanhar.html'), { 'X-Robots-Tag': 'noindex, nofollow', 'Referrer-Policy': 'strict-origin' });
     if (req.method === 'GET' && url.pathname.startsWith('/baixar/')) return this.onTicket(req, res, url);
     if (url.pathname.startsWith('/api/')) {
       this.onApi(req, res, url).catch((e) => {

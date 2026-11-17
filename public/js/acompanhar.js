@@ -292,12 +292,13 @@
   function criarMapa() {
     if (!window.L) return;
     mapa = L.map('ac-mapa', { zoomControl: true, attributionControl: true }).setView([-15.8, -47.9], 4);
-    const osm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>' }).addTo(mapa);
+    // o OpenStreetMap exige o Referer (só a origem do site vai junto; o código do link não)
+    const osm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, referrerPolicy: 'strict-origin', attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>' }).addTo(mapa);
     let falhas = 0;
     osm.on('tileerror', () => {
       if (++falhas !== 6) return;
       mapa.removeLayer(osm);
-      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: 'Mapa &copy; Esri' }).addTo(mapa);
+      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, referrerPolicy: 'strict-origin', attribution: 'Mapa &copy; Esri' }).addTo(mapa);
     });
     camadaLinha = L.layerGroup().addTo(mapa);
     camadaVeic = L.layerGroup().addTo(mapa);
