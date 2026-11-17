@@ -203,7 +203,8 @@ async function abrirComandos(item) {
 
   /* ---------- aparelho: reiniciar e parâmetros ---------- */
   function abaAparelho() {
-    const campo = (k, t, u, min, max, ajuda = '') => `<label class="field"><span>${H(t)} (${u})</span><input type="number" name="${k}" min="${min}" max="${max}">${ajuda ? `<small>${H(ajuda)}</small>` : ''}</label>`;
+    // fator: o aparelho guarda em segundos, a tela mostra em minutos (fator 60)
+    const campo = (k, t, u, min, max, ajuda = '', fator = 1) => `<label class="field"><span>${H(t)} (${u})</span><input type="number" name="${k}" min="${min}" max="${max}" data-fator="${fator}">${ajuda ? `<small>${H(ajuda)}</small>` : ''}</label>`;
     corpo.innerHTML = `
       <div class="cmd-bloco">
         <div class="cmd-linha"><div><b>Reiniciar o aparelho</b><p class="small muted" style="margin:2px 0 0">Resolve travamentos de câmera ou de gravação. Ele some por 1 a 3 minutos e volta sozinho.</p></div>
@@ -218,6 +219,11 @@ async function abrirComandos(item) {
         ${campo('batimento', 'Sinal de vida', 's', 10, 3600)}
         ${campo('velocidadeMax', 'Velocidade máxima no aparelho', 'km/h', 20, 250, 'O alarme de velocidade do próprio DVR (as regras de alerta do FrotaGest são à parte).')}
         ${campo('tempoExcesso', 'Tempo acima da velocidade', 's', 0, 600)}
+        <div class="form-sep">Alarmes de tempo do próprio aparelho (0 = não alarma)</div>
+        ${campo('direcaoContinuaMax', 'Direção contínua máxima', 'min', 0, 1440, 'Gera o alarme "Tempo de direção excedido (aparelho)". A regra de Direção contínua do FrotaGest é à parte.', 60)}
+        ${campo('descansoMin', 'Descanso mínimo', 'min', 0, 1440, 'Parado por este tempo, o aparelho zera a direção contínua.', 60)}
+        ${campo('direcaoDiaMax', 'Direção acumulada no dia', 'min', 0, 1440, '', 60)}
+        ${campo('paradaMax', 'Parada máxima', 'min', 0, 1440, 'Gera o alarme "Parada prolongada (aparelho)".', 60)}
         ${d.pode.master ? `
         <div class="form-sep">Só o master · cuidado: um valor errado tira o aparelho do ar</div>
         <label class="field"><span>APN do chip</span><input name="apn" maxlength="60" autocomplete="off"></label>
@@ -247,7 +253,11 @@ async function abrirComandos(item) {
       try {
         const r = await api(`/api/dvr/${encodeURIComponent(ident)}/parametros/ler`, { corpo: {} });
         lidos = r.valores;
-        for (const el of $$('input', form)) el.value = el.name === 'apnSenha' ? '' : (lidos[el.name] ?? '');
+        for (const el of $$('input', form)) {
+          const f = Number(el.dataset.fator || 1);
+          const v = lidos[el.name];
+          el.value = el.name === 'apnSenha' ? '' : v === undefined || v === null || v === '' ? '' : f > 1 ? Math.round((Number(v) / f) * 10) / 10 : v;
+        }
         form.hidden = false;
         corpo.querySelector('#cmd-par-acoes').hidden = false;
         corpo.querySelector('#cmd-par-info').textContent = `${r.itens.length} parâmetro(s) lidos agora. Mude só o que precisar.`;
@@ -262,7 +272,9 @@ async function abrirComandos(item) {
       // só vai o que mudou
       const mudou = {};
       for (const el of $$('input', form)) {
-        const v = el.value.trim();
+        let v = el.value.trim();
+        const f = Number(el.dataset.fator || 1);
+        if (f > 1 && v !== '') v = String(Math.round(Number(v) * f)); // minutos → segundos
         if (el.name === 'apnSenha' ? v : v !== '' && String(lidos[el.name] ?? '') !== v) mudou[el.name] = v;
       }
       if (!Object.keys(mudou).length) { toast('Nada mudou.'); return; }

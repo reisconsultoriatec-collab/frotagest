@@ -3,6 +3,16 @@
 
 const SITUACOES = { novo: 'Novo', em_tratamento: 'Em tratamento', tratado: 'Tratado' };
 
+/** De onde veio o alerta: o próprio DVR decide os "a…"/"v…"; as regras, cercas e linhas são do FrotaGest. */
+function origemAlerta(codigo) {
+  const c = String(codigo || '');
+  if (/^[av]\d/.test(c)) return 'alarme do aparelho';
+  if (/^r\d/.test(c)) return 'regra da empresa';
+  if (/^c\d/.test(c)) return 'cerca';
+  if (/^l\d/.test(c)) return 'linha';
+  return '';
+}
+
 PAGINAS.alertas = (() => {
   let offs = [];
   let dados = [];
@@ -86,10 +96,10 @@ PAGINAS.alertas = (() => {
     const master = S.eu.perfil === 'master';
     box.innerHTML = tabela([
       { t: 'Gravidade', v: (a) => `<span class="tag ${a.gravidade}">${H(NOMES_GRAVIDADE[a.gravidade])}</span>` },
-      { t: 'Alerta', v: (a) => `<b>${H(a.nome)}</b>${a.velocidade !== null ? `<span class="sub">${fmtNum(a.velocidade)} km/h</span>` : ''}` },
+      { t: 'Alerta', v: (a) => `<b>${H(a.nome)}</b><span class="sub">${[origemAlerta(a.codigo), a.velocidade !== null ? `${fmtNum(a.velocidade)} km/h` : ''].filter(Boolean).map(H).join(' · ')}</span>` },
       { t: 'Veículo', v: (a) => `${H(a.placa ? `${a.prefixo ? `${a.prefixo} · ` : ''}${a.placa}` : `Aparelho ${a.identificador}`)}${a.motorista ? `<span class="sub">${ico('id-badge-2', 'i-xs')} ${H(a.motorista)}</span>` : ''}${master ? `<span class="sub">${H(a.empresa || '')}</span>` : ''}` },
       { t: 'Início', cls: 'nw', v: (a) => H(fmtDataHora(a.inicio)) },
-      { t: 'Fim', cls: 'nw', v: (a) => (a.fim ? H(fmtDataHora(a.fim)) : '<span class="tag err">ativo</span>') },
+      { t: 'Fim', cls: 'nw', v: (a) => (a.fim ? `${H(fmtDataHora(a.fim))}${a.fim > a.inicio ? `<span class="sub">durou ${H(fmtDur((msDe(a.fim) - msDe(a.inicio)) / 1000))}</span>` : ''}` : `<span class="tag err">ativo</span><span class="sub">há ${H(fmtDur(Math.max(0, Date.now() - msDe(a.inicio)) / 1000))}</span>`) },
       { t: 'Situação', v: (a) => `<span class="tag ${a.situacao === 'tratado' ? 'ok' : a.situacao === 'novo' ? 'novo' : 'wait'}">${H(SITUACOES[a.situacao])}</span>${a.tratado_por_nome ? `<span class="sub">${H(a.tratado_por_nome)} · ${H(fmtCurto(a.tratado_em))}</span>` : ''}${a.tratativa ? `<span class="sub">${H(a.tratativa)}</span>` : ''}` },
       {
         t: '', cls: 'acts', v: (a) => {

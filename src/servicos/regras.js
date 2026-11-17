@@ -13,6 +13,10 @@
  * Vale a regra mais específica para cada veículo: a do veículo, senão a do grupo mais próximo, senão
  * a da empresa toda. Dentro de uma cerca com limite próprio, vale o limite da cerca.
  * O alerta fica aberto enquanto a situação durar (código "r<id da regra>") e fecha sozinho depois.
+ * O início do alerta é quando a situação COMEÇOU (ex.: parado desde 10:21; o alerta sai às 10:36 se a regra
+ * é de 15 min), então início → fim mostra o tempo todo da situação. Depois de aberto, o alerta só fecha
+ * quando a situação acaba (não volta a "menos de 15 min" por diferença entre o relógio do aparelho e o do
+ * servidor). O tempo que passa entre uma posição e outra é contado pelo relógio do aparelho.
  * Reis Tecnologia
  */
 const { distM, dentroDoHorario } = require('./geo');
@@ -122,7 +126,19 @@ class Regras {
       st.ign = Boolean(e.ignicao);
       st.contato = paraMs(e.ultimo_contato) || t;
       st.recebido = t;
+      st.tRecebido = t;
       if (st.vel <= PARADO_KMH) st.parada = { desde: t, lat: st.lat, lng: st.lng };
+      // servidor reiniciado (atualização) com alerta de regra aberto: a situação continua de onde estava
+      const abertos = this.historico.abertos.get(apId);
+      for (const [c, entry] of abertos || []) {
+        const m = RE_CODIGO.exec(c);
+        const regra = m && this.lista.get(Number(m[1]));
+        const ini = entry.inicio ? paraMs(String(entry.inicio)) : NaN;
+        if (!regra || !Number.isFinite(ini)) continue;
+        if (regra.tipo === 'parada' && st.parada) st.parada.desde = Math.min(st.parada.desde, ini);
+        if (regra.tipo === 'ociosidade' && st.parada && st.ign) st.ociosoDesde = ini;
+        if (regra.tipo === 'fora_horario' && st.ign) st.foraDesde = ini;
+      }
     }
     this.timer = setInterval(() => this.tick(), TICK_MS);
     this.timer.unref?.();
@@ -132,6 +148,16 @@ class Regras {
     clearInterval(this.timer);
   }
 
+  /**
+   * "Agora" no relógio do aparelho: a hora da última posição mais o tempo que passou desde que ela chegou.
+   * Assim a conferência periódica e as posições medem a duração com o mesmo relógio (um aparelho com o
+   * relógio 10 s atrasado não fecha e reabre o alerta a cada posição).
+   */
+  agoraDoAparelho(st) {
+    if (!st.t) return Date.now();
+    return st.t + Math.max(0, Date.now() - (st.tRecebido || Date.now()));
+  }
+
   frotaMudou() {
     this.cache = new Map();
   }
@@ -139,7 +165,7 @@ class Regras {
   estado(apId) {
     let st = this.estados.get(apId);
     if (!st) {
-      st = { t: 0, contato: 0, recebido: 0, lat: null, lng: null, vel: 0, ign: false, gps: false, online: false, exc: null, foraDesde: null, parada: null, ociosoDesde: null, dir: null };
+      st = { t: 0, tRecebido: 0, contato: 0, recebido: 0, lat: null, lng: null, vel: 0, ign: false, gps: false, online: false, exc: null, foraDesde: null, parada: null, ociosoDesde: null, dir: null };
       this.estados.set(apId, st);
     }
     return st;
@@ -221,6 +247,7 @@ class Regras {
     const vel = Math.max(0, Number(p.speed) || 0);
     const ign = Boolean(p.flags && p.flags.ignicao);
     st.t = t;
+    st.tRecebido = Date.now();
     st.vel = vel;
     st.ign = ign;
     st.gps = Boolean(r.gps);
@@ -249,13 +276,14 @@ class Regras {
     const mot = this.motoristas ? this.motoristas.atual(v.id) : null;
     const motId = mot ? mot.id : null;
     let d = st.dir;
-    if (!d || d.motorista !== motId) d = st.dir = { dirigido: 0, paradoDesde: andando ? null : t, ultimoT: null, ultimoMov: false, motorista: motId };
+    if (!d || d.motorista !== motId) d = st.dir = { dirigido: 0, desde: null, paradoDesde: andando ? null : t, ultimoT: null, ultimoMov: false, motorista: motId };
     if (d.ultimoT !== null) {
       const dt = t - d.ultimoT;
       if (dt > LACUNA_DIRECAO_MS) { if (d.paradoDesde === null) d.paradoDesde = d.ultimoT; } else if (d.ultimoMov && dt > 0) d.dirigido += dt;
     }
     if (andando) {
-      if (d.paradoDesde !== null && t - d.paradoDesde >= descansoMs) d.dirigido = 0; // descansou
+      if (d.paradoDesde !== null && t - d.paradoDesde >= descansoMs) { d.dirigido = 0; d.desde = null; } // descansou
+      if (d.desde === null) d.desde = d.ultimoMov && d.ultimoT !== null && t - d.ultimoT <= LACUNA_DIRECAO_MS ? d.ultimoT : t; // começou a dirigir
       d.paradoDesde = null;
     } else if (d.paradoDesde === null) d.paradoDesde = t;
     d.ultimoMov = andando;
@@ -270,11 +298,10 @@ class Regras {
     if (!st) return;
     st.online = online;
     if (online) st.contato = Date.now();
-    this.avaliar(info, st, Date.now(), true, 'conexao');
+    this.avaliar(info, st, this.agoraDoAparelho(st), true, 'conexao');
   }
 
   tick() {
-    const agora = Date.now();
     for (const [apId, st] of this.estados) {
       const ap = this.frota.aparelhos.get(apId);
       const info = ap ? this.frota.info(ap.identificador) : null;
@@ -285,7 +312,7 @@ class Regras {
       const dev = this.gateway && this.gateway.devices.get(ap.identificador);
       st.online = Boolean(dev && dev.online);
       if (st.online && dev.lastSeen) st.contato = Math.max(st.contato, dev.lastSeen);
-      try { this.avaliar(info, st, Math.max(agora, st.t), true, 'tick'); } catch (e) { this.log('erro', `Regras de alerta: ${e.message}`); }
+      try { this.avaliar(info, st, this.agoraDoAparelho(st), true, 'tick'); } catch (e) { this.log('erro', `Regras de alerta: ${e.message}`); }
     }
   }
 
@@ -299,6 +326,12 @@ class Regras {
     const fins = new Set(dentro.map((c) => c.finalidade));
     const abertos = this.historico.abertos.get(apId);
     const aberto = (codigo) => Boolean(abertos && abertos.has(codigo));
+    // o alerta aberto é desta mesma situação (começou na mesma hora)? Então continua aberto até ela acabar,
+    // mesmo que a conta "agora − início" dê um pouco menos que a regra (relógio do aparelho atrasado)
+    const mesma = (codigo, desde) => {
+      const e = codigo && abertos && abertos.get(codigo);
+      return Boolean(e) && String(e.inicio) === formatar(Math.min(desde, Date.now()));
+    };
     const semPosicao = !st.online || Date.now() - st.recebido > SEM_POSICAO_MS;
 
     for (const tipo of Object.keys(TIPOS)) {
@@ -315,8 +348,8 @@ class Regras {
           if (st.vel > r.limite) {
             if (!st.exc || st.exc.regra !== r.id) st.exc = { regra: r.id, desde: st.t, max: st.vel };
             st.exc.max = Math.max(st.exc.max, st.vel);
-            cond = st.t - st.exc.desde >= r.tempoSeg * 1000;
-            quando = st.t;
+            cond = mesma(codigo, st.exc.desde) || st.t - st.exc.desde >= r.tempoSeg * 1000;
+            quando = st.exc.desde; // passou do limite aqui
           } else {
             st.exc = null;
           }
@@ -330,11 +363,12 @@ class Regras {
           nome = `Excesso de velocidade${c ? ` em ${c.nome}` : ''} (limite ${r.limite} km/h)`;
         }
       } else if (tipo === 'fora_horario') {
-        const emUso = st.online !== false && (st.ign || st.vel >= ANDANDO_KMH) && !(origem !== 'posicao' && semPosicao);
+        // em uso: ligado ou andando; sem posição há 5 min, deixou de estar (a queda rápida do 4G não conta)
+        const emUso = (st.ign || st.vel >= ANDANDO_KMH) && !(origem !== 'posicao' && Date.now() - st.recebido > SEM_POSICAO_MS);
         if (r && emUso && !permitido(r, agoraMs)) {
           st.foraDesde = st.foraDesde ?? agoraMs;
-          cond = agoraMs - st.foraDesde >= r.tempoSeg * 1000;
-          quando = st.foraDesde + r.tempoSeg * 1000;
+          cond = mesma(codigo, st.foraDesde) || agoraMs - st.foraDesde >= r.tempoSeg * 1000;
+          quando = st.foraDesde; // começou a usar aqui
         } else {
           st.foraDesde = null;
         }
@@ -342,8 +376,8 @@ class Regras {
       } else if (tipo === 'parada') {
         if (r && st.parada && !(r.ignorarGaragem && fins.has('garagem')) && !(r.ignorarPonto && fins.has('ponto'))) {
           const dur = agoraMs - st.parada.desde;
-          cond = dur >= r.tempoSeg * 1000;
-          quando = st.parada.desde + r.tempoSeg * 1000;
+          cond = mesma(codigo, st.parada.desde) || dur >= r.tempoSeg * 1000;
+          quando = st.parada.desde; // parou aqui
           // aparelho sem contato há muito tempo (retirado, quebrado): não abre parada nova
           if (cond && !aberto(codigo) && Date.now() - st.contato > PARADA_SEM_CONTATO_MS) cond = false;
         }
@@ -352,10 +386,12 @@ class Regras {
           nome = `Parado${onde} há mais de ${fmtTempo(r.tempoSeg)}`;
         }
       } else if (tipo === 'ociosidade') {
-        if (semPosicao && origem !== 'posicao') st.ociosoDesde = null;
+        // sem posição há 5 min (desligou o aparelho junto com o motor): acabou. Só "offline" não basta: o 4G
+        // cai e volta, e o alerta não pode fechar e reabrir por isso.
+        if (origem !== 'posicao' && Date.now() - st.recebido > SEM_POSICAO_MS) st.ociosoDesde = null;
         if (r && st.ociosoDesde !== null && !(r.ignorarGaragem && fins.has('garagem')) && !(r.ignorarPonto && fins.has('ponto'))) {
-          cond = agoraMs - st.ociosoDesde >= r.tempoSeg * 1000;
-          quando = st.ociosoDesde + r.tempoSeg * 1000;
+          cond = mesma(codigo, st.ociosoDesde) || agoraMs - st.ociosoDesde >= r.tempoSeg * 1000;
+          quando = st.ociosoDesde; // ficou parado com o motor ligado aqui
         }
         if (r) nome = `Motor ligado parado há mais de ${fmtTempo(r.tempoSeg)}`;
       } else if (tipo === 'direcao_continua') {
@@ -364,9 +400,9 @@ class Regras {
           // sem posição há um tempo (desligou, perdeu sinal): conta como parado desde a última
           if (d.paradoDesde === null && d.ultimoT !== null && Date.now() - st.recebido > SEM_POSICAO_MS) d.paradoDesde = d.ultimoT;
           const descansou = d.paradoDesde !== null && agoraMs - d.paradoDesde >= r.descansoSeg * 1000;
-          if (descansou) d.dirigido = 0;
+          if (descansou) { d.dirigido = 0; d.desde = null; }
           cond = !descansou && d.dirigido >= r.tempoSeg * 1000;
-          quando = Math.min(agoraMs, d.ultimoT || agoraMs);
+          quando = d.desde ?? Math.min(agoraMs, d.ultimoT || agoraMs); // começou a dirigir aqui
         }
         if (r) {
           const mot = this.motoristas ? this.motoristas.atual(v.id) : null;
@@ -376,7 +412,7 @@ class Regras {
         const silencio = Date.now() - st.contato;
         if (r && st.contato && (!r.soLigado || st.ign) && silencio >= r.tempoSeg * 1000) {
           cond = true;
-          quando = st.contato + r.tempoSeg * 1000;
+          quando = st.contato; // último contato
           // calado há mais de 1 dia (aparelho retirado, veículo parado na oficina): fica para a Saúde dos aparelhos
           if (!aberto(codigo) && silencio > PARADA_SEM_CONTATO_MS) cond = false;
         }
@@ -391,6 +427,8 @@ class Regras {
           const regra = this.lista.get(Number(m[1]));
           if (regra && regra.tipo !== tipo) continue;
           if (regra && c === codigo && cond) continue;
+          // a situação continua e agora vale outra regra do mesmo tipo: o mesmo alerta passa a ser dela
+          if (regra && cond && codigo && c !== codigo && !aberto(codigo) && this.historico.trocarCodigoExterno(info, c, codigo, nome, r.gravidade)) continue;
           this.fechar(info, c, regra, st);
         }
       }

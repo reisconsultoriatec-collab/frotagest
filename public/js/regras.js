@@ -83,12 +83,78 @@ PAGINAS.regras = (() => {
           </div>
         </section>
         <div class="rg-grade" id="rg-grade"><p class="hint">Carregando…</p></div>
+        <section class="card rg-ap" id="rg-ap"></section>
       </div>`;
     $('#rg-grade').addEventListener('click', clique);
     $('#rg-grade').addEventListener('change', ligarDesligar);
+    $('#rg-ap').addEventListener('change', mudarAlarme);
     carregar();
-    offs.push(on('empresa', carregar));
+    carregarAlarmes();
+    offs.push(on('empresa', () => { carregar(); carregarAlarmes(); }));
     offs.push(on('regras', carregar));
+  }
+
+  /* ---------- alarmes do próprio aparelho (DVR) ---------- */
+
+  let alarmes = null;
+
+  async function carregarAlarmes() {
+    const box = $('#rg-ap');
+    if (!box) return;
+    try {
+      alarmes = await api(`/api/alarmes-aparelho${S.empresa ? `?${qs({ empresa: S.empresa })}` : ''}`);
+      desenharAlarmes();
+    } catch (e) {
+      alarmes = null;
+      box.innerHTML = `${cabAlarmes()}<p class="rg-vazio">${H(e.message)}</p>`;
+    }
+  }
+
+  const cabAlarmes = () => `
+    <header class="rg-head">
+      <div class="rg-ico">${ico('device-cctv')}</div>
+      <div class="rg-head-txt"><h3>Alarmes do próprio aparelho (DVR)</h3>
+        <p>Estes não vêm das regras acima: o DVR decide sozinho, pelos parâmetros gravados nele (em <b>Comandos › Aparelho › Parâmetros</b>: velocidade, direção contínua, parada máxima) e pela câmera do motorista. Desligue os que não interessam: param de virar alerta e aviso no celular.</p></div>
+    </header>`;
+
+  function desenharAlarmes() {
+    const box = $('#rg-ap');
+    if (!box || !alarmes) return;
+    const pode = podeTela('regras', 'alterar');
+    const vistos = alarmes.itens.filter((a) => a.alertas30d > 0);
+    const outros = alarmes.itens.filter((a) => !a.alertas30d);
+    const linha = (a) => `
+      <div class="rg-item${a.ignorado ? ' off' : ''}" data-codigo="${H(a.codigo)}">
+        <div class="rg-item-txt"><span class="rg-alvo">${H(a.nome)}</span>
+          <span class="rg-par">${a.origem === 'video' ? 'câmera / vídeo' : 'alarme do aparelho'}${a.ultimo ? ` · último ${H(fmtCurto(a.ultimo))}` : ''}</span></div>
+        <div class="rg-item-lado">
+          <span class="rg-n">${a.alertas30d ? `${fmtNum(a.alertas30d)} alerta${a.alertas30d === 1 ? '' : 's'} em 30 dias` : 'nenhum em 30 dias'}</span>
+          ${pode ? `<label class="switch" title="${a.ignorado ? 'Não vira alerta' : 'Vira alerta'}"><input type="checkbox" data-alarme ${a.ignorado ? '' : 'checked'} aria-label="Registrar ${H(a.nome)} como alerta"><span></span></label>` : `<span class="tag ${a.ignorado ? 'off' : 'ok'}">${a.ignorado ? 'desligado' : 'ligado'}</span>`}
+        </div>
+      </div>`;
+    box.innerHTML = `${cabAlarmes()}
+      <div class="rg-lista">${vistos.length ? vistos.map(linha).join('') : '<p class="rg-vazio">Nenhum alarme do aparelho nos últimos 30 dias.</p>'}</div>
+      ${outros.length ? `<details class="rg-ap-mais"><summary>Os outros ${outros.length} alarmes que o aparelho pode mandar</summary><div class="rg-lista">${outros.map(linha).join('')}</div></details>` : ''}`;
+  }
+
+  async function mudarAlarme(e) {
+    const x = e.target.closest('[data-alarme]');
+    if (!x || !alarmes) return;
+    const codigo = x.closest('[data-codigo]').dataset.codigo;
+    const item = alarmes.itens.find((a) => a.codigo === codigo);
+    item.ignorado = !x.checked;
+    x.disabled = true;
+    try {
+      await api('/api/alarmes-aparelho', { metodo: 'PUT', corpo: { empresa: alarmes.empresaId, ignorados: alarmes.itens.filter((a) => a.ignorado).map((a) => a.codigo) } });
+      toast(item.ignorado ? `"${item.nome}" não vira mais alerta.` : `"${item.nome}" volta a virar alerta.`, 'ok');
+      desenharAlarmes();
+    } catch (err) {
+      item.ignorado = !item.ignorado;
+      x.checked = !x.checked;
+      toast(err.message, 'err');
+    } finally {
+      x.disabled = false;
+    }
   }
 
   function sair() {

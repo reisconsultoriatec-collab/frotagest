@@ -18,12 +18,15 @@ const NOMES_ACAO = {
   reiniciar_aparelho: 'Reiniciou o aparelho', parametros_aparelho: 'Alterou parâmetros do aparelho', trocar_motorista: 'Trocou o motorista do veículo',
   registrar_manutencao: 'Registrou manutenção feita', renovar_documento: 'Renovou documento',
   situacao_ocorrencia: 'Mudou a situação da ocorrência', gerar_dossie: 'Gerou dossiê da ocorrência', baixar_anexo: 'Baixou prova da ocorrência',
+  trocar_veiculo_viagem: 'Trocou o veículo da viagem', cancelar_viagem: 'Cancelou viagem', criar_link: 'Criou link de acompanhamento',
+  cancelar_link: 'Cancelou link de acompanhamento', alarmes_aparelho: 'Mudou os alarmes do aparelho que viram alerta',
 };
 const NOMES_ENTIDADE = {
   empresa: 'Empresa', usuario: 'Usuário', grupo: 'Grupo', veiculo: 'Veículo', aparelho: 'Aparelho', aparelho_pendente: 'Aparelho pendente',
   perfil_protocolo: 'Perfil de protocolo', configuracoes: 'Configurações', alerta: 'Alerta', download: 'Download',
   cerca: 'Cerca', regra_alerta: 'Regra de alerta', motorista: 'Motorista',
   plano_manutencao: 'Plano de manutenção', manutencao: 'Manutenção feita', documento: 'Documento', ocorrencia: 'Ocorrência',
+  linha: 'Linha', viagem: 'Viagem', link_acompanhamento: 'Link de acompanhamento',
 };
 
 /* ---------------- comunicações ---------------- */

@@ -66,6 +66,7 @@ A tabela acima é o **padrão** de cada perfil. Em **Controle › Controle de ac
 | `linhas`, `linha_pontos`, `linha_partidas` | Linhas (pontos na ordem com o tempo previsto, percurso, tolerâncias, avisos) e os horários de partida (dias da semana e veículo da escala) | sempre |
 | `viagens`, `viagem_pontos` | Viagens de cada dia (uma por partida): situação, saída e chegada reais, a hora em cada ponto e a diferença para o horário, fora da rota | sempre |
 | `links_acompanhamento`, `links_avisos` | Links públicos de acompanhamento (veículo ou linha, para quem, validade, acessos) e os avisos "está chegando" pedidos na página (ponto escolhido e o endereço de push do navegador) | até 30 dias depois de vencer ou ser cancelado |
+| `alarmes_aparelho_ignorados` | Alarmes do próprio aparelho (DVR) que a empresa escolheu não registrar como alerta | sempre |
 | `fotos` | Fotos das câmeras: veículo, câmera, hora, posição e quem pediu (o JPEG fica em `data/fotos`) | 30 dias (configurável) |
 | `push_inscricoes`, `usuarios.push_nivel` | Avisos no celular: os aparelhos de cada pessoa (endereço do serviço de push e as chaves públicas do aparelho) e quais alertas ela quer | até a pessoa tirar o aparelho ou sair |
 | `codigos_recuperacao`, `sessoes_2fa` | Verificação em duas etapas: códigos de recuperação (só o resumo SHA-256) e os logins que já passaram pela segunda etapa | até zerar / 90 dias |
@@ -270,6 +271,18 @@ Em **Operação › Links de acompanhamento** (ou **Compartilhar localização**
 - A página mostra **só** isso: nada de motorista, câmeras, alertas ou outros veículos. Pode esconder o prefixo e a placa. Não aparece em buscadores.
 - Na lista: para quem é, até quando vale, quantos acessos e quantos avisos de chegada estão ligados; **copiar**, **enviar pelo WhatsApp** ou **cancelar** (para de funcionar na hora). Vencidos e cancelados saem depois de 30 dias; criar e cancelar ficam na Auditoria.
 - Controle de acesso: tela **Links de acompanhamento** (Operação). Ver = a lista; Incluir = criar links; Excluir = cancelar. Padrão: só o administrador (o operador e o visualizador não têm até você liberar).
+
+
+## 3.17 Revisão das regras e dos alertas
+
+- **Alertas das regras: o início é quando a situação começou.** Ex.: regra "motor ligado parado há mais de 15 min" — o veículo parou com o motor ligado às 10:21, o alerta sai às 10:36 com **início 10:21**, e o fim é quando andou ou desligou. Assim início → fim mostra o tempo todo da situação (sempre mais que o tempo da regra). Vale para velocidade, uso fora do horário, parada longa, motor ligado parado, direção contínua (início = quando começou a dirigir) e sem comunicação (início = último contato). A lista de alertas mostra **"durou X"** nos encerrados e **"há X"** nos ativos. O aviso no celular diz "desde 10:21".
+- **Sem alertas repetidos:** aberto, o alerta só fecha quando a situação acaba. Antes, um aparelho com o relógio alguns segundos atrasado, uma queda rápida do 4G ou a troca para outra regra do mesmo tipo podiam fechar e reabrir o alerta (às vezes com início = fim e outro igual logo em seguida). Agora: o tempo entre uma posição e outra é contado pelo relógio do aparelho; queda do 4G só conta depois de 5 min sem posição; se passa a valer outra regra (ex.: a do veículo no lugar da da empresa), o mesmo alerta passa a ser dela; e um alarme que fecha e volta na mesma hora reabre o mesmo alerta.
+- **De onde veio cada alerta:** a lista mostra embaixo do nome se é **regra da empresa**, **alarme do aparelho**, **cerca** ou **linha**.
+- **Alarmes do próprio aparelho (DVR):** "Parada prolongada", "Tempo de direção excedido", "Excesso de velocidade", "Fadiga" e o da câmera do motorista são decididos pelo **DVR**, pelos parâmetros gravados nele — não pelas regras do FrotaGest. Para não confundir:
+  - os que se parecem com uma regra levam **(aparelho)** no nome; "Direção anormal" passou a se chamar **Comportamento do motorista (câmera)** e diz o que a câmera viu (fadiga, uso do celular, fumando), quando o aparelho manda;
+  - em **Regras de alerta › Alarmes do próprio aparelho (DVR)**, a empresa desliga os que não interessam (param de virar alerta e aviso; a posição continua guardando o alarme). A lista mostra quantos vieram nos últimos 30 dias;
+  - em **Comandos › Aparelho › Parâmetros**, dá para ler e gravar no DVR os tempos desses alarmes: direção contínua máxima, descanso mínimo, direção acumulada no dia e parada máxima (em minutos; 0 = o aparelho não alarma).
+- Posição atrasada (lote guardado em área sem sinal) não fecha nem abre mais alarme do aparelho fora de ordem.
 
 ---
 

@@ -151,8 +151,10 @@ class Avisos {
   alerta(ev) {
     if (!ev || ev.acao !== 'novo' || !ev.alerta || !this.inscricoes.size) return;
     const a = ev.alerta;
+    // alarme do aparelho com início antigo = posição que chegou atrasada. Alerta de regra (r…), cerca (c…) ou
+    // linha (l…) nasce na hora: o início é quando a situação começou (ex.: parado desde 10:21) e vale o aviso.
     const t = paraMs(a.inicio);
-    if (Number.isFinite(t) && Date.now() - t > VELHO_MS) return;
+    if (!/^[crl]\d/.test(String(a.codigo || '')) && Number.isFinite(t) && Date.now() - t > VELHO_MS) return;
     const pessoas = new Set([...this.inscricoes.values()].map((i) => i.usuario_id));
     for (const id of pessoas) this.paraUsuario(id, a).catch((e) => this.log('erro', `Avisos no celular: ${e.message}`));
   }
@@ -212,8 +214,8 @@ class Avisos {
     if (l.length === 1) {
       const vel = Number(a.velocidade) > 0 ? ` · ${Math.round(Number(a.velocidade))} km/h` : '';
       return {
-        t: a.nome, b: `${emp(a)}${this.rotulo(a)}${a.motorista ? ` · ${a.motorista}` : ''} · ${String(a.inicio || formatar()).slice(11, 16)}${vel}`,
-        tag: `fg-a${a.id}`, g: a.gravidade, u: '/#/alertas', em: paraMs(a.inicio) || Date.now(),
+        t: a.nome, b: `${emp(a)}${this.rotulo(a)}${a.motorista ? ` · ${a.motorista}` : ''} · ${/^r\d/.test(String(a.codigo || '')) ? 'desde ' : ''}${String(a.inicio || formatar()).slice(11, 16)}${vel}`,
+        tag: `fg-a${a.id}`, g: a.gravidade, u: '/#/alertas', em: /^r\d/.test(String(a.codigo || '')) ? Date.now() : paraMs(a.inicio) || Date.now(),
       };
     }
     const altas = l.filter((x) => x.gravidade === 'alta').length;

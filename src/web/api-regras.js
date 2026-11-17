@@ -7,6 +7,15 @@
 const { HttpErro, formatar, validar: V } = require('../util/comum');
 const { empresaAlvo } = require('../auth/acesso');
 const { TIPOS } = require('../servicos/regras');
+const J = require('../protocolo/jt808');
+
+/** Alarmes que o próprio DVR decide (bits do JT/T 808 e do alarme de vídeo do JT/T 1078). */
+const ALARMES_APARELHO = [
+  ...J.ALARM_BITS.map((nome, bit) => (nome ? { codigo: `a${bit}`, nome, origem: 'aparelho' } : null)).filter(Boolean),
+  ...J.VIDEO_ALARM_BITS.map((nome, bit) => ({ codigo: `v${bit}`, nome, origem: 'video' })),
+];
+const CODIGOS_APARELHO = new Set(ALARMES_APARELHO.map((a) => a.codigo));
+const CODIGOS_ORDEM = (x) => ALARMES_APARELHO.findIndex((a) => a.codigo === x.codigo);
 
 const MAX_POR_EMPRESA = 200;
 const COLUNAS = ['empresa_id', 'tipo', 'grupo_id', 'veiculo_id', 'cerca_id', 'limite_kmh', 'tempo_seg', 'dias', 'horario_inicio', 'horario_fim',
@@ -197,6 +206,55 @@ function registrar(srv) {
     return { ok: true };
   }, { acesso: 'regras.alterar' });
 
+  /* ---------- alarmes do próprio aparelho: quais viram alerta ---------- */
+
+  function empresaDosAlarmes(u, q) {
+    const id = empresaAlvo(u, q ? V.id(q, 'a empresa', false) : null);
+    if (id) return id;
+    const ativas = [...frota.empresas.values()].filter((e) => e.ativo !== 0);
+    if (ativas.length === 1) return ativas[0].id;
+    throw new HttpErro(400, 'Escolha a empresa no topo da tela.');
+  }
+
+  srv.rota('GET', '/api/alarmes-aparelho', async ({ u, query }) => {
+    const emp = empresaDosAlarmes(u, query.empresa);
+    const desde = formatar(Date.now() - 30 * 86400000);
+    const [ign, cont] = await Promise.all([
+      banco.query('SELECT codigo FROM alarmes_aparelho_ignorados WHERE empresa_id = ?', [emp]),
+      banco.query("SELECT codigo, COUNT(*) AS n, MAX(inicio) AS ultimo FROM alertas WHERE empresa_id = ? AND inicio >= ? AND (codigo LIKE 'a%' OR codigo LIKE 'v%') GROUP BY codigo", [emp, desde]),
+    ]);
+    const ignorados = new Set(ign.map((x) => x.codigo));
+    const porCodigo = new Map(cont.map((x) => [x.codigo, x]));
+    const itens = ALARMES_APARELHO.map((a) => {
+      const c = porCodigo.get(a.codigo);
+      return { ...a, ignorado: ignorados.has(a.codigo), alertas30d: c ? Number(c.n) : 0, ultimo: c ? c.ultimo : null };
+    }).sort((a, b) => b.alertas30d - a.alertas30d || CODIGOS_ORDEM(a) - CODIGOS_ORDEM(b));
+    return { empresaId: emp, empresa: (frota.empresas.get(emp) || {}).nome || '', itens };
+  }, { acesso: 'regras.ver' });
+
+  srv.rota('PUT', '/api/alarmes-aparelho', async ({ u, body, ip }) => {
+    const emp = empresaDosAlarmes(u, body.empresa);
+    if (!Array.isArray(body.ignorados)) throw new HttpErro(400, 'Lista inválida.');
+    const lista = [...new Set(body.ignorados.map(String))];
+    if (lista.some((c) => !CODIGOS_APARELHO.has(c))) throw new HttpErro(400, 'Alarme desconhecido.');
+    const antes = new Set((await banco.query('SELECT codigo FROM alarmes_aparelho_ignorados WHERE empresa_id = ?', [emp])).map((x) => x.codigo));
+    await banco.transacao(async (c) => {
+      await c.query('DELETE FROM alarmes_aparelho_ignorados WHERE empresa_id = ?', [emp]);
+      if (lista.length) await c.query('INSERT INTO alarmes_aparelho_ignorados (empresa_id, codigo, criado_por, criado_em) VALUES ?', [lista.map((x) => [emp, x, u.id, formatar(Date.now())])]);
+    });
+    await srv.historico.carregarIgnorados();
+    const nome = (c) => (ALARMES_APARELHO.find((a) => a.codigo === c) || {}).nome || c;
+    const desl = lista.filter((c) => !antes.has(c)).map(nome);
+    const lig = [...antes].filter((c) => !lista.includes(c)).map(nome);
+    if (desl.length || lig.length) {
+      await auditoria.registrar(u, 'alarmes_aparelho', {
+        entidade: 'empresa', entidadeId: emp, ip, empresaId: emp,
+        descricao: [desl.length ? `Não registrar: ${desl.join(', ')}` : '', lig.length ? `Voltar a registrar: ${lig.join(', ')}` : ''].filter(Boolean).join(' · ').slice(0, 500),
+      });
+    }
+    return { ok: true, ignorados: lista.length };
+  }, { acesso: 'regras.alterar' });
+
   srv.rota('DELETE', '/api/regras/:id', async ({ u, params, ip }) => {
     const id = V.id(params.id);
     const atual = await banco.um('SELECT * FROM regras_alerta WHERE id = ?', [id]);
@@ -209,4 +267,4 @@ function registrar(srv) {
   }, { acesso: 'regras.excluir' });
 }
 
-module.exports = { registrar };
+module.exports = { registrar, ALARMES_APARELHO };

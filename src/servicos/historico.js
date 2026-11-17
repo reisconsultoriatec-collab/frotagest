@@ -25,9 +25,14 @@ function gravidade(codigo) {
   return 'media';
 }
 
-function nomeAlarme(codigo) {
+function nomeAlarme(codigo, p = null) {
   const bit = Number(codigo.slice(1));
-  if (codigo[0] === 'v') return J.VIDEO_ALARM_BITS[bit] || `Alarme de vídeo (bit ${bit})`;
+  if (codigo[0] === 'v') {
+    // comportamento do motorista: a câmera diz o quê (fadiga, celular, cigarro) no 0x18
+    const c = p && p.extras && p.extras.comportamento;
+    if (bit === 5 && c && c.tipos.length) return `${J.VIDEO_ALARM_BITS[5]}: ${c.tipos.join(', ')}`;
+    return J.VIDEO_ALARM_BITS[bit] || `Alarme de vídeo (bit ${bit})`;
+  }
   return J.ALARM_BITS[bit] || `Alarme (bit ${bit})`;
 }
 
@@ -47,7 +52,8 @@ class Historico extends EventEmitter {
     this.estados = new Map(); // aparelho_id → último estado
     this.sujos = new Set();
     this.abertos = new Map(); // aparelho_id → Map(codigo → { id, promessa, nome, inicio })
-    this.recentes = new Map(); // `${aparelho}:${codigo}` → { id, em } (encerrados há pouco)
+    this.recentes = new Map(); // `${aparelho}:${codigo}` → { feito, inicio, em } (encerrados há pouco)
+    this.ignorados = new Map(); // empresa_id → Set(código do alarme do aparelho que não vira alerta)
     this.pontuais = new Map(); // `${aparelho}:${codigo}` → quando (alertas de um momento só, das cercas)
     this.comandos = new Map(); // `${ident}:${serial}` → { promessa, em }
     this.motoristaDe = () => null; // quem está no veículo agora (o serviço de motoristas preenche)
@@ -61,6 +67,7 @@ class Historico extends EventEmitter {
 
   async iniciar() {
     await this.carregarAbertos();
+    await this.carregarIgnorados();
     const est = await this.banco.query('SELECT * FROM aparelhos_estado');
     for (const e of est) this.estados.set(e.aparelho_id, { ...e, online: 0 });
     this.timers.push(setInterval(() => this.gravar(), 1000));
@@ -84,6 +91,17 @@ class Historico extends EventEmitter {
         id: r.id, promessa: Promise.resolve(r.id), nome: r.nome, inicio: r.inicio, gravidade: r.gravidade, externo: externo(r.codigo),
       });
     }
+  }
+
+  /** Alarmes do aparelho que a empresa escolheu não registrar como alerta. */
+  async carregarIgnorados() {
+    const rows = await this.banco.query('SELECT empresa_id, codigo FROM alarmes_aparelho_ignorados');
+    const m = new Map();
+    for (const r of rows) {
+      if (!m.has(r.empresa_id)) m.set(r.empresa_id, new Set());
+      m.get(r.empresa_id).add(r.codigo);
+    }
+    this.ignorados = m;
   }
 
   /* ---------- posições ---------- */
@@ -112,7 +130,8 @@ class Historico extends EventEmitter {
     }
     // último estado (só avança: posições antigas de área sem sinal não voltam o mapa no tempo)
     const est = this.estado(aparelho.id);
-    if (!est.ultima_posicao_em || h.texto >= est.ultima_posicao_em) {
+    const avancou = !est.ultima_posicao_em || h.texto >= est.ultima_posicao_em;
+    if (avancou) {
       Object.assign(est, {
         ultima_posicao_em: h.texto, velocidade: vel, direcao: limita(p.direction, 0, 65535), ignicao: p.flags && p.flags.ignicao ? 1 : 0,
         gps_valido: gps ? 1 : 0,
@@ -124,7 +143,9 @@ class Historico extends EventEmitter {
     }
     est.ultimo_contato = formatar(recebidoMs);
     this.sujos.add(aparelho.id);
-    this.alarmes(info, p, h.texto);
+    // alarmes do aparelho: só pela posição mais nova (uma posição atrasada, de um lote guardado sem sinal,
+    // fecharia e reabriria o alarme fora de ordem)
+    if (avancou) this.alarmes(info, p, h.texto);
     return { dataHora: h.texto, horaAjustada: h.ajustada, gps };
   }
 
@@ -162,10 +183,12 @@ class Historico extends EventEmitter {
   alarmes(info, p, dataHora) {
     const { aparelho } = info;
     const atuais = new Set();
+    const ign = this.ignorados.get(info.empresa && info.empresa.id);
     const a = p.alarm >>> 0;
     for (let b = 0; b < 32; b++) if ((a >>> b) & 1) atuais.add(`a${b}`);
     const v = ((p.extras && p.extras.alarmeVideo) || 0) >>> 0;
     for (let b = 0; b < 32; b++) if ((v >>> b) & 1) atuais.add(`v${b}`);
+    if (ign) for (const c of [...atuais]) if (ign.has(c)) atuais.delete(c); // a empresa desligou este alarme do aparelho
     let abertos = this.abertos.get(aparelho.id);
     if (!abertos) {
       if (!atuais.size) return;
@@ -180,7 +203,7 @@ class Historico extends EventEmitter {
   /** def: { nome, gravidade } dos alertas que não são bits de alarme do DVR (cercas). */
   abrir(info, codigo, p, dataHora, abertos, def = null) {
     const { aparelho, veiculo, empresa } = info;
-    const nome = def ? def.nome : nomeAlarme(codigo);
+    const nome = def ? def.nome : nomeAlarme(codigo, p);
     const grav = def ? def.gravidade : gravidade(codigo);
     const entry = { id: null, nome, inicio: dataHora, promessa: null, gravidade: grav, externo: Boolean(def) };
     abertos.set(codigo, entry);
@@ -192,12 +215,15 @@ class Historico extends EventEmitter {
       codigo, nome, gravidade: grav, motoristaId: mot ? mot.id : null, motorista: mot ? mot.nome : null,
     };
     if (rec && Date.now() - rec.em < REABRIR_MS) {
+      // voltou logo depois de fechar: é o mesmo alerta (mesmo começo). Espera o encerramento gravar, mesmo
+      // que ainda esteja a caminho, para não nascer um alerta repetido com o mesmo início.
       this.recentes.delete(chave);
-      entry.id = rec.id;
-      entry.promessa = this.banco.query('UPDATE alertas SET fim = NULL WHERE id = ?', [rec.id]).then(() => {
-        this.emit('alerta', { acao: 'reaberto', alerta: { ...base, id: rec.id, fim: null } });
-        return rec.id;
-      });
+      entry.inicio = rec.inicio || dataHora;
+      entry.promessa = rec.feito.then((id) => this.banco.query('UPDATE alertas SET fim = NULL WHERE id = ?', [id]).then(() => {
+        entry.id = id;
+        this.emit('alerta', { acao: 'reaberto', alerta: { ...base, id, fim: null } });
+        return id;
+      }));
     } else {
       const gps = Math.abs(p.lat) > 0.0001 || Math.abs(p.lon) > 0.0001;
       const vel = Math.min(9999.9, Math.max(0, Number(p.speed) || 0));
@@ -221,14 +247,42 @@ class Historico extends EventEmitter {
   encerrar(info, codigo, entry, dataHora, abertos) {
     abertos.delete(codigo);
     const { aparelho, veiculo, empresa } = info;
-    entry.promessa.then((id) => this.banco.query('UPDATE alertas SET fim = ? WHERE id = ? AND fim IS NULL', [dataHora, id]).then(() => {
-      this.recentes.set(`${aparelho.id}:${codigo}`, { id, em: Date.now() });
-      if (this.recentes.size > 5000) this.recentes.delete(this.recentes.keys().next().value);
+    const chave = `${aparelho.id}:${codigo}`;
+    const feito = entry.promessa.then((id) => this.banco.query('UPDATE alertas SET fim = ? WHERE id = ? AND fim IS NULL', [dataHora, id]).then(() => {
       this.emit('alerta', {
         acao: 'encerrado',
         alerta: { id, empresaId: empresa.id, aparelhoId: aparelho.id, veiculoId: veiculo ? veiculo.id : null, ident: aparelho.identificador, codigo, nome: entry.nome, gravidade: entry.gravidade || gravidade(codigo), fim: dataHora },
       });
-    })).catch((e) => this.log('erro', `Falha ao encerrar alerta: ${e.message}`));
+      return id;
+    }));
+    // guardado já (não só depois de gravar): se voltar logo, reabre este mesmo alerta
+    this.recentes.set(chave, { feito, inicio: entry.inicio, em: Date.now() });
+    if (this.recentes.size > 5000) this.recentes.delete(this.recentes.keys().next().value);
+    feito.catch((e) => {
+      this.log('erro', `Falha ao encerrar alerta: ${e.message}`);
+      if (this.recentes.get(chave) && this.recentes.get(chave).feito === feito) this.recentes.delete(chave);
+    });
+  }
+
+  /**
+   * A situação continua, mas passou a valer outra regra do mesmo tipo (ex.: a do veículo no lugar da
+   * da empresa): o alerta aberto muda de código e de nome, em vez de fechar e abrir outro igual.
+   */
+  trocarCodigoExterno(info, de, para, nome, grav = null) {
+    const abertos = this.abertos.get(info.aparelho.id);
+    const entry = abertos && abertos.get(de);
+    if (!entry || abertos.has(para)) return false;
+    abertos.delete(de);
+    entry.nome = String(nome).slice(0, 80);
+    if (grav) entry.gravidade = grav;
+    abertos.set(para, entry);
+    const { aparelho, veiculo, empresa } = info;
+    entry.promessa = entry.promessa.then((id) => this.banco.query('UPDATE alertas SET codigo = ?, nome = ?, gravidade = ? WHERE id = ?', [para, entry.nome, entry.gravidade, id]).then(() => {
+      this.emit('alerta', { acao: 'atualizado', alerta: { id, empresaId: empresa.id, aparelhoId: aparelho.id, veiculoId: veiculo ? veiculo.id : null, codigo: para, nome: entry.nome, gravidade: entry.gravidade } });
+      return id;
+    }));
+    entry.promessa.catch((e) => this.log('erro', `Falha ao trocar o código do alerta: ${e.message}`));
+    return true;
   }
 
   /** Alertas ativos agora (para o mapa), por aparelho. */

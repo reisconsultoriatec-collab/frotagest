@@ -145,6 +145,11 @@ function registrar(srv) {
     num('batimento', 'Sinal de vida', 10, 3600, 's');
     num('velocidadeMax', 'Velocidade máxima no aparelho', 20, 250, 'km/h');
     num('tempoExcesso', 'Tempo acima da velocidade', 0, 600, 's');
+    // os alarmes "(aparelho)" de direção e de parada seguem estes tempos (0 = o aparelho não alarma)
+    num('direcaoContinuaMax', 'Direção contínua máxima no aparelho', 0, 86400, 's');
+    num('descansoMin', 'Descanso mínimo no aparelho', 0, 86400, 's');
+    num('direcaoDiaMax', 'Direção acumulada no dia no aparelho', 0, 86400, 's');
+    num('paradaMax', 'Parada máxima no aparelho', 0, 86400, 's');
     const sensiveis = ['apn', 'apnUsuario', 'apnSenha', 'servidor'].filter((k) => !V.vazio(body[k]));
     if (sensiveis.length) {
       if (u.perfil !== 'master') throw new HttpErro(403, 'Só o master muda o APN e o servidor do aparelho.');

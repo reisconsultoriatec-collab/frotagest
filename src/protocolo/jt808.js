@@ -75,12 +75,14 @@ const MSG_NAMES = {
 
 const RESULT_NAMES = ['sucesso', 'falha', 'mensagem com erro', 'não suportado', 'alarme confirmado'];
 
+// Alarmes que o próprio DVR decide, pelos parâmetros gravados nele (não pelas regras do FrotaGest):
+// os que se parecem com uma regra levam "(aparelho)" no nome para não confundir.
 const ALARM_BITS = [
-  'Botão de emergência', 'Excesso de velocidade', 'Fadiga ao dirigir', 'Alerta de perigo',
+  'Botão de emergência', 'Excesso de velocidade (aparelho)', 'Fadiga ao dirigir (aparelho)', 'Alerta de perigo',
   'Falha no módulo GNSS', 'Antena GNSS desconectada', 'Antena GNSS em curto', 'Tensão baixa na alimentação',
   'Alimentação principal cortada', 'Falha no display', 'Falha no módulo de voz (TTS)', 'Falha de câmera',
   'Falha no leitor de cartão do motorista', 'Pré-alerta de velocidade', 'Pré-alerta de fadiga', null,
-  null, null, 'Tempo de direção acumulado excedido', 'Parada prolongada',
+  null, null, 'Tempo de direção excedido (aparelho)', 'Parada prolongada (aparelho)',
   'Entrada/saída de área', 'Entrada/saída de rota', 'Tempo de trecho fora do previsto', 'Desvio de rota',
   'Falha no sensor de velocidade (VSS)', 'Combustível anormal', 'Furto do veículo', 'Ignição não autorizada',
   'Deslocamento não autorizado', 'Pré-alerta de colisão', 'Pré-alerta de capotamento', 'Abertura de porta não autorizada',
@@ -88,8 +90,11 @@ const ALARM_BITS = [
 
 const VIDEO_ALARM_BITS = [
   'Perda de sinal de vídeo', 'Câmera obstruída', 'Falha no armazenamento', 'Falha em outro equipamento de vídeo',
-  'Excesso de passageiros', 'Direção anormal', 'Gravação de alarme atingiu o limite de armazenamento',
+  'Excesso de passageiros', 'Comportamento do motorista (câmera)', 'Gravação de alarme atingiu o limite de armazenamento',
 ];
+
+/** 0x18 (JT/T 1078): o que a câmera do motorista viu no alarme de comportamento (bit 5 do alarme de vídeo). */
+const COMPORTAMENTOS = ['fadiga', 'uso do celular', 'fumando'];
 
 const MAX_FRAME = 64 * 1024; // nenhuma mensagem 808 legítima chega perto disso
 
@@ -415,6 +420,10 @@ function parseLocation(body) {
       case 0x15: if (len === 4) extras.canaisSemSinal = channelsFromMask(v.readUInt32BE(0)); break;
       case 0x16: if (len === 4) extras.canaisObstruidos = channelsFromMask(v.readUInt32BE(0)); break;
       case 0x17: if (len === 2) extras.falhaArmazenamento = v.readUInt16BE(0); break;
+      case 0x18: if (len >= 2) {
+        const bits = v.readUInt16BE(0);
+        extras.comportamento = { tipos: COMPORTAMENTOS.filter((_, i) => (bits >> i) & 1), grauFadiga: len >= 3 ? v[2] : null };
+      } break;
       case 0x25: if (len === 4) extras.sinaisVeiculo = v.readUInt32BE(0); break;
       case 0x2a: if (len === 2) extras.entradasIO = v.readUInt16BE(0); break;
       case 0x30: if (len === 1) extras.sinalRede = v[0]; break;
@@ -629,6 +638,10 @@ const PARAMS = {
   0x0029: { chave: 'intervaloPosicao', nome: 'Posição com o veículo ligado', tipo: 'dword', unidade: 's' },
   0x0055: { chave: 'velocidadeMax', nome: 'Velocidade máxima no aparelho', tipo: 'dword', unidade: 'km/h' },
   0x0056: { chave: 'tempoExcesso', nome: 'Tempo acima da velocidade para o aparelho alarmar', tipo: 'dword', unidade: 's' },
+  0x0057: { chave: 'direcaoContinuaMax', nome: 'Direção contínua máxima (alarme do aparelho)', tipo: 'dword', unidade: 's' },
+  0x0058: { chave: 'direcaoDiaMax', nome: 'Direção acumulada no dia (alarme do aparelho)', tipo: 'dword', unidade: 's' },
+  0x0059: { chave: 'descansoMin', nome: 'Descanso mínimo (alarme do aparelho)', tipo: 'dword', unidade: 's' },
+  0x005a: { chave: 'paradaMax', nome: 'Parada máxima (alarme do aparelho)', tipo: 'dword', unidade: 's' },
   0x0080: { chave: 'odometro', nome: 'Odômetro do aparelho', tipo: 'dword', unidade: '0,1 km' },
   0x0083: { chave: 'placa', nome: 'Placa no aparelho', tipo: 'string' },
 };
