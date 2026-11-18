@@ -6,7 +6,7 @@ const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const H = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const ico = (n, cls = '') => `<svg class="i ${cls}" aria-hidden="true"><use href="#i-${n}"/></svg>`;
 const WS_PROTO = location.protocol === 'https:' ? 'wss' : 'ws';
-/* Ícones usados por nome calculado (para o gerador do sprite): ico('lock') ico('info-circle') ico('user') ico('steering-wheel')
+/* Ícones usados por nome calculado (para o gerador do sprite): ico('sort-descending') ico('sort-ascending') ico('lock') ico('info-circle') ico('user') ico('steering-wheel')
    ico('clock') ico('gauge') ico('route') ico('map-pin') ico('wifi') ico('bus') ico('plug-connected-x') ico('alert-triangle')
    ico('user-plus') ico('user-check') ico('clock-pause') ico('mail') ico('refresh') ico('key') ico('copy')
    ico('volume-off') ico('volume') ico('sun') ico('moon') ico('antenna-bars-2') ico('camera-off') ico('device-sd-card') ico('gps') ico('plug-x') ico('wifi-off') ico('cpu') ico('wifi') ico('video') ico('check') ico('download') ico('alert-triangle') ico('bell-ringing')
@@ -46,6 +46,46 @@ function pref(nome, padrao) {
 function salvarPref(nome, valor) {
   try { localStorage.setItem(`fg:${nome}`, JSON.stringify(valor)); } catch { /* navegador sem armazenamento */ }
 }
+
+/* ---------- ordem das listas (relatórios, histórico e ocorrências) ---------- */
+
+const ORDENS_LISTA = { recentes: 'Mais recentes primeiro', antigos: 'Mais antigos primeiro' };
+/** A padrão vem de Configurações (master); cada pessoa pode trocar na tela e fica guardado neste navegador. */
+const ordemPadrao = () => (S.eu && ORDENS_LISTA[S.eu.ordemListas] ? S.eu.ordemListas : 'recentes');
+function ordemListas() {
+  const o = pref('ordemListas', null);
+  return ORDENS_LISTA[o] ? o : ordemPadrao();
+}
+function definirOrdemListas(o) {
+  if (!ORDENS_LISTA[o]) return;
+  salvarPref('ordemListas', o === ordemPadrao() ? null : o); // igual à padrão: volta a seguir a configuração
+  $$('[data-ordem-lista]').forEach(desenharBotaoOrdem);
+  emit('ordem', o);
+}
+/** Lista na ordem escolhida, a partir de uma que vem da mais antiga para a mais recente. */
+const naOrdem = (lista) => (ordemListas() === 'recentes' ? [...lista].reverse() : lista);
+function conteudoOrdem() {
+  const o = ordemListas();
+  return {
+    html: `${ico(o === 'recentes' ? 'sort-descending' : 'sort-ascending', 'i-sm')}<span>${ORDENS_LISTA[o]}</span>`,
+    dica: `Mostrando ${ORDENS_LISTA[o].toLowerCase()}. Clique para ver ${o === 'recentes' ? 'os mais antigos' : 'os mais recentes'} primeiro.`,
+  };
+}
+/** Botão que alterna a ordem (vale para todas as telas de eventos desta pessoa). */
+function botaoOrdem(extra = '') {
+  const x = conteudoOrdem();
+  return `<button class="btn btn-sm btn-ghost ordem-btn" type="button" data-ordem-lista title="${H(x.dica)}" aria-label="${H(x.dica)}"${extra}>${x.html}</button>`;
+}
+function desenharBotaoOrdem(b) {
+  const x = conteudoOrdem();
+  b.innerHTML = x.html;
+  b.title = x.dica;
+  b.setAttribute('aria-label', x.dica);
+}
+document.addEventListener('click', (e) => {
+  const b = e.target.closest && e.target.closest('[data-ordem-lista]');
+  if (b) definirOrdemListas(ordemListas() === 'recentes' ? 'antigos' : 'recentes');
+});
 
 /* ---------- datas (o servidor fala sempre no horário de Brasília) ---------- */
 

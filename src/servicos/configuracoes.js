@@ -15,6 +15,8 @@ const CHAVES = {
   sessao_inatividade_min: { padrao: '60', min: 0, max: 1440, titulo: 'Encerrar a sessão sem uso após (minutos)' },
   // perfis que precisam da verificação em duas etapas (vazio = ninguém, além de quem o master marcar no usuário)
   dois_fatores_perfis: { padrao: '', lista: ['master', 'admin', 'operador', 'visualizador'], titulo: 'Verificação em duas etapas obrigatória para' },
+  // relatórios, histórico e ocorrências: o que aparece primeiro (cada pessoa ainda pode trocar na tela)
+  ordem_listas: { padrao: 'recentes', opcoes: ['recentes', 'antigos'], titulo: 'Ordem das listas e relatórios' },
 };
 
 class Configuracoes {

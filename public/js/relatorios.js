@@ -5,14 +5,14 @@
 PAGINAS.relatorios = (() => {
   const TIPOS = [
     { id: 'resumo', nome: 'Resumo por veículo', ico: 'list-details', desc: 'Km rodados, tempo ligado, em movimento e parado, velocidades, excessos, paradas e alertas.' },
-    { id: 'velocidade', nome: 'Excessos de velocidade', ico: 'gauge', desc: 'Cada trecho acima do limite: início, fim, duração, velocidade máxima e local.' },
-    { id: 'paradas', nome: 'Paradas', ico: 'clock-pause', desc: 'Onde e por quanto tempo cada veículo ficou parado, com o motor ligado ou desligado.' },
-    { id: 'alertas', nome: 'Alertas', ico: 'bell-ringing', desc: 'Alertas do período com a gravidade, a situação e o tratamento registrado.' },
-    { id: 'garagem', nome: 'Saídas e chegadas na garagem', ico: 'building-warehouse', desc: 'A que horas cada veículo saiu e voltou, quanto tempo e quantos km ficou fora.' },
-    { id: 'cercas', nome: 'Entradas e saídas das cercas', ico: 'fence', desc: 'Cada passagem pelos pontos, terminais e áreas: entrada, saída e tempo dentro.' },
-    { id: 'jornada', nome: 'Jornada dos motoristas', ico: 'steering-wheel', desc: 'Cada jornada de cada motorista: tempo dirigindo, maior direção sem descanso, pausas e o descanso entre jornadas.' },
+    { id: 'velocidade', eventos: true, nome: 'Excessos de velocidade', ico: 'gauge', desc: 'Cada trecho acima do limite: início, fim, duração, velocidade máxima e local.' },
+    { id: 'paradas', eventos: true, nome: 'Paradas', ico: 'clock-pause', desc: 'Onde e por quanto tempo cada veículo ficou parado, com o motor ligado ou desligado.' },
+    { id: 'alertas', eventos: true, nome: 'Alertas', ico: 'bell-ringing', desc: 'Alertas do período com a gravidade, a situação e o tratamento registrado.' },
+    { id: 'garagem', eventos: true, nome: 'Saídas e chegadas na garagem', ico: 'building-warehouse', desc: 'A que horas cada veículo saiu e voltou, quanto tempo e quantos km ficou fora.' },
+    { id: 'cercas', eventos: true, nome: 'Entradas e saídas das cercas', ico: 'fence', desc: 'Cada passagem pelos pontos, terminais e áreas: entrada, saída e tempo dentro.' },
+    { id: 'jornada', eventos: true, nome: 'Jornada dos motoristas', ico: 'steering-wheel', desc: 'Cada jornada de cada motorista: tempo dirigindo, maior direção sem descanso, pausas e o descanso entre jornadas.' },
     { id: 'motoristas', nome: 'Resumo por motorista', ico: 'id-badge-2', desc: 'Km, tempo dirigindo, velocidade, excessos e alertas de cada motorista no período.' },
-    { id: 'viagens', nome: 'Cumprimento das viagens', ico: 'calendar-time', desc: 'Cada viagem das linhas: saída e chegada comparadas com o horário, pontos pulados e fora da rota.', tela: 'linhas' },
+    { id: 'viagens', eventos: true, nome: 'Cumprimento das viagens', ico: 'calendar-time', desc: 'Cada viagem das linhas: saída e chegada comparadas com o horário, pontos pulados e fora da rota.', tela: 'linhas' },
   ];
   const tipos = () => TIPOS.filter((t) => !t.tela || podeTela(t.tela));
   const DE_MOTORISTA = ['jornada', 'motoristas'];
@@ -21,6 +21,7 @@ PAGINAS.relatorios = (() => {
   let linhasFiltro = null; // linhas para o filtro do relatório de viagens
   let seq = 0;
   let offs = [];
+  let mostrado = null; // tipo do relatório que está na tela
 
   const fmtHms = (s) => {
     if (s === null || s === undefined || s === '') return '';
@@ -117,7 +118,7 @@ PAGINAS.relatorios = (() => {
         </section>
         <div class="kpis" id="rl-kpis" hidden></div>
         <section class="card" id="rl-res" hidden>
-          <div class="card-head"><h2 id="rl-titulo"></h2><span class="count" id="rl-n"></span></div>
+          <div class="card-head"><h2 id="rl-titulo"></h2><div class="card-head-dir"><span class="count" id="rl-n"></span>${botaoOrdem(' id="rl-ordem" hidden')}</div></div>
           <p class="hint rel-sub" id="rl-sub"></p>
           <div class="table-wrap tall" id="rl-tabela"></div>
           <p class="hint rel-obs" id="rl-obs"></p>
@@ -184,6 +185,7 @@ PAGINAS.relatorios = (() => {
     // a empresa escolhida no topo mudou: grupos e veículos mudam junto
     offs.push(on('empresa', () => { f.grupo = ''; f.veiculo = ''; f.cerca = ''; f.motorista = ''; f.linha = ''; S.cercas = null; motoristas = null; linhasFiltro = null; preencherLinhas(); }));
     offs.push(on('motoristas', () => { motoristas = null; preencherMotoristas(); }));
+    offs.push(on('ordem', () => { if (!$('#rl-res').hidden && mostrado === f.tipo && ehEventos()) gerar(); }));
     offs.push(on('cercas', () => carregarCercas().then(preencherCercas).catch(() => {})));
     offs.push(on('frota', () => {
       if (!$('#rl-veic')) return;
@@ -271,8 +273,11 @@ PAGINAS.relatorios = (() => {
       delete q.grupo;
       Object.assign(q, { linha: f.linha, situacao: f.sitViagem });
     }
+    if (ehEventos()) q.ordem = ordemListas(); // a tela, o Excel e o PDF saem na mesma ordem
     return `/api/relatorios/${f.tipo}?${qs(q)}`;
   }
+
+  const ehEventos = () => Boolean((TIPOS.find((t) => t.id === f.tipo) || {}).eventos);
 
   function ocupado(sim, texto) {
     for (const id of ['#rl-gerar', '#rl-xlsx', '#rl-pdf']) $(id).disabled = sim;
@@ -323,6 +328,8 @@ PAGINAS.relatorios = (() => {
       : `<tr><td class="empty" colspan="${r.colunas.length}">${H(r.vazio || 'Nenhum registro no período.')}</td></tr>`;
     const totais = r.totais && r.linhas.length ? `<tfoot><tr>${r.colunas.map((c, i) => `<td class="${cls(c)}">${celula(r.totais[i], c.tipo)}</td>`).join('')}</tr></tfoot>` : '';
     $('#rl-tabela').innerHTML = `<table class="tbl rel-tbl"><thead><tr>${r.colunas.map((c) => `<th class="${cls(c)}">${H(c.titulo)}</th>`).join('')}</tr></thead><tbody>${corpo}</tbody>${totais}</table>`;
+    $('#rl-ordem').hidden = !r.ordem;
+    mostrado = r.tipo;
     $('#rl-obs').textContent = r.observacao || '';
     $('#rl-obs').hidden = !r.observacao;
     $('#rl-res').hidden = false;

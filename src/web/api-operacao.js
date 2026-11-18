@@ -42,6 +42,7 @@ function registrar(srv) {
       empresaId: u.empresaId, empresaNome: u.empresaNome, todosGrupos: u.todosGrupos, pode: u.pode,
       acessos: u.acessos, acessoPersonalizado: Boolean(u.acessoPersonalizado),
       sessaoMin: config.numeroOuZero('sessao_inatividade_min'),
+      ordemListas: config.get('ordem_listas') || 'recentes',
       doisFatores: { ativo: u.doisFatoresAtivo, exigido: srv.doisFatores ? srv.doisFatores.exige(u) : false },
     };
   });

@@ -10,6 +10,7 @@ PAGINAS.historico = (() => {
   const pl = { pts: [], t0: 0, t1: 0, t: 0, tocando: false, quadro: 0, ultimo: null, marcador: null, feito: null, rastro: [], ate: -1, desenhado: 0, arrastando: false };
   const VELOCIDADES = [1, 5, 10, 30, 60, 120, 300];
   const f = { veiculo: '', de: '', ate: '' };
+  let offOrdem = null;
 
   function render(c, params) {
     if (params.v) f.veiculo = params.v;
@@ -46,7 +47,7 @@ PAGINAS.historico = (() => {
               </div>
             </div>
           </section>
-          <section class="card"><div class="card-head"><h2>${ico('list-details')} Posições</h2><span class="count" id="hi-n"></span></div>
+          <section class="card"><div class="card-head"><h2>${ico('list-details')} Posições</h2><div class="card-head-dir"><span class="count" id="hi-n"></span>${botaoOrdem(' id="hi-ordem"')}</div></div>
             <div class="table-wrap" style="max-height:520px" id="hi-tabela"><p class="hint">Nenhuma busca feita.</p></div></section>
         </div>
       </div>`;
@@ -86,11 +87,14 @@ PAGINAS.historico = (() => {
       }
     });
     mapa = criarMapa($('#hmap'));
+    offOrdem = on('ordem', () => { if (dados && $('#hi-tabela')) desenharTabela(); });
     if (f.veiculo) buscar();
   }
 
   function sair() {
     pausar();
+    if (offOrdem) offOrdem();
+    offOrdem = null;
     document.removeEventListener('keydown', teclas);
     removerMapa(mapa);
     mapa = null;
@@ -296,8 +300,10 @@ PAGINAS.historico = (() => {
   function desenharTabela() {
     const lista = dados.posicoes;
     $('#hi-n').textContent = lista.length ? `${fmtNum(lista.length)} posições` : '';
-    // a tabela mostra até 2.000 linhas (o CSV leva todas)
-    const mostrar = lista.length > 2000 ? lista.filter((_, i) => i % Math.ceil(lista.length / 2000) === 0) : lista;
+    // a tabela mostra até 2.000 linhas (o CSV leva todas), sempre com a primeira e a última;
+    // o mapa e a reprodução seguem o trajeto do começo ao fim, a tabela vai na ordem escolhida
+    const passo = Math.ceil(lista.length / 2000);
+    const mostrar = naOrdem(lista.length > 2000 ? lista.filter((_, i) => i % passo === 0 || i === lista.length - 1) : lista);
     const idx = new Map(lista.map((p, i) => [p, i]));
     $('#hi-tabela').innerHTML = tabela([
       { t: 'Data/hora', cls: 'nw', v: (p) => H(fmtDataHora(p.data_hora)) },
@@ -312,7 +318,7 @@ PAGINAS.historico = (() => {
     if (!dados) return;
     const it = S.itens.get(f.veiculo);
     const linhas = [['Data/hora', 'Latitude', 'Longitude', 'Velocidade (km/h)', 'Direção', 'Ignição', 'GPS válido', 'Satélites', 'Sinal 4G', 'Odômetro (km)', 'Alarmes']];
-    for (const p of dados.posicoes) linhas.push([p.data_hora, p.latitude, p.longitude, p.velocidade, p.direcao, p.ignicao ? 'sim' : 'não', p.gps_valido ? 'sim' : 'não', p.satelites, p.sinal, p.odometro, p.alarmes || p.alarmes_video ? 'sim' : '']);
+    for (const p of naOrdem(dados.posicoes)) linhas.push([p.data_hora, p.latitude, p.longitude, p.velocidade, p.direcao, p.ignicao ? 'sim' : 'não', p.gps_valido ? 'sim' : 'não', p.satelites, p.sinal, p.odometro, p.alarmes || p.alarmes_video ? 'sim' : '']);
     baixarCsv(`historico-${(it && (it.placa || it.ident)) || 'veiculo'}-${f.de.slice(0, 10)}.csv`, linhas);
   }
 

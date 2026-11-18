@@ -19,17 +19,20 @@ const MAX_DIAS_ALERTAS = 92;
 const MAX_LINHAS = 20000;
 const CACHE_MS = 10 * 60000;
 
+// eventos: cada linha é um acontecimento com data e hora (vai na ordem escolhida: mais recentes ou mais antigos primeiro).
+// agrupar: coluna que mantém as linhas juntas (a jornada fica por motorista; a ordem vale dentro de cada um).
 const TIPOS = {
   resumo: { titulo: 'Resumo por veículo', arquivo: 'resumo-por-veiculo' },
-  velocidade: { titulo: 'Excessos de velocidade', arquivo: 'excessos-de-velocidade' },
-  paradas: { titulo: 'Paradas', arquivo: 'paradas' },
-  alertas: { titulo: 'Alertas no período', arquivo: 'alertas' },
-  garagem: { titulo: 'Saídas e chegadas na garagem', arquivo: 'saidas-e-chegadas-na-garagem' },
-  cercas: { titulo: 'Entradas e saídas das cercas', arquivo: 'entradas-e-saidas-das-cercas' },
-  jornada: { titulo: 'Jornada dos motoristas', arquivo: 'jornada-dos-motoristas' },
+  velocidade: { titulo: 'Excessos de velocidade', arquivo: 'excessos-de-velocidade', eventos: true },
+  paradas: { titulo: 'Paradas', arquivo: 'paradas', eventos: true },
+  alertas: { titulo: 'Alertas no período', arquivo: 'alertas', eventos: true },
+  garagem: { titulo: 'Saídas e chegadas na garagem', arquivo: 'saidas-e-chegadas-na-garagem', eventos: true },
+  cercas: { titulo: 'Entradas e saídas das cercas', arquivo: 'entradas-e-saidas-das-cercas', eventos: true },
+  jornada: { titulo: 'Jornada dos motoristas', arquivo: 'jornada-dos-motoristas', eventos: true, agrupar: 0 },
   motoristas: { titulo: 'Resumo por motorista', arquivo: 'resumo-por-motorista' },
-  viagens: { titulo: 'Cumprimento das viagens', arquivo: 'cumprimento-das-viagens' },
+  viagens: { titulo: 'Cumprimento das viagens', arquivo: 'cumprimento-das-viagens', eventos: true },
 };
+const ORDENS = ['recentes', 'antigos'];
 const NOVA_JORNADA_SEG = 8 * 3600; // sem dirigir por 8 h ou mais: começa outra jornada (Lei do Motorista: 8 h seguidas do descanso de 11 h)
 const DESCANSO_DIARIO_SEG = 11 * 3600;
 const NOMES_FINALIDADE = { garagem: 'Garagem', ponto: 'Ponto ou terminal', area: 'Área de interesse', proibida: 'Área proibida' };
@@ -57,6 +60,22 @@ function fmtValor(v, tipo) {
     case 'duracao': return fmtDuracao(v);
     default: return String(v);
   }
+}
+
+/**
+ * Põe as linhas de um relatório de eventos na ordem pedida, pela primeira data preenchida de cada linha
+ * (ex.: garagem usa a saída e, sem ela, a chegada). Empates ficam na ordem em que vieram.
+ */
+function ordenarLinhas(linhas, colunas, ordem, agrupar = null) {
+  const datas = colunas.map((c, i) => (c.tipo === 'dataHora' ? i : -1)).filter((i) => i >= 0);
+  if (!datas.length) return linhas;
+  const chave = (l) => { for (const i of datas) if (l[i]) return String(l[i]); return ''; };
+  const sinal = ordem === 'antigos' ? 1 : -1;
+  const grupo = new Map();
+  if (agrupar !== null) for (const l of linhas) if (!grupo.has(l[agrupar])) grupo.set(l[agrupar], grupo.size);
+  return linhas.map((l, i) => ({ l, i, k: chave(l), g: agrupar === null ? 0 : grupo.get(l[agrupar]) }))
+    .sort((a, b) => (a.g - b.g) || (a.k === b.k ? a.i - b.i : (a.k < b.k ? -sinal : sinal)))
+    .map((x) => x.l);
 }
 
 /* ---------- cálculo ---------- */
@@ -245,8 +264,9 @@ function jornadas(rows, { limiteSeg = 19800, descansoSeg = 1800 } = {}) {
 /* ---------- relatórios ---------- */
 
 class Relatorios {
-  constructor({ banco, frota, acesso, cercas = null, motoristas = null }) {
+  constructor({ banco, frota, acesso, cercas = null, motoristas = null, config = null }) {
     this.servMotoristas = motoristas;
+    this.config = config;
     this.banco = banco;
     this.frota = frota;
     this.acesso = acesso;
@@ -307,9 +327,26 @@ class Relatorios {
         WHERE veiculo_id = ? AND data_hora BETWEEN ? AND ? ORDER BY data_hora, id`, [v.id, de, ate]);
   }
 
-  /** Gera (ou reaproveita, se for o mesmo pedido de há pouco) o relatório. */
+  /** Ordem padrão das listas (Configurações › Listas e relatórios). */
+  ordemPadrao() {
+    const o = this.config ? this.config.get('ordem_listas') : null;
+    return ORDENS.includes(o) ? o : 'recentes';
+  }
+
+  /**
+   * Gera (ou reaproveita, se for o mesmo pedido de há pouco) o relatório. A ordem das linhas é aplicada
+   * por último, sobre o que ficou guardado: trocar entre "mais recentes" e "mais antigos" não recalcula nada.
+   */
   async gerar(u, tipo, q) {
     if (!TIPOS[tipo]) throw new HttpErro(404, 'Relatório não encontrado.');
+    const ordem = V.opcao(q.ordem, ORDENS, 'o tipo de ordem', this.ordemPadrao());
+    const resultado = await this.calcular(u, tipo, q);
+    if (!TIPOS[tipo].eventos) return resultado;
+    const agrupar = TIPOS[tipo].agrupar ?? null;
+    return { ...resultado, ordem, linhas: ordenarLinhas(resultado.linhas, resultado.colunas, ordem, agrupar) };
+  }
+
+  async calcular(u, tipo, q) {
     const chave = JSON.stringify([tipo, q.de, q.ate, q.empresa || '', q.grupo || '', q.veiculo || '', q.limite || '', q.minutos || '', q.gravidade || '', q.situacao || '', q.cerca || '', q.finalidade || '',
       q.motorista || '', q.continua || '', q.descanso || '', q.linha || '']);
     const c = this.cache.get(u.id);
@@ -963,10 +1000,15 @@ class Relatorios {
 }
 
 /** Resultado → abas da planilha e dados do PDF */
+const NOMES_ORDEM = { recentes: 'Mais recentes primeiro', antigos: 'Mais antigos primeiro' };
+// a ordem vai no fim da linha do período (o cabeçalho do PDF não cresce)
+const comOrdem = (r) => (r.ordem && r.linhas.length > 1 && r.subtitulo.length
+  ? [...r.subtitulo.slice(0, -1), `${r.subtitulo[r.subtitulo.length - 1]} · ${NOMES_ORDEM[r.ordem]}`] : r.subtitulo);
+
 function paraXlsx(r) {
   return [{
     nome: r.titulo, titulo: `${r.titulo} — FrotaGest`,
-    subtitulo: [...r.subtitulo, `Gerado em ${fmtDataHora(r.geradoEm, false)} por ${r.geradoPor} · Reis Tecnologia`],
+    subtitulo: [...comOrdem(r), `Gerado em ${fmtDataHora(r.geradoEm, false)} por ${r.geradoPor} · Reis Tecnologia`],
     colunas: r.colunas, linhas: r.linhas, totais: r.totais,
   }];
 }
@@ -974,7 +1016,7 @@ function paraXlsx(r) {
 function paraPdf(r) {
   return {
     titulo: r.titulo,
-    subtitulo: r.subtitulo,
+    subtitulo: comOrdem(r),
     resumo: r.resumo,
     colunas: r.colunas.map((c) => ({ titulo: c.titulo, peso: c.peso, alinhar: c.alinhar })),
     linhas: r.linhas.map((l) => l.map((v, i) => fmtValor(v, r.colunas[i].tipo))),
@@ -985,4 +1027,4 @@ function paraPdf(r) {
   };
 }
 
-module.exports = { Relatorios, TIPOS, analisar, jornadas, percorrerCercas, paraXlsx, paraPdf, fmtValor, fmtDuracao, distanciaKm };
+module.exports = { Relatorios, TIPOS, ORDENS, ordenarLinhas, analisar, jornadas, percorrerCercas, paraXlsx, paraPdf, fmtValor, fmtDuracao, distanciaKm };

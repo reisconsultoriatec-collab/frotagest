@@ -221,7 +221,7 @@ async function main() {
   srv = new Servidor({
     cfg: cfg.web, versao: version, gateway, media, mediaCfg: cfg.media, recorder, transcoders, frota, historico, monitor, acesso,
     firebase, banco, config, auditoria, retencao, logs: ring, mensagens, iniciadoEm: Date.now(), cercas, doisFatores, logotipos: new Logotipos(banco),
-    relatorios: new Relatorios({ banco, frota, acesso, cercas, motoristas }),
+    relatorios: new Relatorios({ banco, frota, acesso, cercas, motoristas, config }),
     painel: new Painel({ banco, frota, regras, log: (level, text) => log(level, text) }),
     regras,
     avisos,

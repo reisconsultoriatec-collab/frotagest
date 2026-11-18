@@ -284,6 +284,17 @@ Em **Operação › Links de acompanhamento** (ou **Compartilhar localização**
   - em **Comandos › Aparelho › Parâmetros**, dá para ler e gravar no DVR os tempos desses alarmes: direção contínua máxima, descanso mínimo, direção acumulada no dia e parada máxima (em minutos; 0 = o aparelho não alarma).
 - Posição atrasada (lote guardado em área sem sinal) não fecha nem abre mais alarme do aparelho fora de ordem.
 
+## 3.18 Ordem das listas: mais recentes primeiro
+
+- **O que acabou de acontecer aparece no topo**, seguindo por data e hora:
+  - **Relatórios** de eventos (excessos de velocidade, paradas, alertas, garagem, cercas, jornada e viagens), na tela, no Excel e no PDF. O arquivo diz no cabeçalho qual ordem foi usada. A jornada continua agrupada por motorista, com a ordem valendo dentro de cada um. Os resumos (por veículo e por motorista) não mudam, porque não são listas de eventos;
+  - **Histórico**: a tabela de posições e o CSV. O mapa e a reprodução do trajeto seguem sempre do começo ao fim;
+  - **Ocorrências**: a lista, o andamento (o campo de anotar fica em cima) e os alertas do período.
+- **Parametrizado:**
+  - o master escolhe a ordem padrão em **Controle › Sistema › Configurações › Listas e relatórios**;
+  - cada pessoa pode trocar na própria tela, no botão **Mais recentes primeiro / Mais antigos primeiro**. A troca vale para todas essas telas e fica guardada no navegador. Voltar para a ordem padrão faz a tela seguir de novo a configuração do sistema.
+- Trocar a ordem de um relatório já gerado não recalcula nada: o servidor reaproveita o relatório e só muda a ordem das linhas.
+
 ---
 
 ## 4. Instalação (primeira vez)

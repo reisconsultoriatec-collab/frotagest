@@ -69,6 +69,7 @@ PAGINAS.ocorrencias = (() => {
     }));
     offs.push(on('downloads', () => { if (idAberto) desenharBaixando(); }));
     offs.push(on('empresa', () => { if (!idAberto) carregarLista(); }));
+    offs.push(on('ordem', () => { if (idAberto) { if (det) desenharDetalhe(); } else desenharLista(); }));
   }
 
   function sair() {
@@ -96,7 +97,7 @@ PAGINAS.ocorrencias = (() => {
             <div class="grow"></div>
             ${podeTela('ocorrencias', 'incluir') ? `<button class="btn btn-primary" type="button" id="oc-nova">${ico('plus', 'i-sm')} Nova ocorrência</button>` : ''}
           </div>
-          <div class="card-head" style="border-bottom:0;padding-bottom:6px"><span class="count" id="oc-total"></span></div>
+          <div class="card-head" style="border-bottom:0;padding-bottom:6px"><span class="count" id="oc-total"></span>${botaoOrdem()}</div>
           <div class="table-wrap tall" id="oc-tabela"><p class="hint">Carregando…</p></div>
         </section>
       </div>`;
@@ -132,7 +133,8 @@ PAGINAS.ocorrencias = (() => {
     const box = $('#oc-tabela');
     if (!box) return;
     const b = norm(f.busca);
-    const l = b ? lista.filter((o) => norm([o.numero, o.titulo, o.veiculo, o.motorista, o.protocolo, o.tipoNome, o.responsavel].join(' ')).includes(b)) : lista;
+    // o servidor manda das mais recentes para as mais antigas (pela data do fato)
+    const l = naOrdem([...(b ? lista.filter((o) => norm([o.numero, o.titulo, o.veiculo, o.motorista, o.protocolo, o.tipoNome, o.responsavel].join(' ')).includes(b)) : lista)].reverse());
     $('#oc-total').textContent = `${fmtNum(l.length)} ocorrência(s)`;
     const master = S.eu.perfil === 'master';
     box.innerHTML = tabela([
@@ -175,6 +177,11 @@ PAGINAS.ocorrencias = (() => {
     const o = det.ocorrencia;
     const fechada = o.situacao === 'encerrada';
     const rolagem = window.scrollY;
+    const rascunho = $('#oc-nota') ? $('#oc-nota').value : ''; // a anotação que ainda não foi enviada não se perde
+    // mais recentes primeiro: o campo de anotar fica em cima, logo antes do que acabou de acontecer
+    const recentes = ordemListas() === 'recentes';
+    const nota = pode('incluir') ? `<div class="oc-nota"><textarea id="oc-nota" rows="2" maxlength="1000" placeholder="Anotar o que foi feito (ligação, retorno do seguro, conversa com o motorista...)"></textarea>
+              <button class="btn btn-sm" type="button" data-anotar>${ico('message-plus', 'i-sm')} Anotar</button></div>` : '';
     const campos = [
       ['Veículo', o.veiculo || '—'],
       ['Motorista', o.motorista ? `${o.motorista.nome}${o.motorista.matricula ? ` (${o.motorista.matricula})` : ''}` : '—'],
@@ -221,8 +228,8 @@ PAGINAS.ocorrencias = (() => {
             <div class="card-body">${o.veiculo_id ? `<div class="oc-mapa" id="oc-mapa"></div><p class="hint" id="oc-traj-info"></p>` : '<p class="hint" style="margin:0">Ocorrência sem veículo: não há trajeto.</p>'}</div>
           </section>
           <section class="card">
-            <div class="card-head"><h2>${ico('bell', 'i-sm')} Alertas do veículo no período</h2><span class="count">${det.alertas.length}</span></div>
-            <div class="card-body">${det.alertas.length ? `<div class="oc-alertas">${det.alertas.map((a) => `<div class="oc-alerta"><span class="tag ${a.gravidade}">${GRAV_OC[a.gravidade]}</span><b>${H(a.nome)}</b><span class="muted">${H(fmtDataHora(a.inicio))}${a.velocidade !== null ? ` · ${fmtNum(Math.round(a.velocidade))} km/h` : ''}</span></div>`).join('')}</div>`
+            <div class="card-head"><h2>${ico('bell', 'i-sm')} Alertas do veículo no período</h2><div class="card-head-dir"><span class="count">${det.alertas.length}</span>${det.alertas.length > 1 ? botaoOrdem() : ''}</div></div>
+            <div class="card-body">${det.alertas.length ? `<div class="oc-alertas">${naOrdem(det.alertas).map((a) => `<div class="oc-alerta"><span class="tag ${a.gravidade}">${GRAV_OC[a.gravidade]}</span><b>${H(a.nome)}</b><span class="muted">${H(fmtDataHora(a.inicio))}${a.velocidade !== null ? ` · ${fmtNum(Math.round(a.velocidade))} km/h` : ''}</span></div>`).join('')}</div>`
               : '<p class="hint" style="margin:0">Nenhum alerta do veículo no período do trajeto.</p>'}</div>
           </section>
         </div>
@@ -242,15 +249,16 @@ PAGINAS.ocorrencias = (() => {
             </div>
           </section>
           <section class="card">
-            <div class="card-head"><h2>${ico('history', 'i-sm')} Andamento</h2></div>
-            <div class="card-body">
-            <ol class="oc-linha">${det.eventos.map((e) => `<li class="oc-ev ${H(e.tipo)}"><div class="oc-ev-cab"><b>${H(e.usuario || 'Sistema')}</b><span class="muted">${H(fmtCurto(e.quando))}</span></div><div>${H(e.texto)}</div></li>`).join('')}</ol>
-            ${pode('incluir') ? `<div class="oc-nota"><textarea id="oc-nota" rows="2" maxlength="1000" placeholder="Anotar o que foi feito (ligação, retorno do seguro, conversa com o motorista...)"></textarea>
-              <button class="btn btn-sm" type="button" data-anotar>${ico('message-plus', 'i-sm')} Anotar</button></div>` : ''}
+            <div class="card-head"><h2>${ico('history', 'i-sm')} Andamento</h2>${det.eventos.length > 1 ? botaoOrdem() : ''}</div>
+            <div class="card-body${recentes ? ' oc-recentes' : ''}">
+            ${recentes ? nota : ''}
+            <ol class="oc-linha">${naOrdem(det.eventos).map((e) => `<li class="oc-ev ${H(e.tipo)}"><div class="oc-ev-cab"><b>${H(e.usuario || 'Sistema')}</b><span class="muted">${H(fmtCurto(e.quando))}</span></div><div>${H(e.texto)}</div></li>`).join('')}</ol>
+            ${recentes ? '' : nota}
             </div>
           </section>
         </div>
       </div>`;
+    if (rascunho && $('#oc-nota')) $('#oc-nota').value = rascunho;
     window.scrollTo(0, rolagem);
     desenharBaixando();
     desenharMapa();

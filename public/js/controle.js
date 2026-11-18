@@ -380,6 +380,11 @@ PAGINAS.sistema = (() => {
         <label class="field full">${H(c.aparelhos_nao_cadastrados.titulo)}<select name="aparelhos_nao_cadastrados">
           <option value="listar">Aceitar a conexão e listar em "Aparelhos pendentes" (recomendado durante a implantação)</option>
           <option value="recusar">Recusar a conexão (mais seguro depois que toda a frota estiver cadastrada)</option></select></label>
+        <div class="form-sep">Listas e relatórios</div>
+        <label class="field full">${H(c.ordem_listas.titulo)}<select name="ordem_listas">
+          <option value="recentes">Mais recentes primeiro: o que acabou de acontecer aparece no topo</option>
+          <option value="antigos">Mais antigos primeiro: do começo do período até o fim</option></select>
+          <small>Vale para os relatórios (na tela, no Excel e no PDF), as posições do Histórico e as ocorrências (lista, andamento e alertas do período). Cada pessoa ainda pode trocar na própria tela, no botão de ordem; o mapa e a reprodução do trajeto seguem sempre do começo ao fim.</small></label>
         <div class="form-sep">Quanto tempo guardar o histórico</div>
         ${num('retencao_posicoes_dias')}${num('retencao_eventos_dias')}${num('retencao_alertas_dias')}${num('retencao_auditoria_dias')}${num('retencao_fotos_dias')}
         <div class="field full"><small>Nenhum vídeo é guardado no banco. As posições são o que mais ocupa espaço: com 363 veículos, cada 30 dias somam alguns GB.</small></div>
@@ -399,6 +404,7 @@ PAGINAS.sistema = (() => {
     </form>`;
     const form = $('#cf-form');
     form.aparelhos_nao_cadastrados.value = c.aparelhos_nao_cadastrados.valor;
+    form.ordem_listas.value = c.ordem_listas.valor;
     const perfis2fa = new Set(String(c.dois_fatores_perfis.valor || '').split(',').filter(Boolean));
     $$('[data-2fa]', form).forEach((x) => { x.checked = perfis2fa.has(x.dataset['2fa']); });
     const sincronizar2fa = () => {
@@ -415,6 +421,7 @@ PAGINAS.sistema = (() => {
       const corpo = Object.fromEntries(r.configuracoes.map((x) => [x.chave, form[x.chave].value]));
       try {
         await api('/api/configuracoes', { metodo: 'PUT', corpo });
+        if (S.eu.ordemListas !== corpo.ordem_listas) { S.eu.ordemListas = corpo.ordem_listas; $$('[data-ordem-lista]').forEach(desenharBotaoOrdem); }
         toast('Configurações salvas.', 'ok');
       } catch (err) {
         erro.textContent = err.message;
