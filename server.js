@@ -57,6 +57,8 @@ const apiLinhas = require('./src/web/api-linhas');
 const { Acompanhamento } = require('./src/servicos/acompanhamento');
 const apiAcompanhamento = require('./src/web/api-acompanhamento');
 const apiGuia = require('./src/web/api-guia');
+const apiEscala = require('./src/web/api-escala');
+const { EscalaGlobus } = require('./src/servicos/escala-globus');
 const { definirFuso, gerarCodigo } = require('./src/util/comum');
 const { version } = require('./package.json');
 
@@ -254,6 +256,7 @@ async function main() {
   apiLinhas.registrar(srv);
   apiAcompanhamento.registrar(srv);
   apiGuia.registrar(srv);
+  apiEscala.registrar(srv);
   apiDoisFatores.registrar(srv);
   srv.onLog = (e) => log(e.level, e.text, { source: 'painel' });
 
@@ -365,6 +368,8 @@ async function main() {
   regras.iniciar();
   srv.manutencao.iniciar();
   srv.fotos.iniciar();
+  // escala do Globus: o motorista vinculado pela escala sai do veículo no fim do serviço
+  new EscalaGlobus({ banco, motoristas, log: (text) => log('aviso', text) }).iniciar();
   limparLogs();
 
   let saindo = false;

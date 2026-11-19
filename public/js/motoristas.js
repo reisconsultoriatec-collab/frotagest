@@ -3,7 +3,7 @@
  * lidos pelo DVR que ainda não estão no cadastro. Trocar o motorista do veículo: no painel do veículo
  * (Monitoramento) ou aqui. Reis Tecnologia */
 
-const ORIGEM_VINCULO = { manual: 'escolhido no painel', cartao: 'pelo cartão no DVR' };
+const ORIGEM_VINCULO = { manual: 'escolhido no painel', cartao: 'pelo cartão no DVR', escala: 'pela escala do Globus' };
 
 /** Linha "Motorista" do painel do veículo (quem vê o veículo vê quem dirige; trocar pede a tela Motoristas). */
 function htmlMotoristaVeiculo(i) {
@@ -59,7 +59,7 @@ PAGINAS.motoristas = (() => {
     ativo: (m) => !!m.ativo,
     colunas: [
       { t: 'Motorista', v: (m) => `<b>${H(m.nome)}</b><span class="sub">${H([m.matricula ? `matrícula ${m.matricula}` : '', m.telefone].filter(Boolean).join(' · '))}</span>` },
-      { t: 'Agora', cls: 'nw', v: (m) => (m.veiculoAtual ? `${ico('bus', 'i-xs')} ${H(m.veiculoAtual.rotulo)}<span class="sub">desde ${H(fmtCurto(m.veiculoAtual.desde))}${m.veiculoAtual.origem === 'cartao' ? ' · cartão' : ''}</span>` : '<span class="muted">—</span>') },
+      { t: 'Agora', cls: 'nw', v: (m) => (m.veiculoAtual ? `${ico('bus', 'i-xs')} ${H(m.veiculoAtual.rotulo)}<span class="sub">desde ${H(fmtCurto(m.veiculoAtual.desde))}${m.veiculoAtual.origem === 'cartao' ? ' · cartão' : m.veiculoAtual.origem === 'escala' ? ' · escala' : ''}</span>` : '<span class="muted">—</span>') },
       { t: 'CNH', cls: 'nw', v: (m) => (m.cnh_numero || m.cnh_validade ? `${H(m.cnh_categoria || '')}${m.cnh_categoria && m.cnh_validade ? ' · ' : ''}${m.cnh_validade ? vencimentoCnh(m.cnh_validade) : ''}` : '<span class="muted">—</span>') },
       { t: 'Cartão', v: (m) => (m.cartao ? `<span class="mono">${H(m.cartao)}</span>` : '<span class="muted">—</span>') },
       { t: 'Grupo', v: (m) => H(m.grupo || '—') },

@@ -64,6 +64,11 @@ const TELAS = [
   { id: 'auditoria', grupo: 'Controle', nome: 'Auditoria', acoes: { ver: 'Histórico de tudo o que foi feito no painel' } },
   { id: 'acesso', grupo: 'Controle', nome: 'Controle de acesso', soMaster: true, acoes: {
     ver: 'Ver o que cada usuário pode fazer', alterar: 'Mudar o acesso dos usuários da empresa' } },
+  { id: 'escala', grupo: 'Procedimentos Auxiliares', nome: 'Importação da Escala Globus', acoes: {
+    ver: 'Ver a escala do dia importada do Globus (linha, veículo, motorista e horários)',
+    incluir: 'Importar o arquivo da escala gerado no Globus',
+    alterar: 'Vincular o motorista da escala ao veículo, um a um',
+    excluir: 'Excluir a escala importada de um dia' } },
 ];
 
 const POR_ID = new Map(TELAS.map((t) => [t.id, t]));
@@ -73,8 +78,8 @@ const tudo = (filtro = () => true) => Object.fromEntries(TELAS.filter(filtro).ma
 /** Padrão de cada perfil = o que ele já tinha antes do controle de acesso. */
 const PADRAO = {
   admin: tudo((t) => !t.soMaster),
-  operador: { dashboard: ['ver'], mapa: ['ver'], cameras: ['ver'], comandos: ['ver', 'incluir'], alertas: ['ver', 'alterar'], ocorrencias: ['ver', 'incluir', 'alterar'], linhas: ['ver'], historico: ['ver'], relatorios: ['ver'], gravacoes: ['ver', 'incluir'], tv: ['ver'] },
-  visualizador: { dashboard: ['ver'], mapa: ['ver'], cameras: ['ver'], comandos: ['ver'], alertas: ['ver'], ocorrencias: ['ver'], linhas: ['ver'], historico: ['ver'], relatorios: ['ver'], tv: ['ver'] },
+  operador: { dashboard: ['ver'], mapa: ['ver'], cameras: ['ver'], comandos: ['ver', 'incluir'], alertas: ['ver', 'alterar'], ocorrencias: ['ver', 'incluir', 'alterar'], linhas: ['ver'], historico: ['ver'], relatorios: ['ver'], gravacoes: ['ver', 'incluir'], tv: ['ver'], escala: ['ver', 'alterar'] },
+  visualizador: { dashboard: ['ver'], mapa: ['ver'], cameras: ['ver'], comandos: ['ver'], alertas: ['ver'], ocorrencias: ['ver'], linhas: ['ver'], historico: ['ver'], relatorios: ['ver'], tv: ['ver'], escala: ['ver'] },
 };
 
 /** Ações válidas de uma tela, na ordem, com "ver" sempre junto (sem ver não há como fazer o resto). */

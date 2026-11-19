@@ -68,6 +68,7 @@ A tabela acima é o **padrão** de cada perfil. Em **Controle › Controle de ac
 | `links_acompanhamento`, `links_avisos` | Links públicos de acompanhamento (veículo ou linha, para quem, validade, acessos) e os avisos "está chegando" pedidos na página (ponto escolhido e o endereço de push do navegador) | até 30 dias depois de vencer ou ser cancelado |
 | `alarmes_aparelho_ignorados` | Alarmes do próprio aparelho (DVR) que a empresa escolheu não registrar como alerta | sempre |
 | `usuario_ajuda` | Guia do FrotaGest: artigos lidos, tours feitos e as boas-vindas de cada pessoa | sempre |
+| `escala_importacoes`, `escala_servicos` | Escala do Globus importada: o arquivo de cada dia (quem importou e quando) e os serviços (prefixo, linha, turno, chapa e nome do motorista, horários do serviço, da jornada e do intervalo, local de pegada) com o vínculo feito por ela | até excluir a escala do dia |
 | `fotos` | Fotos das câmeras: veículo, câmera, hora, posição e quem pediu (o JPEG fica em `data/fotos`) | 30 dias (configurável) |
 | `push_inscricoes`, `usuarios.push_nivel` | Avisos no celular: os aparelhos de cada pessoa (endereço do serviço de push e as chaves públicas do aparelho) e quais alertas ela quer | até a pessoa tirar o aparelho ou sair |
 | `codigos_recuperacao`, `sessoes_2fa` | Verificação em duas etapas: códigos de recuperação (só o resumo SHA-256) e os logins que já passaram pela segunda etapa | até zerar / 90 dias |
@@ -300,13 +301,13 @@ Em **Operação › Links de acompanhamento** (ou **Compartilhar localização**
 
 - **Guia do FrotaGest** (entrada em destaque, em âmbar, no fim do menu lateral, separada dos grupos): o manual do sistema, no mesmo modelo da Central de ajuda do EduGest.
   - **Menus e telas:** cada menu que a pessoa vê, com para que serve cada tela; clique para ler o artigo.
-  - **54 artigos** em 9 assuntos: primeiros passos, implantação da empresa, cadastros, operação do dia a dia, linhas e links, Dashboard e relatórios, manutenção, controle e segurança, e perguntas frequentes.
+  - **57 artigos** em 10 assuntos: primeiros passos, implantação da empresa, cadastros, operação do dia a dia, linhas e links, Dashboard e relatórios, manutenção, controle e segurança, procedimentos auxiliares e perguntas frequentes.
   - **Busca** (sem precisar de acento), **"Comece por aqui"** de cada perfil e o controle do que a pessoa já leu. As marcas ficam no servidor e valem em qualquer computador ou celular.
   - Cada artigo de tela diz **onde fica no menu** e tem **Abrir a tela** e **Mostrar na tela** (destaca os elementos reais daquela tela).
   - **Manual em PDF:** capa, índice e os artigos do perfil da pessoa, pela impressão do navegador.
   - Cada pessoa vê só os artigos das telas que abre ("Mostrar também os de outros perfis" traz os demais).
 - **Botão ? no topo** (no celular, no ⋮): abre o guia já na **ajuda da tela em que a pessoa está**.
-- **Tour guiado:** passa por todas as telas que a pessoa abre (35 passos para o master), escurecendo o resto e explicando os botões principais.
+- **Tour guiado:** passa por todas as telas que a pessoa abre (37 passos para o master), escurecendo o resto e explicando os botões principais.
   - Não altera nada; Esc sai; as setas do teclado avançam e voltam.
   - Pula as telas que a pessoa não tem e os elementos que não existem para ela. O Modo TV fica de fora.
   - No celular, o balão fica embaixo e o menu lateral abre sozinho nos passos do menu.
@@ -316,6 +317,40 @@ Em **Operação › Links de acompanhamento** (ou **Compartilhar localização**
   - Aparece no Dashboard até tudo ficar pronto (com **Ocultar**) e, completa, no guia.
 - **Dashboard:** cada cartão tem o nome e o ícone **(i)**. Ao passar o mouse, tocar (celular) ou chegar pelo Tab, um balão diz o que aquela informação significa. Clicar no ícone não abre a tela do cartão.
 - Servidor: migração **017** (`usuario_ajuda`). As rotas são `GET/PUT /api/eu/ajuda` (marcas da pessoa) e `GET /api/guia/implantacao` (só contagens).
+
+## 3.20 Procedimentos Auxiliares › Importação da Escala Globus
+
+- **Menu novo, Procedimentos Auxiliares**, com a tela **Importação da Escala Globus**: importa o arquivo de texto da escala de trabalho gerada no Globus.
+  - O layout tem **17 campos separados por ";"**: data, tipo de dia, prefixo, código e número da linha, nome da linha, turno, chapa e nome do motorista, horas do serviço, do motorista e do intervalo, local de pegada e descrição do turno. A janela de importação mostra o layout.
+  - O arquivo pode vir em **UTF-8 ou Windows-1252**; a tela lê os dois. Uma linha de cabeçalho é ignorada.
+- **Como o FrotaGest acha cada um:**
+  - o **veículo** pelo **prefixo**, sem os zeros da frente (`0005755` do Globus = `5755` no cadastro);
+  - o **motorista** pela **chapa**, que é a **matrícula** dele no cadastro.
+  - Quem for cadastrado depois da importação já aparece, sem importar de novo.
+- **Importação manual, com prévia antes de gravar:**
+  - mostra os serviços, veículos, motoristas e linhas, e o que **não bateu** (motoristas sem cadastro e prefixos não encontrados);
+  - mostra também as linhas com erro, que ficam de fora com o motivo (data que não existe, hora inválida, campos faltando).
+  - Importar o **mesmo dia de novo substitui** a escala desse dia, depois de confirmar. Os vínculos já feitos continuam.
+- **Horários:** o vínculo usa a hora do **serviço**, que é quando o veículo troca de mãos. A hora do motorista e o intervalo ficam na tela para conferir a jornada.
+  - Hora menor que o início do serviço é do **dia seguinte** (serviço que passa da meia-noite, marcado com **+1**).
+- **A escala do dia:** resumo (serviços, veículos, motoristas, linhas, em serviço agora, vinculados).
+  - A lista tem busca (sem acento) e filtros por situação (aguardando, em serviço, encerrado, **podem ser vinculados agora**, **com pendência de cadastro**) e por linha.
+  - **Dias importados** leva direto a qualquer dia já importado.
+  - A situação de cada serviço muda sozinha com o relógio.
+- **Motoristas sem cadastro:** ficam em **O que falta para vincular** e na própria linha, com o botão **Cadastrar** no fim do nome. Ele abre o cadastro já com o nome e a chapa como matrícula.
+- **Vínculo opcional, um a um:** o botão **Vincular** coloca o motorista da escala no veículo, a partir de agora e até o fim do serviço.
+  - Aparece de 1 hora antes do início até o fim do serviço, quando o veículo e o motorista estão cadastrados. Quando não dá, a linha diz o motivo.
+  - Quando o serviço termina, o motorista **sai do veículo sozinho**.
+  - O cartão no DVR e a troca pelo painel **valem mais**: se alguém trocar antes, o vínculo da escala termina ali e a troca não é desfeita.
+  - Cada vínculo fica no histórico do motorista (**pela escala do Globus**) e na Auditoria (importar, vincular e excluir).
+- **Acesso:** a tela entra no Controle de acesso com ver, importar (incluir), vincular (alterar) e excluir.
+  - Por padrão, o administrador tem tudo, o operador vê e vincula, e o visualizador só vê.
+  - Quem enxerga só alguns grupos vê só os veículos deles.
+- Servidor: migração **018** (`escala_importacoes`, `escala_servicos` e `motorista_vinculos.fim_previsto`). Rotas:
+  - `POST /api/escala-globus/previa` e `/importar`;
+  - `GET` e `DELETE /api/escala-globus?data=`;
+  - `POST /api/escala-globus/servicos/:id/vincular`.
+- No Guia do FrotaGest: assunto novo **Procedimentos Auxiliares** (3 artigos) e o passo da tela no tour.
 
 ---
 

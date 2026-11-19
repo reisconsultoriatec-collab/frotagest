@@ -444,6 +444,14 @@ const NAV = [
       { id: 'sistema', nome: 'Sistema', ico: 'server', master: true },
     ],
   },
+  {
+    // integrações com outros sistemas da empresa (por enquanto, a escala do Globus)
+    grupo: 'Procedimentos Auxiliares',
+    ico: 'tools',
+    itens: [
+      { id: 'escala', nome: 'Importação da Escala Globus', ico: 'file-import' },
+    ],
+  },
 ];
 
 /** Celular ou tablet em pé: o mapa e o painel de detalhes ficam um embaixo do outro. */

@@ -1712,3 +1712,84 @@ body.em-tour .nova-versao, body.em-tour .dica-balao { display: none !important; 
   #manual-impressao .gu-botao { border-color: #bbb; background: #f1f3f7; color: #111; }
   #manual-impressao .i { width: 12pt; height: 12pt; }
 }
+
+/* ---------- Procedimentos Auxiliares › Importação da Escala Globus (1.20) ---------- */
+.es { gap: 16px; }
+.es-topo .toolbar { padding: 16px 18px 6px; align-items: flex-end; }
+.es-acoes { display: flex; gap: 8px; flex-wrap: wrap; margin-left: auto; }
+.es-info { margin: 0; padding: 0 18px 14px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.es-info:empty { display: none; }
+.kpis.k6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.es-kpis .kpi { padding: 14px; }
+.es-kpis .kpi-value { font-size: 23px; }
+.es-vazio { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; padding: 34px 16px; color: var(--ink-2); }
+.es-vazio > .i { width: 30px; height: 30px; color: var(--ink-3); }
+.es-vazio b { color: var(--ink); font-size: 15px; }
+.es-vazio span { font-size: 13px; max-width: 520px; }
+.es-pendencias { border-color: var(--amber); }
+.es-pend-grade { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px 22px; }
+.es-pend-bloco summary { cursor: pointer; display: flex; flex-direction: column; gap: 2px; padding: 4px 0 8px; list-style: none; }
+.es-pend-bloco summary::-webkit-details-marker { display: none; }
+.es-pend-bloco summary b::after { content: ' ▾'; color: var(--ink-3); font-weight: 400; }
+.es-pend-bloco:not([open]) summary b::after { content: ' ▸'; }
+.es-pend-lista { list-style: none; margin: 0; padding: 0; max-height: 320px; overflow: auto; border: 1px solid var(--line-2); border-radius: 10px; }
+.es-pend-lista li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 10px; border-bottom: 1px solid var(--line-2); }
+.es-pend-lista li:last-child { border-bottom: 0; }
+.es-pend-lista li > span { display: flex; flex-direction: column; min-width: 0; font-size: 13px; }
+.es-pend-lista small { font-size: 11.5px; color: var(--ink-2); }
+.es-filtros { display: flex; gap: 10px; flex-wrap: wrap; padding-top: 0; }
+.es-filtros .search { flex: 1 1 260px; display: flex; }
+.es-filtros .search input { width: 100%; }
+.es-filtros select { flex: 0 1 240px; min-width: 0; }
+#es-tabela td .sub { display: block; }
+#es-tabela sup { font-size: 10px; color: var(--amber-700); margin-left: 2px; font-weight: 700; }
+#es-tabela tr.es-encerrado td { color: var(--ink-2); }
+#es-tabela tr.es-pode td:last-child { background: var(--amber-50); }
+.es-falta { color: var(--amber-ink); font-weight: 600; }
+.es-sem-cad { display: flex; align-items: center; gap: 10px; justify-content: space-between; }
+.es-sem-cad .btn { flex: none; }
+.es-motivo { display: inline-block; max-width: 190px; white-space: normal; line-height: 1.35; cursor: help; }
+.es-imp .es-layout { margin: 0 0 12px; font-size: 12.5px; }
+.es-imp .es-layout summary { cursor: pointer; color: var(--info-ink); font-weight: 600; }
+.es-imp .es-layout ol { columns: 2 220px; margin: 8px 0 0 18px; padding: 0; color: var(--ink-2); }
+.es-drop { display: flex; align-items: center; gap: 14px; padding: 18px; border: 2px dashed var(--line); border-radius: 12px; cursor: pointer; background: var(--fundo-suave); position: relative; }
+.es-drop:hover, .es-drop.sobre { border-color: var(--amber); background: var(--amber-50); }
+.es-drop.ok { border-style: solid; border-color: var(--ok); }
+.es-drop > .i { width: 30px; height: 30px; color: var(--amber-600); flex: none; }
+.es-drop > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.es-drop b { word-break: break-all; }
+.es-drop small { color: var(--ink-2); font-size: 12px; }
+.es-drop input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.es-prev-resumo { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 14px 0 10px; }
+.es-prev-resumo > div { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.es-prev-resumo span { font-size: 12px; color: var(--ink-2); }
+.es-prev-resumo b { font-family: var(--display); font-size: 21px; }
+.es-prev-resumo small { font-size: 11.5px; color: var(--ink-3); }
+.es-prev-pend details, .es-prev-erros { margin: 6px 0; font-size: 13px; }
+.es-prev-pend summary, .es-prev-erros summary { cursor: pointer; font-weight: 600; }
+.es-prev-pend ul, .es-prev-erros ul { margin: 6px 0 0 18px; padding: 0; max-height: 200px; overflow: auto; font-size: 12.5px; }
+.es-prev-cols { columns: 4 90px; }
+.es-prev-erros { color: var(--err); }
+@media (max-width: 1080px) { .kpis.k6 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 640px) {
+  .kpis.k6 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .es-prev-resumo { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .es-acoes { margin-left: 0; width: 100%; }
+  .es-acoes .btn { flex: 1; justify-content: center; }
+  .es-pend-grade { grid-template-columns: minmax(0, 1fr); }
+  .es-filtros select { flex: 1 1 100%; }
+  /* cada serviço vira um cartão */
+  #es-tabela table, #es-tabela tbody, #es-tabela tr, #es-tabela td { display: block; }
+  #es-tabela thead { display: none; }
+  #es-tabela tr[data-servico] { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px 14px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+  #es-tabela td { padding: 0; border: 0; white-space: normal; min-width: 0; }
+  #es-tabela td[data-r]::before { content: attr(data-r); display: block; font-size: 10.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 2px; }
+  #es-tabela td:nth-child(4), #es-tabela td.es-vinc { grid-column: 1 / -1; }
+  /* veículo ao lado da situação; motorista e vínculo na largura toda */
+  #es-tabela td:nth-child(1) { order: 1; } #es-tabela td:nth-child(2) { order: 2; } #es-tabela td:nth-child(3) { order: 3; }
+  #es-tabela td:nth-child(7) { order: 4; } #es-tabela td:nth-child(4) { order: 5; } #es-tabela td:nth-child(5) { order: 6; }
+  #es-tabela td:nth-child(6) { order: 7; } #es-tabela td:nth-child(8) { order: 8; }
+  #es-tabela tr.es-pode td:last-child { background: none; }
+  #es-tabela td.es-vinc .btn { width: 100%; justify-content: center; }
+  .es-motivo { max-width: none; }
+}

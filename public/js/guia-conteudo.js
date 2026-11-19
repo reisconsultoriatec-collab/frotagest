@@ -46,6 +46,7 @@ const GUIA = (() => {
     { id: 'analise', titulo: 'Dashboard e relatórios', icone: 'chart-bar', desc: 'Os números da frota ao vivo e os relatórios em Excel e PDF.' },
     { id: 'manutencao', titulo: 'Manutenção e documentos', icone: 'tool', desc: 'Planos por km e tempo, manutenções feitas e documentos com vencimento.' },
     { id: 'controle', titulo: 'Controle e segurança', icone: 'shield-check', desc: 'Saúde dos aparelhos, comunicações, usuários online, auditoria, controle de acesso e sistema.' },
+    { id: 'auxiliares', titulo: 'Procedimentos auxiliares', icone: 'tools', desc: 'Integração com outros sistemas da empresa: a importação da escala do Globus e o vínculo do motorista ao veículo.' },
     { id: 'duvidas', titulo: 'Perguntas frequentes', icone: 'help-circle', desc: 'Respostas rápidas para as situações mais comuns do dia a dia.' },
   ];
   const artigos = [];
@@ -82,7 +83,7 @@ const GUIA = (() => {
         ['h', 'Menu lateral'],
         ['lista', [
           '**Dashboard**, no alto e à parte: os números da frota ao vivo.',
-          '**Cadastros**, **Operação** e **Controle**: clique no nome do grupo para abrir e ver as telas. Um grupo abre por vez; com ele fechado, os números (alertas, cadastros pendentes) somam no título.',
+          '**Cadastros**, **Operação**, **Controle** e **Procedimentos Auxiliares**: clique no nome do grupo para abrir e ver as telas. Um grupo abre por vez; com ele fechado, os números (alertas, cadastros pendentes) somam no título.',
           '**Guia do FrotaGest**, em destaque no fim do menu: este manual e o tour guiado.',
           'Embaixo: se o **tempo real** está conectado e quantos veículos estão **online**.',
         ]],
@@ -812,6 +813,69 @@ const GUIA = (() => {
     },
   ]);
 
+  /* =================== PROCEDIMENTOS AUXILIARES =================== */
+  add('auxiliares', [
+    {
+      id: 'tela-escala', titulo: 'Importação da Escala Globus', tela: 'escala',
+      resumo: 'A escala de trabalho gerada no Globus dentro do FrotaGest: linha, veículo, motorista e horários de cada serviço.',
+      palavras: ['escala', 'globus', 'importar', 'importacao', 'turno', 'chapa', 'pegada', 'servico', 'plantao'],
+      corpo: [
+        ['p', 'Cada linha do arquivo do Globus é um **serviço**: o veículo, a linha, o turno, o motorista (chapa e nome), a hora do serviço, a hora do motorista com o intervalo e o local de pegada. A tela mostra a escala do dia escolhido, com o veículo e o motorista achados no FrotaGest.'],
+        ['tabela', [
+          ['No Globus', 'No FrotaGest'],
+          ['Prefixo do veículo (ex.: 0005755)', 'Prefixo do veículo, sem os zeros da frente (5755)'],
+          ['Chapa do motorista', 'Matrícula no cadastro do motorista'],
+          ['Hora inicial e final do serviço', 'Quando o veículo está com aquele motorista (é o que vale para o vínculo)'],
+          ['Hora do motorista e intervalo', 'A jornada dele (pode terminar depois do serviço, voltando à garagem)'],
+        ]],
+        ['lista', [
+          '**Situação**: aguardando, em serviço ou encerrado, pelo horário do serviço. Horário menor que o início é do dia seguinte (marcado com **+1**).',
+          '**O que falta para vincular**: motoristas sem cadastro (com o botão {{Cadastrar}}, que já leva o nome e a chapa como matrícula) e veículos com prefixo diferente do cadastro.',
+          '**Filtros**: busca por linha, prefixo, motorista ou chapa; situação (incluindo "podem ser vinculados agora") e linha.',
+          '**Dias importados**: volte a qualquer escala já importada pelo dia.',
+        ]],
+        ['dica', 'O vínculo do motorista ao veículo é opcional: a escala serve também só para consulta.'],
+      ],
+      relacionados: ['escala-importar', 'escala-vincular', 'tela-motoristas'],
+    },
+    {
+      id: 'escala-importar', titulo: 'Importar o arquivo da escala do Globus', tela: 'escala',
+      resumo: 'O layout de 17 campos, a prévia antes de gravar e o que acontece ao importar o mesmo dia de novo.',
+      palavras: ['importar', 'arquivo', 'txt', 'layout', 'globus', 'substituir', 'reimportar'],
+      corpo: [
+        ['passos', [
+          'Gere a escala no Globus com o layout de **17 campos separados por ponto e vírgula**: data; tipo de dia; prefixo; código da linha; número oficial da linha; nome da linha; código do turno; chapa; nome do motorista; hora inicial e final do serviço; hora inicial do motorista; hora inicial e final do intervalo; hora final do motorista; local de pegada; descrição do turno.',
+          'Em **Procedimentos Auxiliares › Importação da Escala Globus**, clique em {{Importar escala do Globus}} (o master escolhe antes a empresa no topo).',
+          'Escolha ou arraste o arquivo .txt. A **prévia** mostra os serviços, os veículos e motoristas encontrados, o que não bateu e as linhas com erro (que ficam de fora).',
+          'Confirme em {{Importar}}. A tela abre na escala do dia importado.',
+        ]],
+        ['p', 'Importar **o mesmo dia de novo substitui** a escala daquele dia (a prévia avisa). Os motoristas que já foram vinculados continuam nos veículos.'],
+        ['atencao', 'Se aparecer um caractere estranho no nome de uma linha (ex.: "VIA M� HELENA"), o acento já saiu estragado do Globus: confira a codificação da exportação lá. O FrotaGest lê tanto UTF-8 quanto Windows-1252.'],
+      ],
+      relacionados: ['tela-escala', 'escala-vincular'],
+    },
+    {
+      id: 'escala-vincular', titulo: 'Vincular o motorista da escala ao veículo', tela: 'escala',
+      resumo: 'Um serviço por vez, pelo botão Vincular: o motorista entra no veículo agora e sai no fim do serviço.',
+      palavras: ['vincular', 'vinculo', 'motorista no veiculo', 'escala', 'jornada', 'quem esta dirigindo'],
+      corpo: [
+        ['passos', [
+          'Na escala do dia, filtre por **Podem ser vinculados agora** (ou procure a linha ou o motorista).',
+          'Clique em {{Vincular}} no serviço. O motorista passa a estar no veículo **a partir de agora**, até o **fim do serviço**.',
+          'No fim do serviço ele sai do veículo sozinho. Se alguém trocar antes (pelo painel do veículo ou pelo cartão no DVR), vale a troca.',
+        ]],
+        ['lista', [
+          'Dá para vincular desde **1 hora antes** do início do serviço até o fim dele.',
+          'Precisa do veículo encontrado (prefixo) e do motorista cadastrado (chapa = matrícula).',
+          'Se o motorista estava em outro veículo, ele sai de lá.',
+          'Com o vínculo, os **alertas**, a **Jornada dos motoristas** e o **Resumo por motorista** passam a trazer quem estava dirigindo. No painel do veículo aparece "pela escala do Globus".',
+          'Cada vínculo fica na auditoria, com quem fez e quando.',
+        ]],
+      ],
+      relacionados: ['tela-escala', 'motoristas-trocar', 'tela-relatorios'],
+    },
+  ]);
+
   /* =================== PERGUNTAS FREQUENTES =================== */
   add('duvidas', [
     {
@@ -1021,6 +1085,12 @@ const GUIA = (() => {
     sistema: [
       { g: 1, alvo: '#si-abas', titulo: 'Sistema', texto: 'Status do servidor, portas e protocolos, aparelhos pendentes, configurações (retenção, sessão, duas etapas, ordem das listas) e o log ao vivo.' },
     ],
+    escala: [
+      { g: 1, alvo: ['#es-importar', '.es-topo'], titulo: 'Importação da Escala Globus', texto: 'Importe o arquivo da escala gerado no Globus. A prévia mostra o que bateu (prefixo e chapa) antes de gravar.' },
+      { alvo: ['#es-dia', '.es-topo'], titulo: 'Dia da escala', texto: 'Escolha o dia, ou um dos dias já importados.' },
+      { alvo: '#es-pend', titulo: 'O que falta para vincular', texto: 'Motoristas sem cadastro, com o botão Cadastrar (nome e chapa já preenchidos), e veículos com prefixo diferente.' },
+      { g: 1, alvo: ['#es-tabela', '#es-vazio'], titulo: 'Serviços do dia', texto: 'Linha, veículo, motorista e horários. O botão **Vincular** coloca o motorista no veículo, um serviço por vez, até o fim do serviço.' },
+    ],
     guia: [
       { alvo: '.gu-cab', titulo: 'Guia do FrotaGest', texto: 'Busque o que quer fazer, refaça o tour e gere o manual em PDF.' },
       { alvo: '.gu-telas', titulo: 'Menus e telas', texto: 'Cada menu que você vê, com para que serve. Clique para ler o artigo da tela.' },
@@ -1029,7 +1099,7 @@ const GUIA = (() => {
 
   const tourInicio = [
     { titulo: 'Bem-vindo(a) ao tour do FrotaGest', texto: ['Vamos passar pelas telas que você usa e mostrar para que serve cada uma e onde ficam os botões principais.', 'Use **Próximo** e **Voltar** (ou as setas do teclado). **Esc** sai a qualquer momento. Nada é alterado no sistema durante o tour.'] },
-    { alvo: '#nav', menu: true, celular: '#nav', titulo: 'Menu', texto: 'O Dashboard fica no alto; as telas ficam nos grupos **Cadastros**, **Operação** e **Controle**. Clique no nome do grupo para abrir. Você só vê o que foi liberado para você.' },
+    { alvo: '#nav', menu: true, celular: '#nav', titulo: 'Menu', texto: 'O Dashboard fica no alto; as telas ficam nos grupos **Cadastros**, **Operação**, **Controle** e **Procedimentos Auxiliares**. Clique no nome do grupo para abrir. Você só vê o que foi liberado para você.' },
     { alvo: '#sb-guia', menu: true, titulo: 'Guia do FrotaGest', texto: 'Este manual: para que serve cada tela, passo a passo, perguntas frequentes e este tour para rever quando quiser.' },
     { alvo: '#tb-empresa', perfis: ['master'], titulo: 'Empresa', texto: 'Escolha a empresa que as telas mostram, ou todas.' },
     { alvo: ['.tb-right'], celular: '.tb-right', titulo: 'Topo', texto: 'Tempo conectado, tema claro/escuro, atualizar a tela, **som e avisos no celular**, alertas pendentes (o sino) e sair. No celular, os menos usados ficam no **⋮**.' },
@@ -1040,7 +1110,7 @@ const GUIA = (() => {
   /* ordem do tour geral: a mesma do menu (o Modo TV fica de fora: é a tela da parede) */
   const ordem = ['dashboard', 'empresas', 'aparelhos', 'grupos', 'veiculos', 'motoristas', 'cercas', 'regras', 'usuarios',
     'mapa', 'alertas', 'ocorrencias', 'linhas', 'acompanhamento', 'historico', 'relatorios', 'gravacoes', 'manutencao',
-    'saude', 'comunicacoes', 'online', 'auditoria', 'acesso', 'sistema'];
+    'saude', 'comunicacoes', 'online', 'auditoria', 'acesso', 'sistema', 'escala'];
 
   /* "Comece por aqui": o essencial de cada perfil, na ordem de uso */
   const trilhas = {
