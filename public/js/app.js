@@ -346,6 +346,8 @@ async function abrirApp() {
   montarNav();
   abrirRota();
   sincronizarAvisos(); // este aparelho já recebe os avisos desta pessoa? mantém em dia
+  carregarMarcasGuia(); // selo "Novo" do Guia do FrotaGest
+  setTimeout(guiaBoasVindas, 900); // primeiro acesso: convite para o tour guiado
 }
 
 function atualizarSeletorEmpresa() {

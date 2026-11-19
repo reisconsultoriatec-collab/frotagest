@@ -6,7 +6,7 @@ const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const H = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const ico = (n, cls = '') => `<svg class="i ${cls}" aria-hidden="true"><use href="#i-${n}"/></svg>`;
 const WS_PROTO = location.protocol === 'https:' ? 'wss' : 'ws';
-/* Ícones usados por nome calculado (para o gerador do sprite): ico('sort-descending') ico('sort-ascending') ico('lock') ico('info-circle') ico('user') ico('steering-wheel')
+/* Ícones usados por nome calculado (para o gerador do sprite): ico('circle-check') ico('circle-dashed') ico('file-text') ico('sort-descending') ico('sort-ascending') ico('lock') ico('info-circle') ico('user') ico('steering-wheel')
    ico('clock') ico('gauge') ico('route') ico('map-pin') ico('wifi') ico('bus') ico('plug-connected-x') ico('alert-triangle')
    ico('user-plus') ico('user-check') ico('clock-pause') ico('mail') ico('refresh') ico('key') ico('copy')
    ico('volume-off') ico('volume') ico('sun') ico('moon') ico('antenna-bars-2') ico('camera-off') ico('device-sd-card') ico('gps') ico('plug-x') ico('wifi-off') ico('cpu') ico('wifi') ico('video') ico('check') ico('download') ico('alert-triangle') ico('bell-ringing')
@@ -599,7 +599,7 @@ function abrirRota() {
     try { S.paginaAtual.sair(); } catch { /* página já desmontada */ }
   }
   S.paginaAtual = pag;
-  $$('.sb-item, .sb-solo').forEach((a) => a.classList.toggle('active', a.dataset.nav === (pag.id || id)));
+  $$('.sb-item, .sb-solo, .sb-guia').forEach((a) => a.classList.toggle('active', a.dataset.nav === (pag.id || id)));
   marcarGrupo(pag.id || id);
   document.body.classList.remove('sb-open');
   $('#tb-titulo').textContent = pag.titulo;
@@ -615,6 +615,73 @@ function abrirRota() {
 }
 
 /* ---------- componentes ---------- */
+
+/**
+ * Dica: o ícone (i) ao lado do nome de um cartão. Passar o mouse (ou tocar, ou chegar pelo Tab) mostra
+ * um balão dizendo o que aquela informação significa. Clicar no ícone não aciona o cartão em volta.
+ */
+function dica(texto, nome = '') {
+  return `<button class="dica" type="button" data-dica="${H(texto)}" aria-label="${H(nome ? `O que é ${nome}` : 'O que é isto')}: ${H(texto)}">${ico('info-circle')}</button>`;
+}
+const balaoDica = { el: null, alvo: null };
+function mostrarDica(b) {
+  if (!balaoDica.el) {
+    balaoDica.el = document.createElement('div');
+    balaoDica.el.className = 'dica-balao';
+    balaoDica.el.id = 'dica-balao';
+    balaoDica.el.setAttribute('role', 'tooltip');
+    document.body.append(balaoDica.el);
+  }
+  const el = balaoDica.el;
+  balaoDica.alvo = b;
+  el.textContent = b.dataset.dica;
+  el.hidden = false;
+  el.style.left = '0px';
+  el.style.top = '0px';
+  const r = b.getBoundingClientRect();
+  const w = el.offsetWidth;
+  const h = el.offsetHeight;
+  const M = 8;
+  let left = r.left + r.width / 2 - w / 2;
+  left = Math.max(M, Math.min(left, window.innerWidth - w - M));
+  let top = r.bottom + 8;
+  if (top + h > window.innerHeight - M) top = Math.max(M, r.top - h - 8);
+  el.style.left = `${left}px`;
+  el.style.top = `${top}px`;
+  b.setAttribute('aria-describedby', 'dica-balao');
+}
+function esconderDica() {
+  if (balaoDica.el) balaoDica.el.hidden = true;
+  if (balaoDica.alvo) balaoDica.alvo.removeAttribute('aria-describedby');
+  balaoDica.alvo = null;
+}
+document.addEventListener('mouseover', (e) => {
+  const b = e.target.closest && e.target.closest('.dica');
+  // com o ícone focado pelo teclado (ou tocado), o balão fica até sair dele
+  if (b) { if (balaoDica.alvo !== b) mostrarDica(b); } else if (balaoDica.alvo && balaoDica.alvo.dataset.toque !== '1' && document.activeElement !== balaoDica.alvo) esconderDica();
+});
+document.addEventListener('focusin', (e) => { const b = e.target.closest && e.target.closest('.dica'); if (b) mostrarDica(b); else if (balaoDica.alvo) esconderDica(); });
+// captura: o clique (ou toque) no ícone só mostra o balão, sem abrir a tela do cartão em volta
+document.addEventListener('click', (e) => {
+  const b = e.target.closest && e.target.closest('.dica');
+  if (!b) { if (balaoDica.alvo) { delete balaoDica.alvo.dataset.toque; esconderDica(); } return; }
+  e.preventDefault();
+  e.stopPropagation();
+  if (balaoDica.alvo === b && b.dataset.toque === '1') { delete b.dataset.toque; esconderDica(); return; }
+  b.dataset.toque = '1';
+  mostrarDica(b);
+}, true);
+document.addEventListener('keydown', (e) => {
+  const b = e.target.closest && e.target.closest('.dica');
+  if (b && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); e.stopPropagation(); mostrarDica(b); } else if (e.key === 'Escape' && balaoDica.alvo) esconderDica();
+}, true);
+// rolou a tela: o balão acompanha o ícone (ou some, se o ícone saiu da tela)
+window.addEventListener('scroll', () => {
+  const b = balaoDica.alvo;
+  if (!b) return;
+  const r = b.getBoundingClientRect();
+  if (!b.isConnected || r.bottom < 0 || r.top > window.innerHeight) esconderDica(); else mostrarDica(b);
+}, true);
 
 /**
  * Tira um mapa Leaflet da tela. Sair no meio da animação de zoom (clicar no veículo e logo num botão

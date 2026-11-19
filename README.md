@@ -67,6 +67,7 @@ A tabela acima é o **padrão** de cada perfil. Em **Controle › Controle de ac
 | `viagens`, `viagem_pontos` | Viagens de cada dia (uma por partida): situação, saída e chegada reais, a hora em cada ponto e a diferença para o horário, fora da rota | sempre |
 | `links_acompanhamento`, `links_avisos` | Links públicos de acompanhamento (veículo ou linha, para quem, validade, acessos) e os avisos "está chegando" pedidos na página (ponto escolhido e o endereço de push do navegador) | até 30 dias depois de vencer ou ser cancelado |
 | `alarmes_aparelho_ignorados` | Alarmes do próprio aparelho (DVR) que a empresa escolheu não registrar como alerta | sempre |
+| `usuario_ajuda` | Guia do FrotaGest: artigos lidos, tours feitos e as boas-vindas de cada pessoa | sempre |
 | `fotos` | Fotos das câmeras: veículo, câmera, hora, posição e quem pediu (o JPEG fica em `data/fotos`) | 30 dias (configurável) |
 | `push_inscricoes`, `usuarios.push_nivel` | Avisos no celular: os aparelhos de cada pessoa (endereço do serviço de push e as chaves públicas do aparelho) e quais alertas ela quer | até a pessoa tirar o aparelho ou sair |
 | `codigos_recuperacao`, `sessoes_2fa` | Verificação em duas etapas: códigos de recuperação (só o resumo SHA-256) e os logins que já passaram pela segunda etapa | até zerar / 90 dias |
@@ -294,6 +295,27 @@ Em **Operação › Links de acompanhamento** (ou **Compartilhar localização**
   - o master escolhe a ordem padrão em **Controle › Sistema › Configurações › Listas e relatórios**;
   - cada pessoa pode trocar na própria tela, no botão **Mais recentes primeiro / Mais antigos primeiro**. A troca vale para todas essas telas e fica guardada no navegador. Voltar para a ordem padrão faz a tela seguir de novo a configuração do sistema.
 - Trocar a ordem de um relatório já gerado não recalcula nada: o servidor reaproveita o relatório e só muda a ordem das linhas.
+
+## 3.19 Guia do FrotaGest, tour guiado e dicas do Dashboard
+
+- **Guia do FrotaGest** (entrada em destaque, em âmbar, no fim do menu lateral, separada dos grupos): o manual do sistema, no mesmo modelo da Central de ajuda do EduGest.
+  - **Menus e telas:** cada menu que a pessoa vê, com para que serve cada tela; clique para ler o artigo.
+  - **54 artigos** em 9 assuntos: primeiros passos, implantação da empresa, cadastros, operação do dia a dia, linhas e links, Dashboard e relatórios, manutenção, controle e segurança, e perguntas frequentes.
+  - **Busca** (sem precisar de acento), **"Comece por aqui"** de cada perfil e o controle do que a pessoa já leu. As marcas ficam no servidor e valem em qualquer computador ou celular.
+  - Cada artigo de tela diz **onde fica no menu** e tem **Abrir a tela** e **Mostrar na tela** (destaca os elementos reais daquela tela).
+  - **Manual em PDF:** capa, índice e os artigos do perfil da pessoa, pela impressão do navegador.
+  - Cada pessoa vê só os artigos das telas que abre ("Mostrar também os de outros perfis" traz os demais).
+- **Botão ? no topo** (no celular, no ⋮): abre o guia já na **ajuda da tela em que a pessoa está**.
+- **Tour guiado:** passa por todas as telas que a pessoa abre (35 passos para o master), escurecendo o resto e explicando os botões principais.
+  - Não altera nada; Esc sai; as setas do teclado avançam e voltam.
+  - Pula as telas que a pessoa não tem e os elementos que não existem para ela. O Modo TV fica de fora.
+  - No celular, o balão fica embaixo e o menu lateral abre sozinho nos passos do menu.
+- **Boas-vindas:** no primeiro acesso de cada pessoa (inclusive de quem já usa o sistema, uma vez depois desta atualização), uma janela convida para o tour.
+- **Implantação da empresa** (administrador, e o master com a empresa escolhida no topo): os 10 passos para a empresa começar a usar o FrotaGest, conferidos pelos próprios dados.
+  - Os passos: aparelhos, aparelhos comunicando, grupos, veículos, garagem, regras, equipe, motoristas, avisos no celular e logotipo.
+  - Aparece no Dashboard até tudo ficar pronto (com **Ocultar**) e, completa, no guia.
+- **Dashboard:** cada cartão tem o nome e o ícone **(i)**. Ao passar o mouse, tocar (celular) ou chegar pelo Tab, um balão diz o que aquela informação significa. Clicar no ícone não abre a tela do cartão.
+- Servidor: migração **017** (`usuario_ajuda`). As rotas são `GET/PUT /api/eu/ajuda` (marcas da pessoa) e `GET /api/guia/implantacao` (só contagens).
 
 ---
 

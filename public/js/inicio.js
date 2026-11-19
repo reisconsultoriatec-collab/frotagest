@@ -17,6 +17,8 @@ PAGINAS.dashboard = (() => {
   let agendado = null;
 
   const cor = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+  /** Ícone (i) do cartão: o que aquela informação significa (textos em DICAS_DASHBOARD, guia-conteudo.js). */
+  const dc = (k) => dica(DICAS_DASHBOARD[k][1], DICAS_DASHBOARD[k][0]);
   const fmtKm = (v) => `${fmtNum(v, v >= 100 || v === 0 ? 0 : 1)} km`;
   const hora = () => Number(textoServidor().slice(11, 13));
 
@@ -116,41 +118,42 @@ PAGINAS.dashboard = (() => {
         <div class="db-avisos">
           ${podeTela('usuarios') ? '<section class="card" id="ini-cad" hidden></section>' : ''}${podeTela('saude') ? '<section class="card" id="ini-saude" hidden></section>' : ''}${podeTela('manutencao') ? '<section class="card" id="ini-manut" hidden></section>' : ''}
           ${S.eu.perfil === 'master' ? '<section class="card" id="ini-pend" hidden></section>' : ''}
+          ${S.eu.perfil === 'admin' || S.eu.perfil === 'master' ? '<section class="card" id="ini-impl" hidden></section>' : ''}
         </div>
 
         <div class="db-kpis" id="db-kpis">
           <section class="card db-hero" id="k-km" ${podeTela('relatorios') ? 'data-ir="relatorios" data-q="tipo=resumo" tabindex="0" role="link"' : ''}>
-            <div class="db-tile-top"><span class="db-rot">${ico('route', 'i-sm')} Km rodados hoje</span></div>
+            <div class="db-tile-top"><span class="db-rot">${ico('route', 'i-sm')} Km rodados hoje</span>${dc('km')}</div>
             <div class="db-hero-v"><span class="kpi-value" id="k-km-v">—</span><span class="db-delta" id="k-km-delta"></span></div>
             <div class="db-hero-sub" id="k-km-sub">Calculando…</div>
             <div class="db-spark" id="k-km-spark"></div>
           </section>
-          ${tile('k-on', 'wifi', 'Online agora', verMapa ? 'online' : null)}
-          ${tile('k-mov', 'steering-wheel', 'Em movimento', verMapa ? 'online' : null)}
-          ${al ? tile('k-alertas', 'bell-ringing', 'Alertas hoje', 'alertas') : tile('k-alarme', 'alert-triangle', 'Com alarme agora', verMapa ? 'alerta' : null)}
-          ${tile('k-gar', 'building-warehouse', 'Na garagem', podeTela('cercas') ? 'cercas' : null)}
+          ${tile('k-on', 'wifi', 'Online agora', verMapa ? 'online' : null, 'on')}
+          ${tile('k-mov', 'steering-wheel', 'Em movimento', verMapa ? 'online' : null, 'mov')}
+          ${al ? tile('k-alertas', 'bell-ringing', 'Alertas hoje', 'alertas', 'alertas') : tile('k-alarme', 'alert-triangle', 'Com alarme agora', verMapa ? 'alerta' : null, 'alarme')}
+          ${tile('k-gar', 'building-warehouse', 'Na garagem', podeTela('cercas') ? 'cercas' : null, 'garagem')}
         </div>
 
         <div class="db-linha ${verMapa ? 'db-l-mapa' : ''}">
           <section class="card db-card">
-            <div class="card-head"><h2>${ico('bus')} Situação da frota agora</h2><span class="db-total"><b id="k-total">0</b> veículos</span></div>
+            <div class="card-head"><h2>${ico('bus')} Situação da frota agora ${dc('situacao')}</h2><span class="db-total"><b id="k-total">0</b> veículos</span></div>
             <div class="db-corpo" id="db-situacao"></div>
           </section>
           ${verMapa ? `<section class="card db-card db-mapa-card">
-            <div class="card-head"><h2>${ico('map-2')} Frota no mapa</h2><button class="link" type="button" data-ir="mapa">Abrir o monitoramento ${ico('chevron-right', 'i-sm')}</button></div>
+            <div class="card-head"><h2>${ico('map-2')} Frota no mapa ${dc('mapa')}</h2><button class="link" type="button" data-ir="mapa">Abrir o monitoramento ${ico('chevron-right', 'i-sm')}</button></div>
             <div class="db-mapa-area"><div id="db-mapa"></div></div>
           </section>` : ''}
         </div>
 
         <div class="db-linha">
           <section class="card db-card">
-            <div class="card-head"><h2>${ico('clock-hour-4')} Hoje, hora a hora</h2>
+            <div class="card-head"><h2>${ico('clock-hour-4')} Hoje, hora a hora ${dc('hora')}</h2>
               <div class="seg db-seg" id="db-modo"><button class="seg-btn" data-m="km" type="button">Km</button><button class="seg-btn" data-m="veic" type="button">Veículos rodando</button></div></div>
             <div class="db-corpo"><div class="db-leg" id="db-hora-leg"></div><div class="db-graf" id="db-hora"><div class="db-carregando">Carregando…</div></div>
               <button class="link db-tab-btn" type="button" data-tabela="db-hora">${ico('table', 'i-sm')} Ver como tabela</button><div class="db-tab" id="db-hora-tab" hidden></div></div>
           </section>
           <section class="card db-card">
-            <div class="card-head"><h2>${ico('calendar-stats')} Km rodados · últimos 14 dias</h2><span class="muted small" id="db-dias-media"></span></div>
+            <div class="card-head"><h2>${ico('calendar-stats')} Km rodados · últimos 14 dias ${dc('dias')}</h2><span class="muted small" id="db-dias-media"></span></div>
             <div class="db-corpo"><div class="db-graf" id="db-dias"><div class="db-carregando">Carregando…</div></div>
               <button class="link db-tab-btn" type="button" data-tabela="db-dias">${ico('table', 'i-sm')} Ver como tabela</button><div class="db-tab" id="db-dias-tab" hidden></div></div>
           </section>
@@ -158,37 +161,37 @@ PAGINAS.dashboard = (() => {
 
         ${al ? `<div class="db-linha db-l3">
           <section class="card db-card">
-            <div class="card-head"><h2>${ico('alert-triangle')} Alertas de hoje por hora</h2><span class="muted small" id="db-al-total"></span></div>
+            <div class="card-head"><h2>${ico('alert-triangle')} Alertas de hoje por hora ${dc('alHora')}</h2><span class="muted small" id="db-al-total"></span></div>
             <div class="db-corpo"><div class="db-leg" id="db-al-leg"></div><div class="db-graf" id="db-al"><div class="db-carregando">Carregando…</div></div>
               <button class="link db-tab-btn" type="button" data-tabela="db-al">${ico('table', 'i-sm')} Ver como tabela</button><div class="db-tab" id="db-al-tab" hidden></div></div>
           </section>
           <section class="card db-card">
-            <div class="card-head"><h2>${ico('list-details')} Tipos de alerta hoje</h2></div>
+            <div class="card-head"><h2>${ico('list-details')} Tipos de alerta hoje ${dc('tipos')}</h2></div>
             <div class="db-corpo" id="db-tipos"><div class="db-carregando">Carregando…</div></div>
           </section>
           <section class="card db-card">
-            <div class="card-head"><h2>${ico('bell-ringing')} Pendentes</h2><button class="link" type="button" data-ir="alertas">Ver todos ${ico('chevron-right', 'i-sm')}</button></div>
+            <div class="card-head"><h2>${ico('bell-ringing')} Pendentes ${dc('pendentes')}</h2><button class="link" type="button" data-ir="alertas">Ver todos ${ico('chevron-right', 'i-sm')}</button></div>
             <div class="list" id="ini-alertas"><div class="list-empty">Carregando…</div></div>
           </section>
         </div>` : ''}
 
         <div class="db-linha db-l3">
           <section class="card db-card" id="db-gar-card">
-            <div class="card-head"><h2>${ico('building-warehouse')} Garagens agora</h2></div>
+            <div class="card-head"><h2>${ico('building-warehouse')} Garagens agora ${dc('garagens')}</h2></div>
             <div class="db-corpo" id="db-gar"></div>
           </section>
           <section class="card db-card">
-            <div class="card-head"><h2>${ico('trophy')} Quem mais rodou hoje</h2></div>
+            <div class="card-head"><h2>${ico('trophy')} Quem mais rodou hoje ${dc('rank')}</h2></div>
             <div class="db-corpo" id="db-rank"><div class="db-carregando">Carregando…</div></div>
           </section>
           <section class="card db-card">
-            <div class="card-head"><h2>${ico('plug-connected-x')} Sem comunicação há mais tempo</h2></div>
+            <div class="card-head"><h2>${ico('plug-connected-x')} Sem comunicação há mais tempo ${dc('semCom')}</h2></div>
             <div class="list" id="ini-offline"></div>
           </section>
         </div>
 
         <section class="card db-card" id="db-grupos-card" hidden>
-          <div class="card-head"><h2>${ico('folders')} Por grupo</h2><span class="muted small">Clique num grupo para ver só ele</span></div>
+          <div class="card-head"><h2>${ico('folders')} Por grupo ${dc('grupos')}</h2><span class="muted small">Clique num grupo para ver só ele</span></div>
           <div class="table-wrap" id="db-grupos"></div>
         </section>
       </div>`;
@@ -232,19 +235,20 @@ PAGINAS.dashboard = (() => {
     offs.push(on('pendentes', desenharCadastros));
     offs.push(on('saude', desenharSaude));
     offs.push(on('manut', desenharManut));
-    offs.push(on('empresa', () => { dados = null; enquadrou = false; montarFiltro(); carregar(); carregarAlertas(); carregarCercas(true).then(() => { desenharAoVivo(); desenharGaragensMapa(); }).catch(() => {}); }));
+    offs.push(on('empresa', () => { dados = null; enquadrou = false; montarFiltro(); carregar(); carregarAlertas(); guiaCartaoImplantacao($('#ini-impl')); carregarCercas(true).then(() => { desenharAoVivo(); desenharGaragensMapa(); }).catch(() => {}); }));
     offs.push(on('tema', () => { desenharHora(); desenharDias(); desenharAlertasHora(); desenharTiposEgrupos(); desenharAoVivo(); }));
     timers.recarga = setInterval(() => { if (!document.hidden) carregar(); }, 60000);
     timers.relogio = setInterval(atualizarRelogio, 5000);
     desenharCadastros();
     desenharSaude();
+    guiaCartaoImplantacao($('#ini-impl'));
     desenharManut();
   }
 
-  function tile(id, icone, rot, ir) {
+  function tile(id, icone, rot, ir, dicaDe) {
     const alvo = ir === 'alertas' || ir === 'cercas' ? `data-ir="${ir}" tabindex="0" role="link"` : ir ? `data-st="${ir}" tabindex="0" role="link"` : '';
     return `<section class="card db-tile${ir ? ' clic' : ''}" id="${id}" ${alvo}>
-      <div class="db-tile-top"><span class="db-rot">${ico(icone, 'i-sm')} ${H(rot)}</span></div>
+      <div class="db-tile-top"><span class="db-rot">${ico(icone, 'i-sm')} ${H(rot)}</span>${dc(dicaDe)}</div>
       <div class="kpi-value db-tile-v">—</div><div class="db-tile-sub"></div><div class="db-medidor" hidden><i></i></div></section>`;
   }
 
@@ -356,6 +360,8 @@ PAGINAS.dashboard = (() => {
     else setTile('k-gar', s.off, 'offline (cadastre as garagens em Cercas para ver quem está recolhido)');
     const kg = $('#k-gar .db-rot');
     if (kg) kg.innerHTML = s.garagens.length ? `${ico('building-warehouse', 'i-sm')} Na garagem` : `${ico('plug-connected-x', 'i-sm')} Offline`;
+    const kd = $('#k-gar .dica');
+    if (kd) kd.outerHTML = dc(s.garagens.length ? 'garagem' : 'offline');
   }
 
   function desenharHero() {
@@ -671,7 +677,7 @@ PAGINAS.dashboard = (() => {
     const p = [...S.itens.values()].filter((i) => i.pendente);
     box.hidden = !p.length;
     if (!p.length) return;
-    box.innerHTML = `<div class="card-head"><h2>${ico('device-cctv')} Aparelhos conectados sem cadastro <span class="pill">${p.length}</span></h2>
+    box.innerHTML = `<div class="card-head"><h2>${ico('device-cctv')} Aparelhos conectados sem cadastro <span class="pill">${p.length}</span> ${dc('avisoPendentes')}</h2>
       <button class="link" type="button" data-ir="sistema" data-q="aba=pendentes">Ver lista ${ico('chevron-right', 'i-sm')}</button></div>
       <p class="hint">Estes DVRs já estão falando com o servidor. Cadastre cada um (Aparelhos › Novo) e ligue a um veículo para entrar no histórico.</p>
       <div class="list compact">${p.map((i) => `<div class="list-item"><div class="list-ico" style="background:var(--amber-100);color:var(--amber-700)">${ico('device-cctv')}</div>
@@ -690,7 +696,7 @@ PAGINAS.dashboard = (() => {
     if (box.hidden) return;
     const partes = [['offline', 'offline'], ['camera', 'com câmera ou vídeo'], ['armazenamento', 'com cartão ou HD'], ['gps', 'com GPS'], ['energiaSinal', 'com alimentação ou sinal']]
       .filter(([k]) => sd[k]).map(([k, t]) => `${sd[k]} ${t}`);
-    box.innerHTML = `<div class="card-head"><h2>${ico('heartbeat')} ${sd.comProblema === 1 ? '1 aparelho precisa' : `${sd.comProblema} aparelhos precisam`} de atenção${sd.graves ? ` <span class="pill err">${sd.graves} grave${sd.graves > 1 ? 's' : ''}</span>` : ''}</h2>
+    box.innerHTML = `<div class="card-head"><h2>${ico('heartbeat')} ${sd.comProblema === 1 ? '1 aparelho precisa' : `${sd.comProblema} aparelhos precisam`} de atenção${sd.graves ? ` <span class="pill err">${sd.graves} grave${sd.graves > 1 ? 's' : ''}</span>` : ''} ${dc('avisoSaude')}</h2>
       <button class="btn btn-sm" type="button" data-ir="saude">${ico('heartbeat', 'i-sm')} Ver a saúde dos aparelhos</button></div>
       <p class="hint">${H(partes.join(' · '))}. A lista pode ser baixada em PDF para a manutenção.</p>`;
   }
@@ -704,7 +710,7 @@ PAGINAS.dashboard = (() => {
     if (box.hidden) return;
     const partes = [m.vencidos ? `${m.vencidos} vencido${m.vencidos > 1 ? 's' : ''}` : '', m.perto ? `${m.perto} vence${m.perto > 1 ? 'm' : ''} em breve` : ''].filter(Boolean).join(' e ');
     const ex = m.itens.slice(0, 3).map((x) => `${x.nome} (${x.veiculo || x.motorista})`).join(' · ');
-    box.innerHTML = `<div class="card-head"><h2>${ico('tool')} Manutenção e documentos: ${H(partes)}${m.vencidos ? ` <span class="pill err">${m.vencidos} vencido${m.vencidos > 1 ? 's' : ''}</span>` : ''}</h2>
+    box.innerHTML = `<div class="card-head"><h2>${ico('tool')} Manutenção e documentos: ${H(partes)}${m.vencidos ? ` <span class="pill err">${m.vencidos} vencido${m.vencidos > 1 ? 's' : ''}</span>` : ''} ${dc('avisoManut')}</h2>
       <button class="btn btn-sm" type="button" data-ir="manutencao">${ico('tool', 'i-sm')} Ver o que vence</button></div>
       <p class="hint">${H(ex)}${m.itens.length > 3 ? ' …' : ''}</p>`;
   }
@@ -714,7 +720,7 @@ PAGINAS.dashboard = (() => {
     if (!box) return;
     box.hidden = !S.pendentes;
     if (!S.pendentes) return;
-    box.innerHTML = `<div class="card-head"><h2>${ico('clock-pause')} ${S.pendentes === 1 ? '1 cadastro aguardando' : `${S.pendentes} cadastros aguardando`} a sua aprovação</h2>
+    box.innerHTML = `<div class="card-head"><h2>${ico('clock-pause')} ${S.pendentes === 1 ? '1 cadastro aguardando' : `${S.pendentes} cadastros aguardando`} a sua aprovação ${dc('avisoCadastros')}</h2>
       <button class="btn btn-primary btn-sm" type="button" data-ir="usuarios">${ico('user-check', 'i-sm')} Ver e aprovar</button></div>
       <p class="hint">Pessoas que criaram a conta na tela de entrada com o código da empresa. Elas só entram depois da aprovação.</p>`;
   }
