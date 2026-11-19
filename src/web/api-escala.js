@@ -93,7 +93,8 @@ function registrar(srv) {
     const r = lerEscala(texto);
     if (!r.servicos.length) {
       const e = r.erros[0];
-      throw new HttpErro(400, e ? `Nenhum serviço válido no arquivo. Linha ${e.linha}: ${e.motivo}.` : 'Nenhum serviço no arquivo.');
+      const modelo = ' Confira se o arquivo foi gerado no Globus em "Exportação da Escala Diária - Modelo Personalizado".';
+      throw new HttpErro(400, e ? `Nenhum serviço válido no arquivo. Linha ${e.linha}: ${e.motivo}.${modelo}` : `Nenhum serviço no arquivo.${modelo}`);
     }
     return { ...r, arquivo };
   }

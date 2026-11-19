@@ -9,6 +9,21 @@ const SIT_ESCALA = { aguardando: ['Aguardando', 'off'], em_servico: ['Em serviç
 const LAYOUT_GLOBUS = ['Data', 'Tipo de dia', 'Prefixo do veículo', 'Código da linha', 'Número oficial da linha', 'Nome da linha', 'Código do turno',
   'Chapa do motorista', 'Nome do motorista', 'Hora inicial do serviço', 'Hora final do serviço', 'Hora inicial do motorista',
   'Hora inicial do intervalo', 'Hora final do intervalo', 'Hora final do motorista', 'Local de pegada do motorista', 'Descrição do turno'];
+/** O modelo de exportação do Globus que gera o arquivo neste layout. */
+const MODELO_GLOBUS = 'Exportação da Escala Diária - Modelo Personalizado';
+/** As regras do arquivo (na janela de importação e em "Ver as regras"). */
+function regrasGlobus({ layoutAberto = false } = {}) {
+  return `<div class="gu-nota gu-n-dica es-modelo-nota">${ico('info-circle')}<div>
+      <b>Modelo do Globus:</b> gere o arquivo em <b>${H(MODELO_GLOBUS)}</b>, com estas regras:
+      <ul class="es-regras">
+        <li>arquivo de texto (<b>.txt</b>), <b>um serviço por linha</b>; a primeira linha pode ser o cabeçalho com os nomes dos campos;</li>
+        <li><b>${LAYOUT_GLOBUS.length} campos separados por ponto e vírgula (;)</b>, na ordem do layout abaixo;</li>
+        <li>data em <b>dd/mm/aaaa</b> e horas em <b>HH:MM</b> (hora menor que o início do serviço é do dia seguinte);</li>
+        <li><b>prefixo</b> igual ao do cadastro do veículo no FrotaGest; os zeros da frente são ignorados (0005755 = 5755);</li>
+        <li><b>chapa</b> igual à <b>matrícula</b> do motorista no FrotaGest.</li>
+      </ul></div></div>
+    <details class="es-layout" ${layoutAberto ? 'open' : ''}><summary>Layout do arquivo: os ${LAYOUT_GLOBUS.length} campos, nesta ordem</summary><ol>${LAYOUT_GLOBUS.map((x) => `<li>${H(x)}</li>`).join('')}</ol></details>`;
+}
 const hmEscala = (s) => (s ? String(s).slice(11, 16) : '');
 const diaBr = (d) => (d ? `${d.slice(8, 10)}/${d.slice(5, 7)}/${d.slice(0, 4)}` : '');
 
@@ -40,6 +55,8 @@ PAGINAS.escala = (() => {
             ${podeTela('escala', 'excluir') ? `<button class="btn btn-ghost" type="button" id="es-excluir" hidden>${ico('trash', 'i-sm')} Excluir a escala deste dia</button>` : ''}
           </div>
         </div>
+        ${podeTela('escala', 'incluir') ? `<p class="es-modelo" id="es-modelo">${ico('info-circle', 'i-sm')}<span>Layout de importação: no Globus, use a <b>${H(MODELO_GLOBUS)}</b>.</span>
+          <button class="btn btn-ghost btn-sm" type="button" id="es-regras">${ico('list-check', 'i-sm')} Ver as regras</button></p>` : ''}
         <p class="small muted es-info" id="es-info"></p>
       </section>
       <div class="kpis k6 es-kpis" id="es-kpis" hidden></div>
@@ -115,7 +132,7 @@ PAGINAS.escala = (() => {
       : '';
     if (!r.importacao) {
       mostrarVazio(`${ico('calendar-off')} <b>Nenhuma escala importada para ${diaBr(r.data)}</b>
-        <span>${podeTela('escala', 'incluir') ? 'Gere a escala no Globus e clique em <b>Importar escala do Globus</b>.' : 'Peça para quem importa a escala do Globus.'}${r.recentes.length ? ' Ou escolha um dos dias importados.' : ''}</span>`);
+        <span>${podeTela('escala', 'incluir') ? `Gere no Globus a <b>${H(MODELO_GLOBUS)}</b> e clique em <b>Importar escala do Globus</b>.` : 'Peça para quem importa a escala do Globus.'}${r.recentes.length ? ' Ou escolha um dos dias importados.' : ''}</span>`);
       return;
     }
     $('#es-vazio').innerHTML = '';
@@ -226,6 +243,11 @@ PAGINAS.escala = (() => {
   async function clique(ev) {
     const t = ev.target;
     if (t.closest('#es-importar')) { importar(); return; }
+    if (t.closest('#es-regras')) {
+      janela({ titulo: 'Layout de importação da escala', tamanho: 'lg', corpo: `<div class="es-imp">${regrasGlobus({ layoutAberto: true })}</div>`,
+        rodape: '<button class="btn btn-primary" type="button" data-fechar>Entendi</button>' });
+      return;
+    }
     if (t.closest('#es-excluir')) { excluir(); return; }
     const cad = t.closest('[data-cadastrar]');
     if (cad) {
@@ -268,9 +290,7 @@ PAGINAS.escala = (() => {
       titulo: 'Importar escala do Globus',
       tamanho: 'lg',
       corpo: `<div class="es-imp">
-        <p class="small muted" style="margin:0 0 10px">Arquivo de texto gerado pelo Globus, um serviço por linha, com os ${LAYOUT_GLOBUS.length} campos separados por ponto e vírgula (;).
-          O veículo é achado pelo <b>prefixo</b> (sem os zeros da frente) e o motorista pela <b>chapa</b>, que é a matrícula dele no FrotaGest.</p>
-        <details class="es-layout"><summary>Ver o layout do arquivo</summary><ol>${LAYOUT_GLOBUS.map((x) => `<li>${H(x)}</li>`).join('')}</ol></details>
+        ${regrasGlobus()}
         <label class="es-drop" id="es-drop">${ico('file-upload')}<span><b>Escolha o arquivo da escala</b><small>ou arraste para cá (.txt)</small></span>
           <input type="file" id="es-arquivo" accept=".txt,.csv,text/plain"></label>
         <div id="es-previa"></div>

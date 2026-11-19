@@ -820,7 +820,7 @@ const GUIA = (() => {
       resumo: 'A escala de trabalho gerada no Globus dentro do FrotaGest: linha, veículo, motorista e horários de cada serviço.',
       palavras: ['escala', 'globus', 'importar', 'importacao', 'turno', 'chapa', 'pegada', 'servico', 'plantao'],
       corpo: [
-        ['p', 'Cada linha do arquivo do Globus é um **serviço**: o veículo, a linha, o turno, o motorista (chapa e nome), a hora do serviço, a hora do motorista com o intervalo e o local de pegada. A tela mostra a escala do dia escolhido, com o veículo e o motorista achados no FrotaGest.'],
+        ['p', 'O arquivo vem do Globus, gerado em **Exportação da Escala Diária - Modelo Personalizado** (o botão {{Ver as regras}} da tela mostra o layout). Cada linha do arquivo é um **serviço**: o veículo, a linha, o turno, o motorista (chapa e nome), a hora do serviço, a hora do motorista com o intervalo e o local de pegada. A tela mostra a escala do dia escolhido, com o veículo e o motorista achados no FrotaGest.'],
         ['tabela', [
           ['No Globus', 'No FrotaGest'],
           ['Prefixo do veículo (ex.: 0005755)', 'Prefixo do veículo, sem os zeros da frente (5755)'],
@@ -840,11 +840,20 @@ const GUIA = (() => {
     },
     {
       id: 'escala-importar', titulo: 'Importar o arquivo da escala do Globus', tela: 'escala',
-      resumo: 'O layout de 17 campos, a prévia antes de gravar e o que acontece ao importar o mesmo dia de novo.',
-      palavras: ['importar', 'arquivo', 'txt', 'layout', 'globus', 'substituir', 'reimportar'],
+      resumo: 'O modelo do Globus (Exportação da Escala Diária - Modelo Personalizado), o layout de 17 campos, a prévia antes de gravar e o que acontece ao importar o mesmo dia de novo.',
+      palavras: ['importar', 'arquivo', 'txt', 'layout', 'globus', 'substituir', 'reimportar', 'exportacao', 'escala diaria', 'modelo personalizado'],
       corpo: [
+        ['dica', 'O FrotaGest lê o arquivo do Globus gerado em **Exportação da Escala Diária - Modelo Personalizado**. Outros modelos de exportação têm outro layout e não são lidos.'],
+        ['tabela', [
+          ['Regra do arquivo', 'Como deve vir'],
+          ['Formato', 'Texto (.txt), um serviço por linha; a primeira linha pode ser o cabeçalho'],
+          ['Campos', '17, separados por ponto e vírgula (;), na ordem do layout'],
+          ['Data e horas', 'Data em dd/mm/aaaa e horas em HH:MM (hora menor que o início do serviço é do dia seguinte)'],
+          ['Prefixo', 'O mesmo do cadastro do veículo; os zeros da frente são ignorados (0005755 = 5755)'],
+          ['Chapa', 'A matrícula do motorista no cadastro do FrotaGest'],
+        ]],
         ['passos', [
-          'Gere a escala no Globus com o layout de **17 campos separados por ponto e vírgula**: data; tipo de dia; prefixo; código da linha; número oficial da linha; nome da linha; código do turno; chapa; nome do motorista; hora inicial e final do serviço; hora inicial do motorista; hora inicial e final do intervalo; hora final do motorista; local de pegada; descrição do turno.',
+          'No Globus, gere a escala em **Exportação da Escala Diária - Modelo Personalizado**, com o layout de **17 campos separados por ponto e vírgula**: data; tipo de dia; prefixo; código da linha; número oficial da linha; nome da linha; código do turno; chapa; nome do motorista; hora inicial e final do serviço; hora inicial do motorista; hora inicial e final do intervalo; hora final do motorista; local de pegada; descrição do turno.',
           'Em **Procedimentos Auxiliares › Importação da Escala Globus**, clique em {{Importar escala do Globus}} (o master escolhe antes a empresa no topo).',
           'Escolha ou arraste o arquivo .txt. A **prévia** mostra os serviços, os veículos e motoristas encontrados, o que não bateu e as linhas com erro (que ficam de fora).',
           'Confirme em {{Importar}}. A tela abre na escala do dia importado.',
@@ -1086,7 +1095,8 @@ const GUIA = (() => {
       { g: 1, alvo: '#si-abas', titulo: 'Sistema', texto: 'Status do servidor, portas e protocolos, aparelhos pendentes, configurações (retenção, sessão, duas etapas, ordem das listas) e o log ao vivo.' },
     ],
     escala: [
-      { g: 1, alvo: ['#es-importar', '.es-topo'], titulo: 'Importação da Escala Globus', texto: 'Importe o arquivo da escala gerado no Globus. A prévia mostra o que bateu (prefixo e chapa) antes de gravar.' },
+      { g: 1, alvo: ['#es-importar', '.es-topo'], titulo: 'Importação da Escala Globus', texto: 'Importe o arquivo da escala gerado no Globus em **Exportação da Escala Diária - Modelo Personalizado**. A prévia mostra o que bateu (prefixo e chapa) antes de gravar.' },
+      { alvo: '#es-modelo', titulo: 'Layout de importação', texto: 'O modelo do Globus que gera o arquivo certo. Em **Ver as regras** estão o formato e os 17 campos, na ordem.' },
       { alvo: ['#es-dia', '.es-topo'], titulo: 'Dia da escala', texto: 'Escolha o dia, ou um dos dias já importados.' },
       { alvo: '#es-pend', titulo: 'O que falta para vincular', texto: 'Motoristas sem cadastro, com o botão Cadastrar (nome e chapa já preenchidos), e veículos com prefixo diferente.' },
       { g: 1, alvo: ['#es-tabela', '#es-vazio'], titulo: 'Serviços do dia', texto: 'Linha, veículo, motorista e horários. O botão **Vincular** coloca o motorista no veículo, um serviço por vez, até o fim do serviço.' },

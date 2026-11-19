@@ -1749,6 +1749,13 @@ body.em-tour .nova-versao, body.em-tour .dica-balao { display: none !important; 
 .es-sem-cad { display: flex; align-items: center; gap: 10px; justify-content: space-between; }
 .es-sem-cad .btn { flex: none; }
 .es-motivo { display: inline-block; max-width: 190px; white-space: normal; line-height: 1.35; cursor: help; }
+.es-modelo { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 10px 18px 14px; padding: 9px 12px; border-radius: 10px; background: var(--info-50); color: var(--info-ink); font-size: 13px; line-height: 1.45; }
+.es-modelo > .i { flex: none; }
+.es-modelo > span { flex: 1 1 260px; min-width: 0; }
+.es-modelo .btn { flex: none; color: inherit; }
+.es-modelo-nota { margin-top: 0; }
+.es-regras { margin: 6px 0 0 18px; padding: 0; }
+.es-regras li { margin: 2px 0; }
 .es-imp .es-layout { margin: 0 0 12px; font-size: 12.5px; }
 .es-imp .es-layout summary { cursor: pointer; color: var(--info-ink); font-weight: 600; }
 .es-imp .es-layout ol { columns: 2 220px; margin: 8px 0 0 18px; padding: 0; color: var(--ink-2); }

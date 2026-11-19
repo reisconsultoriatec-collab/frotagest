@@ -321,7 +321,9 @@ Em **Operação › Links de acompanhamento** (ou **Compartilhar localização**
 ## 3.20 Procedimentos Auxiliares › Importação da Escala Globus
 
 - **Menu novo, Procedimentos Auxiliares**, com a tela **Importação da Escala Globus**: importa o arquivo de texto da escala de trabalho gerada no Globus.
-  - O layout tem **17 campos separados por ";"**: data, tipo de dia, prefixo, código e número da linha, nome da linha, turno, chapa e nome do motorista, horas do serviço, do motorista e do intervalo, local de pegada e descrição do turno. A janela de importação mostra o layout.
+  - **Modelo do Globus:** o arquivo é gerado no Globus em **Exportação da Escala Diária - Modelo Personalizado**. A tela avisa qual é o layout de importação, e o botão **Ver as regras** mostra o formato e os campos. A janela de importação e o erro de arquivo fora do layout também lembram o modelo.
+  - O layout tem **17 campos separados por ";"**: data, tipo de dia, prefixo, código e número da linha, nome da linha, turno, chapa e nome do motorista, horas do serviço, do motorista e do intervalo, local de pegada e descrição do turno.
+  - Regras: arquivo .txt com um serviço por linha, data em dd/mm/aaaa, horas em HH:MM, prefixo igual ao do cadastro (sem os zeros da frente) e chapa igual à matrícula do motorista.
   - O arquivo pode vir em **UTF-8 ou Windows-1252**; a tela lê os dois. Uma linha de cabeçalho é ignorada.
 - **Como o FrotaGest acha cada um:**
   - o **veículo** pelo **prefixo**, sem os zeros da frente (`0005755` do Globus = `5755` no cadastro);
